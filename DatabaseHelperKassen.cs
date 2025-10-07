@@ -107,7 +107,6 @@ WHERE t.name = 'TKassenbuch'";
         {
             using (var cmd = _connection.CreateCommand())
             {
-                // Verwende QUOTENAME um saubere [Schema].[Tabelle] zurückzugeben (verhindert Anführungszeichen-Fehler)
                 cmd.CommandText = @"
 SELECT QUOTENAME(s.name) + '.' + QUOTENAME(t.name)
 FROM sys.tables t
@@ -603,16 +602,21 @@ WHERE Belegnummer=@bnr AND (Verbucht=0 OR Verbucht IS NULL)";
             }
         }
 
+        // -------- Angepasste Methoden: AutomatenName -> DeviceID ---------
+
         public async Task<DataTable> GetKassenListeAsync(IEnumerable<string> automatenNamen)
         {
+            // Parameter-Reuse: Liste enthält jetzt DeviceIDs (als String); parse zu Byte (tinyint)
             await EnsureOpenAsync();
-            var names = new List<string>();
-            foreach (var n in automatenNamen ?? Array.Empty<string>()) if (!string.IsNullOrWhiteSpace(n)) names.Add(n);
-            if (names.Count == 0) return new DataTable();
+            var ids = new List<byte>();
+            foreach (var n in automatenNamen ?? Array.Empty<string>())
+            {
+                if (byte.TryParse((n ?? string.Empty).Trim(), out var b)) ids.Add(b);
+            }
+            if (ids.Count == 0) return new DataTable();
 
             var paramNames = new List<string>();
-            int i = 0;
-            foreach (var _ in names) paramNames.Add($"@AN{i++}");
+            int i = 0; foreach (var _ in ids) paramNames.Add($"@D{i++}");
             string inClause = string.Join(", ", paramNames);
 
             using (var cmd = _connection.CreateCommand())
@@ -625,23 +629,24 @@ WHERE Belegnummer=@bnr AND (Verbucht=0 OR Verbucht IS NULL)";
             WHEN TRY_CONVERT(int, LTRIM(RTRIM(k.FirmenId))) IS NULL THEN NULL
             ELSE TRY_CONVERT(int, LTRIM(RTRIM(k.FirmenId)))
         END AS FirmenId,
-        k.AutomatenName,
+        k.DeviceID,
         k.Kassenbestand,
         k.ErfasstAm
     FROM {_tblKassenbuch} k WITH (NOLOCK)
-    WHERE k.AutomatenName IN ({inClause})
+    WHERE k.DeviceID IN ({inClause})
 ), x AS (
     SELECT 
         FirmenId,
-        AutomatenName,
+        DeviceID,
         Kassenbestand,
         ErfasstAm,
-        ROW_NUMBER() OVER (PARTITION BY FirmenId, AutomatenName ORDER BY ErfasstAm DESC) rn
+        ROW_NUMBER() OVER (PARTITION BY FirmenId, DeviceID ORDER BY ErfasstAm DESC) rn
     FROM raw
 )
 SELECT 
     x.FirmenId,
-    x.AutomatenName,
+    x.DeviceID,
+    CAST(x.DeviceID AS varchar(10)) AS AutomatenName, -- Alias für Abwärtskompatibilität
     CASE 
         WHEN x.FirmenId = -1 THEN 'Personalguthaben'
         WHEN x.FirmenId BETWEEN 0 AND 255 THEN ISNULL(m.ManName, 'ID ' + CAST(x.FirmenId AS varchar(10)))
@@ -653,50 +658,57 @@ SELECT
 FROM x
 LEFT JOIN {_tblMandanten} m ON (x.FirmenId BETWEEN 0 AND 255 AND m.ManID = x.FirmenId)
 WHERE x.rn = 1
-ORDER BY ManName ASC, x.AutomatenName ASC;";
+ORDER BY ManName ASC, x.DeviceID ASC;";
 
-                i = 0; foreach (var n in names) cmd.Parameters.AddWithValue($"@AN{i++}", n);
+                i = 0; foreach (var id in ids) cmd.Parameters.AddWithValue($"@D{i++}", id);
 
                 using (var rdr = await cmd.ExecuteReaderAsync()) { var dt = new DataTable(); dt.Load(rdr); return dt; }
             }
         }
 
-        public async Task<decimal> GetAnfangsbestandAsync(int firmenId, string automatenName, DateTime tag)
+        public async Task<decimal> GetAnfangsbestandAsync(int firmenId, string automatenNameAlsDeviceId, DateTime tag)
         {
-            await EnsureOpenAsync(); var dayStart = new DateTime(tag.Year, tag.Month, tag.Day, 0, 0, 0);
+            await EnsureOpenAsync();
+            byte deviceId = 0; byte.TryParse(automatenNameAlsDeviceId ?? string.Empty, out deviceId);
+            var dayStart = new DateTime(tag.Year, tag.Month, tag.Day, 0, 0, 0);
             using (var cmd = _connection.CreateCommand())
             {
-                cmd.CommandText = $@"SELECT TOP 1 Kassenbestand FROM {_tblKassenbuch} WITH (NOLOCK) WHERE FirmenId = @FID AND AutomatenName = @AN AND ErfasstAm < @DayStart ORDER BY ErfasstAm DESC;";
+                cmd.CommandText = $"SELECT TOP 1 Kassenbestand FROM {_tblKassenbuch} WITH (NOLOCK) WHERE FirmenId = @FID AND DeviceID = @Dev AND ErfasstAm < @DayStart ORDER BY ErfasstAm DESC;";
                 cmd.Parameters.AddWithValue("@FID", firmenId);
-                cmd.Parameters.AddWithValue("@AN", automatenName ?? "");
+                cmd.Parameters.AddWithValue("@Dev", deviceId);
                 cmd.Parameters.AddWithValue("@DayStart", dayStart);
                 var res = await cmd.ExecuteScalarAsync(); return (res == null || res == DBNull.Value) ? 0m : Convert.ToDecimal(res);
             }
         }
 
-        public async Task<decimal> GetEndbestandAsync(int firmenId, string automatenName, DateTime tag)
+        public async Task<decimal> GetEndbestandAsync(int firmenId, string automatenNameAlsDeviceId, DateTime tag)
         {
-            await EnsureOpenAsync(); var dayEnd = new DateTime(tag.Year, tag.Month, tag.Day, 23, 59, 59);
+            await EnsureOpenAsync();
+            byte deviceId = 0; byte.TryParse(automatenNameAlsDeviceId ?? string.Empty, out deviceId);
+            var dayEnd = new DateTime(tag.Year, tag.Month, tag.Day, 23, 59, 59);
             using (var cmd = _connection.CreateCommand())
             {
-                cmd.CommandText = $@"SELECT TOP 1 Kassenbestand FROM {_tblKassenbuch} WITH (NOLOCK) WHERE FirmenId = @FID AND AutomatenName = @AN AND ErfasstAm <= @DayEnd ORDER BY ErfasstAm DESC;";
+                cmd.CommandText = $"SELECT TOP 1 Kassenbestand FROM {_tblKassenbuch} WITH (NOLOCK) WHERE FirmenId = @FID AND DeviceID = @Dev AND ErfasstAm <= @DayEnd ORDER BY ErfasstAm DESC;";
                 cmd.Parameters.AddWithValue("@FID", firmenId);
-                cmd.Parameters.AddWithValue("@AN", automatenName ?? "");
+                cmd.Parameters.AddWithValue("@Dev", deviceId);
                 cmd.Parameters.AddWithValue("@DayEnd", dayEnd);
                 var res = await cmd.ExecuteScalarAsync(); return (res == null || res == DBNull.Value) ? 0m : Convert.ToDecimal(res);
             }
         }
 
-        public async Task<DataTable> GetKassenTagEintraegeAsync(int firmenId, string automatenName, DateTime tag)
+        public async Task<DataTable> GetKassenTagEintraegeAsync(int firmenId, string automatenNameAlsDeviceId, DateTime tag)
         {
-            await EnsureOpenAsync(); var dayStart = new DateTime(tag.Year, tag.Month, tag.Day, 0, 0, 0); var dayEnd = new DateTime(tag.Year, tag.Month, tag.Day, 23, 59, 59);
+            await EnsureOpenAsync();
+            byte deviceId = 0; byte.TryParse(automatenNameAlsDeviceId ?? string.Empty, out deviceId);
+            var dayStart = new DateTime(tag.Year, tag.Month, tag.Day, 0, 0, 0);
+            var dayEnd = new DateTime(tag.Year, tag.Month, tag.Day, 23, 59, 59);
             using (var cmd = _connection.CreateCommand())
             {
                 cmd.CommandText = $@"
 SELECT 
     Belegnummer,
-    SchichtId,       -- NEU für Export (RechNr = FhzId-SchichtId)
-    FhzId,           -- NEU für Export
+    SchichtId,
+    FhzId,
     ErfasstAm,
     Typ,
     Buchungstext,
@@ -712,39 +724,41 @@ SELECT
     ISNULL(RevIsOld, 0) AS RevIsOld,
     ISNULL(Festgeschrieben, 0) AS Festgeschrieben
 FROM {_tblKassenbuch} WITH (NOLOCK)
-WHERE FirmenId = @FID AND AutomatenName = @AN AND ErfasstAm >= @From AND ErfasstAm <= @To
+WHERE FirmenId = @FID AND DeviceID = @Dev AND ErfasstAm >= @From AND ErfasstAm <= @To
 ORDER BY ErfasstAm ASC, Belegnummer ASC;";
                 cmd.Parameters.AddWithValue("@FID", firmenId);
-                cmd.Parameters.AddWithValue("@AN", automatenName ?? "");
+                cmd.Parameters.AddWithValue("@Dev", deviceId);
                 cmd.Parameters.AddWithValue("@From", dayStart);
                 cmd.Parameters.AddWithValue("@To", dayEnd);
                 using (var rdr = await cmd.ExecuteReaderAsync()) { var dt = new DataTable(); dt.Load(rdr); return dt; }
             }
         }
 
-        public async Task<int> LockDayAsync(int firmenId, string automatenName, DateTime tag)
+        public async Task<int> LockDayAsync(int firmenId, string automatenNameAlsDeviceId, DateTime tag)
         {
             await EnsureOpenAsync();
+            byte deviceId = 0; byte.TryParse(automatenNameAlsDeviceId ?? string.Empty, out deviceId);
             using (var cmd = _connection.CreateCommand())
             {
                 var dayEnd = new DateTime(tag.Year, tag.Month, tag.Day, 23, 59, 59);
-                cmd.CommandText = $@"UPDATE {_tblKassenbuch} SET Festgeschrieben = 1 WHERE FirmenId = @FID AND AutomatenName = @AN AND ErfasstAm <= @DayEnd AND ISNULL(Festgeschrieben,0) = 0";
+                cmd.CommandText = $"UPDATE {_tblKassenbuch} SET Festgeschrieben = 1 WHERE FirmenId = @FID AND DeviceID = @Dev AND ErfasstAm <= @DayEnd AND ISNULL(Festgeschrieben,0) = 0";
                 cmd.Parameters.AddWithValue("@FID", firmenId);
-                cmd.Parameters.AddWithValue("@AN", automatenName ?? "");
+                cmd.Parameters.AddWithValue("@Dev", deviceId);
                 cmd.Parameters.AddWithValue("@DayEnd", dayEnd);
                 return await cmd.ExecuteNonQueryAsync();
             }
         }
 
-        public async Task<bool> IsLockedUntilAsync(int firmenId, string automatenName, DateTime tag)
+        public async Task<bool> IsLockedUntilAsync(int firmenId, string automatenNameAlsDeviceId, DateTime tag)
         {
             await EnsureOpenAsync();
+            byte deviceId = 0; byte.TryParse(automatenNameAlsDeviceId ?? string.Empty, out deviceId);
             using (var cmd = _connection.CreateCommand())
             {
                 var dayEnd = new DateTime(tag.Year, tag.Month, tag.Day, 23, 59, 59);
-                cmd.CommandText = $@"SELECT COUNT(1) FROM {_tblKassenbuch} WHERE FirmenId = @FID AND AutomatenName = @AN AND ErfasstAm <= @DayEnd AND ISNULL(Festgeschrieben,0) = 0";
+                cmd.CommandText = $"SELECT COUNT(1) FROM {_tblKassenbuch} WHERE FirmenId = @FID AND DeviceID = @Dev AND ErfasstAm <= @DayEnd AND ISNULL(Festgeschrieben,0) = 0";
                 cmd.Parameters.AddWithValue("@FID", firmenId);
-                cmd.Parameters.AddWithValue("@AN", automatenName ?? "");
+                cmd.Parameters.AddWithValue("@Dev", deviceId);
                 cmd.Parameters.AddWithValue("@DayEnd", dayEnd);
                 var o = await cmd.ExecuteScalarAsync();
                 var cnt = (o == null || o == DBNull.Value) ? 0 : Convert.ToInt32(o);
@@ -752,6 +766,7 @@ ORDER BY ErfasstAm ASC, Belegnummer ASC;";
             }
         }
 
+        // Revision / Split Methoden bleiben unverändert, da sie Belegnummer-basiert arbeiten
         public async Task ReviseSingleAsync(string belegnummer, string buchungstext, int? kost1, int? kost2, int? konto,
             decimal betrag19, decimal betrag7, decimal betrag0)
         {
@@ -1034,7 +1049,7 @@ WHERE Id=@Id; SELECT @Id;";
         }
     }
 
-    // DTO fr dieses Projekt
+    // DTO für dieses Projekt
     public class PersonalInfo
     {
         public int PID { get; set; }

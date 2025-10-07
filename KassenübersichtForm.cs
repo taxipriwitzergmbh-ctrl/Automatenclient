@@ -100,7 +100,7 @@ namespace TaMi_Kassenclient
             pnlKassen.Controls.Clear();
 
             if (AppSettings.AutomatenNamen.Count == 0)
-                AppSettings.LoadAutomatenNamenFromIni();
+                AppSettings.LoadAutomatenNamenFromIni(); // Enthält jetzt DeviceIDs als String
 
             try
             {
@@ -121,18 +121,19 @@ namespace TaMi_Kassenclient
                         return;
                     }
 
-                    // Gruppierung nach AutomatenName, "Personalguthaben" immer als letzte Gruppe
+                    // Gruppierung nach DeviceID, Personalguthaben (FirmenId -1) zuletzt
                     var gruppen = dt.AsEnumerable()
-                        .GroupBy(r => r.Field<string>("AutomatenName"))
-                        .OrderBy(g => string.Equals(g.Key, "Personalguthaben", StringComparison.OrdinalIgnoreCase) ? 1 : 0)
-                        .ThenBy(g => g.Key);
+                        .GroupBy(r => r.Field<byte>("DeviceID"))
+                        .OrderBy(g => 0) // DeviceID-Gruppen normal sortieren
+                        .ToList();
 
                     foreach (var gruppe in gruppen)
                     {
-                        // Überschrift für die Gruppe
+                        // Überschrift: "Gerät X"
+                        string headerText = "Gerät " + gruppe.Key;
                         var lblGroup = new Label
                         {
-                            Text = gruppe.Key,
+                            Text = headerText,
                             AutoSize = false,
                             Width = pnlKassen.Width - 40,
                             Height = 32,
@@ -143,7 +144,7 @@ namespace TaMi_Kassenclient
                         };
                         pnlKassen.Controls.Add(lblGroup);
 
-                        // Sortierung: erst FirmenId >= 0, dann FirmenId < 0 (jeweils aufsteigend)
+                        // Sortierung: erst FirmenId >= 0, dann FirmenId < 0
                         var sortierteButtons = gruppe
                             .OrderBy(r => Convert.ToInt32(r["FirmenId"]) < 0 ? 1 : 0)
                             .ThenBy(r => Convert.ToInt32(r["FirmenId"]))
@@ -151,8 +152,8 @@ namespace TaMi_Kassenclient
 
                         foreach (var row in sortierteButtons)
                         {
-                            int fid = Convert.ToInt32(row["FirmenId"]);
-                            string auto = row["AutomatenName"] as string ?? "";
+                            int fid = row["FirmenId"] == DBNull.Value ? 0 : Convert.ToInt32(row["FirmenId"]);
+                            byte deviceId = row.Field<byte>("DeviceID");
                             string manName = row["ManName"] as string ?? ("ID " + fid);
                             decimal kb = row["Kassenbestand"] == DBNull.Value ? 0m : Convert.ToDecimal(row["Kassenbestand"]);
 
@@ -166,19 +167,19 @@ namespace TaMi_Kassenclient
                                 ForeColor = Color.White,
                                 Font = new Font("Segoe UI Variable", 12F, FontStyle.Bold),
                                 TextAlign = ContentAlignment.MiddleLeft,
-                                Tag = new { FirmenId = fid, AutomatenName = auto, KassenName = manName }
+                                Tag = new { FirmenId = fid, DeviceID = deviceId, KassenName = manName }
                             };
                             btn.FlatAppearance.BorderSize = 0;
 
-                            btn.Text = $"{manName} – {auto}\r\nBestand: {kb:C2}";
+                            btn.Text = $"{manName} – Gerät {deviceId}\r\nBestand: {kb:C2}";
 
                             btn.Click += (s, e) =>
                             {
                                 dynamic t = btn.Tag;
                                 int _fid = (int)t.FirmenId;
-                                string _auto = (string)t.AutomatenName;
+                                byte _dev = (byte)t.DeviceID;
                                 string _name = (string)t.KassenName;
-                                using (var frm = new DayViewForm(_fid, _name, _auto))
+                                using (var frm = new DayViewForm(_fid, _name, _dev.ToString()))
                                 {
                                     frm.ShowDialog(this);
                                 }
