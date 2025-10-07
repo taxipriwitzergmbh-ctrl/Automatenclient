@@ -1,4 +1,4 @@
-using System;
+ï»¿using System;
 using System.Data;
 using System.Drawing;
 using System.Windows.Forms;
@@ -35,7 +35,7 @@ namespace TaMi_Kassenclient
         private int _currentPid = 0;
         private bool _suppressEvents = false; // Neu: verhindert Initial-Handler
 
-        // NEU: Mehrzeichen-Suchpuffer für cboPerson
+        // NEU: Mehrzeichen-Suchpuffer fÃ¼r cboPerson
         private string _personTypeBuffer = string.Empty;
         private DateTime _personTypeLastKey = DateTime.MinValue;
         private const int PersonTypeTimeoutMs = 1000; // 1s Timeout
@@ -64,15 +64,15 @@ namespace TaMi_Kassenclient
         private Button btnCreatePayment;
         private Button btnCreatePreset; // NEU
 
-        // Overlay für neue Vorlage
+        // Overlay fÃ¼r neue Vorlage
         private Panel overlay;
         private ComboBox ovType;     // NEU: Typ in Vorlage
         private TextBox ovName;      // NEU: Vorlagenname
         private TextBox ovTxt, ovK1, ovK2, ovKto;
-        private ComboBox ovMwst;     // NEU MwSt für Vorlage
+        private ComboBox ovMwst;     // NEU MwSt fÃ¼r Vorlage
         private Button ovSave, ovCancel;
 
-        // Aktionen für offene Zahlungen
+        // Aktionen fÃ¼r offene Zahlungen
         private Button btnEditPayment;
         private Button btnDeletePayment;
 
@@ -145,14 +145,14 @@ namespace TaMi_Kassenclient
                 btnClose.Click += (s, e) => Close();
                 headerPanel.Controls.Add(btnClose);
 
-                btnMinimize = new Button { Text = "–", Font = new Font("Segoe UI", 16F, FontStyle.Bold), ForeColor = Color.White, BackColor = Color.Transparent, FlatStyle = FlatStyle.Flat, Size = new Size(48, 48), Location = new Point(ClientSize.Width - 112, 8), TabStop = false, Anchor = AnchorStyles.Top | AnchorStyles.Right };
+                btnMinimize = new Button { Text = "â€“", Font = new Font("Segoe UI", 16F, FontStyle.Bold), ForeColor = Color.White, BackColor = Color.Transparent, FlatStyle = FlatStyle.Flat, Size = new Size(48, 48), Location = new Point(ClientSize.Width - 112, 8), TabStop = false, Anchor = AnchorStyles.Top | AnchorStyles.Right };
                 btnMinimize.FlatAppearance.BorderSize = 0;
                 btnMinimize.FlatAppearance.MouseOverBackColor = Color.FromArgb(33, 150, 243, 80);
                 btnMinimize.Click += (s, e) => WindowState = FormWindowState.Minimized;
                 headerPanel.Controls.Add(btnMinimize);
                 headerPanel.ResumeLayout();
 
-                // Rundung später in OnShown setzen (vermeidet schwarzes Flackern beim Erzeugen)
+                // Rundung spÃ¤ter in OnShown setzen (vermeidet schwarzes Flackern beim Erzeugen)
                 // try { Region = Region.FromHrgn(CreateRoundRectRgn(0, 0, Width, Height, 20, 20)); } catch { }
 
                 // Linke Seite: strukturierte Gruppen
@@ -183,10 +183,10 @@ namespace TaMi_Kassenclient
                 grpOpenPayments.ResumeLayout();
                 Controls.Add(grpOpenPayments);
 
-                // Edit/Löschen Buttons unter dem Grid für Offene Zahlungen
-                btnEditPayment = new Button { Text = "Auswahl ändern", Location = new Point(540, 0), Size = new Size(140, 28), BackColor = Color.FromArgb(3,155,229), ForeColor = Color.White, FlatStyle = FlatStyle.Flat };
+                // Edit/LÃ¶schen Buttons unter dem Grid fÃ¼r Offene Zahlungen
+                btnEditPayment = new Button { Text = "Auswahl Ã¤ndern", Location = new Point(540, 0), Size = new Size(140, 28), BackColor = Color.FromArgb(3,155,229), ForeColor = Color.White, FlatStyle = FlatStyle.Flat };
                 btnEditPayment.FlatAppearance.BorderSize = 0; btnEditPayment.Click += async (s, e) => await EditSelectedPaymentAsync();
-                btnDeletePayment = new Button { Text = "Auswahl löschen", Location = new Point(688, 0), Size = new Size(140, 28), BackColor = Color.FromArgb(229,57,53), ForeColor = Color.White, FlatStyle = FlatStyle.Flat };
+                btnDeletePayment = new Button { Text = "Auswahl lÃ¶schen", Location = new Point(688, 0), Size = new Size(140, 28), BackColor = Color.FromArgb(229,57,53), ForeColor = Color.White, FlatStyle = FlatStyle.Flat };
                 btnDeletePayment.FlatAppearance.BorderSize = 0; btnDeletePayment.Click += async (s, e) => await DeleteSelectedPaymentAsync();
                 btnEditPayment.Enabled = false;
                 btnDeletePayment.Enabled = false;
@@ -194,7 +194,7 @@ namespace TaMi_Kassenclient
                 Controls.Add(btnDeletePayment);
 
                 // NEU: Personalguthaben-Verlauf unter den Buttons
-                grpGuthabenHistory = new GroupBox { Text = "Personalguthaben – Verlauf", Location = new Point(540, grpOpenPayments.Bottom + 48), Size = new Size(ClientSize.Width - 564, 280), Anchor = AnchorStyles.Top | AnchorStyles.Left | AnchorStyles.Right };
+                grpGuthabenHistory = new GroupBox { Text = "Personalguthaben â€“ Verlauf", Location = new Point(540, grpOpenPayments.Bottom + 48), Size = new Size(ClientSize.Width - 564, 280), Anchor = AnchorStyles.Top | AnchorStyles.Left | AnchorStyles.Right };
                 grpGuthabenHistory.SuspendLayout();
                 gvGuthabenHistory = new DataGridView { Location = new Point(10, 24), Size = new Size(grpGuthabenHistory.Width - 20, grpGuthabenHistory.Height - 34), ReadOnly = true, AllowUserToAddRows = false, AllowUserToDeleteRows = false, AutoSizeColumnsMode = DataGridViewAutoSizeColumnsMode.None, Anchor = AnchorStyles.Top | AnchorStyles.Left | AnchorStyles.Right };
                 StyleGrid(gvGuthabenHistory); EnableDgvDoubleBuffer(gvGuthabenHistory);
@@ -203,7 +203,7 @@ namespace TaMi_Kassenclient
                 Controls.Add(grpGuthabenHistory);
 
                 // Saldo-Label rechts oben neben dem Verlauf
-                lblSaldoAktuell = new Label { AutoSize = true, Text = "Saldo: 0,00 €", Font = new Font("Segoe UI", 10F, FontStyle.Bold), ForeColor = Color.FromArgb(33,37,41), Location = new Point(grpGuthabenHistory.Left + 200, grpGuthabenHistory.Top - 18), Anchor = AnchorStyles.Top | AnchorStyles.Right };
+                lblSaldoAktuell = new Label { AutoSize = true, Text = "Saldo: 0,00 â‚¬", Font = new Font("Segoe UI", 10F, FontStyle.Bold), ForeColor = Color.FromArgb(33,37,41), Location = new Point(grpGuthabenHistory.Left + 200, grpGuthabenHistory.Top - 18), Anchor = AnchorStyles.Top | AnchorStyles.Right };
                 Controls.Add(lblSaldoAktuell);
 
                 // Rekursiv DoubleBuffer aktivieren
@@ -217,7 +217,7 @@ namespace TaMi_Kassenclient
             finally { ResumeLayout(true); }
         }
 
-        // Inkrementelle Mehrzeichen-Suche für cboPerson
+        // Inkrementelle Mehrzeichen-Suche fÃ¼r cboPerson
         private void CboPerson_KeyPress(object sender, KeyPressEventArgs e)
         {
             if (cboPerson == null || cboPerson.Items.Count == 0) return;
@@ -258,7 +258,7 @@ namespace TaMi_Kassenclient
             }
         }
 
-        // Umbenannt: frühere doppelte OnShown-Implementierung als Hilfsmethode
+        // Umbenannt: frÃ¼here doppelte OnShown-Implementierung als Hilfsmethode
         private void OnShown_InitialLayout(EventArgs e)
         {
             try
@@ -332,7 +332,7 @@ namespace TaMi_Kassenclient
                         await LoadPersonalAsync();
                     }
                 };
-                // NEU: KeyPress Handler für Mehrzeichen-Suche
+                // NEU: KeyPress Handler fÃ¼r Mehrzeichen-Suche
                 cboPerson.KeyPress += CboPerson_KeyPress;
 
                 // Gruppe Stammdaten
@@ -367,18 +367,31 @@ namespace TaMi_Kassenclient
                 startY += rowH;
                 var lblFcode = new Label { Text = "Fahrercode:", Location = new Point(12, startY + 6), AutoSize = true, Width = labelW };
                 grpStammdaten.Controls.Add(lblFcode);
-                txtFahrercode = new TextBox { Location = new Point(fieldX, startY), Width = 160, Font = new Font("Segoe UI", 14F), TextAlign = HorizontalAlignment.Center, UseSystemPasswordChar = true, MaxLength = 8 };
+                // Fahrercode Feld auf gleiche Breite wie NFC (200)
+                txtFahrercode = new TextBox { Location = new Point(fieldX, startY), Width = 200, Font = new Font("Segoe UI", 14F), TextAlign = HorizontalAlignment.Center, UseSystemPasswordChar = true, MaxLength = 8 };
                 grpStammdaten.Controls.Add(txtFahrercode);
-                btnShowHideCode = new Button { Text = "??", Location = new Point(fieldX + 166, startY - 1), Size = new Size(36, 30), FlatStyle = FlatStyle.Flat, BackColor = Color.FromArgb(245,247,250) };
-                btnShowHideCode.FlatAppearance.BorderSize = 0; btnShowHideCode.Click += (s,e) => { txtFahrercode.UseSystemPasswordChar = !txtFahrercode.UseSystemPasswordChar; }; grpStammdaten.Controls.Add(btnShowHideCode);
-                btnClearCode = new Button { Text = "Löschen", Location = new Point(fieldX + 206, startY - 1), Size = new Size(88, 30), FlatStyle = FlatStyle.Flat, BackColor = Color.FromArgb(229,57,53), ForeColor = Color.White, Font = new Font("Segoe UI", 9.5F, FontStyle.Bold) };
+                // Symbol Button (View/Lock) mit Segoe MDL2 Assets statt Emoji
+                btnShowHideCode = new Button { Text = "\uE052", Location = new Point(fieldX + 206, startY - 1), Size = new Size(34, 30), FlatStyle = FlatStyle.Flat, BackColor = Color.FromArgb(245, 247, 250), Font = new Font("Segoe MDL2 Assets", 14F), UseVisualStyleBackColor = false }; // \uE052 = View
+                btnShowHideCode.FlatAppearance.BorderSize = 0;
+                btnShowHideCode.Click += (s,e) => {
+                    txtFahrercode.UseSystemPasswordChar = !txtFahrercode.UseSystemPasswordChar;
+                    // \uE052 View, \uE72E Lock
+                    btnShowHideCode.Text = txtFahrercode.UseSystemPasswordChar ? "\uE052" : "\uE72E";
+                };
+                grpStammdaten.Controls.Add(btnShowHideCode);
+                btnClearCode = new Button { Text = "LÃ¶schen", Location = new Point(btnShowHideCode.Right + 6, startY - 1), Size = new Size(88, 30), FlatStyle = FlatStyle.Flat, BackColor = Color.FromArgb(229,57,53), ForeColor = Color.White, Font = new Font("Segoe UI", 9.5F, FontStyle.Bold) };
                 btnClearCode.FlatAppearance.BorderSize = 0; btnClearCode.Click += (s,e) => txtFahrercode.Text = string.Empty; grpStammdaten.Controls.Add(btnClearCode);
 
                 startY += rowH + 6;
-                btnSave = new Button { Text = "Speichern", Location = new Point(16, startY), Size = new Size(200, 40), BackColor = Color.FromArgb(33,150,243), ForeColor = Color.White, FlatStyle = FlatStyle.Flat, Font = new Font("Segoe UI", 12F, FontStyle.Bold) };
-                btnSave.FlatAppearance.BorderSize = 0; btnSave.Click += async (s,e) => await SaveAsync(); grpStammdaten.Controls.Add(btnSave);
+                // Speichern Button verkleinert & zentriert
+                btnSave = new Button { Text = "Speichern", Size = new Size(160, 36), BackColor = Color.FromArgb(33,150,243), ForeColor = Color.White, FlatStyle = FlatStyle.Flat, Font = new Font("Segoe UI", 11F, FontStyle.Bold) };
+                btnSave.FlatAppearance.BorderSize = 0;
+                btnSave.Location = new Point((grpStammdaten.ClientSize.Width - btnSave.Width)/2, startY);
+                btnSave.Click += async (s,e) => await SaveAsync();
+                grpStammdaten.Controls.Add(btnSave);
+                grpStammdaten.Resize += (s,e)=> { if(btnSave!=null) btnSave.Left = (grpStammdaten.ClientSize.Width - btnSave.Width)/2; };
 
-                // Neue Zahlung (schmal, keine Überlappung rechts)
+                // Neue Zahlung (schmal, keine Ãœberlappung rechts)
                 grpNewPayment = new GroupBox { Text = "Neue Zahlung", Location = new Point(16, grpStammdaten.Bottom + 12), Size = new Size(470, 320) };
                 Controls.Add(grpNewPayment);
 
@@ -433,7 +446,7 @@ namespace TaMi_Kassenclient
                 btnCreatePayment.FlatAppearance.BorderSize = 0; btnCreatePayment.Click += async (s, e) => await CreatePaymentWithPresetAsync();
                 grpNewPayment.Controls.Add(btnCreatePayment);
 
-                // MWSt-Auswahl befüllen (falls noch nicht)
+                // MWSt-Auswahl befÃ¼llen (falls noch nicht)
                 if (cboNewMwst != null && cboNewMwst.Items.Count == 0)
                 {
                     cboNewMwst.Items.AddRange(new object[] { "19", "7", "0" });
@@ -539,7 +552,7 @@ namespace TaMi_Kassenclient
 
             var btnNeu = new Button { Text = "Neu", Left = 24, Width = 80, Height = 34, Top = body.Height - 46, Anchor = AnchorStyles.Left | AnchorStyles.Bottom, BackColor = Color.FromArgb(33,150,243), ForeColor = Color.White, FlatStyle = FlatStyle.Flat };
             btnNeu.FlatAppearance.BorderSize = 0;
-            var btnDelete = new Button { Text = "Löschen", Left = btnNeu.Right + 8, Width = 90, Height = 34, Top = body.Height - 46, Anchor = AnchorStyles.Left | AnchorStyles.Bottom, BackColor = Color.FromArgb(229,57,53), ForeColor = Color.White, FlatStyle = FlatStyle.Flat };
+            var btnDelete = new Button { Text = "LÃ¶schen", Left = btnNeu.Right + 8, Width = 90, Height = 34, Top = body.Height - 46, Anchor = AnchorStyles.Left | AnchorStyles.Bottom, BackColor = Color.FromArgb(229,57,53), ForeColor = Color.White, FlatStyle = FlatStyle.Flat };
             btnDelete.FlatAppearance.BorderSize = 0; body.Controls.Add(btnNeu); body.Controls.Add(btnDelete);
 
             int baseX = 260; int wLabel = 60; int curY = 14; int spacing = 30;
@@ -607,12 +620,12 @@ namespace TaMi_Kassenclient
             btnDelete.Click += async (s, e) =>
             {
                 if (!(lst.SelectedItem is ComboItem ciDel) || editBeleg == null) return;
-                if (MessageBox.Show(dlg, "Vorlage wirklich löschen?", "Bestätigung", MessageBoxButtons.YesNo, MessageBoxIcon.Question) != DialogResult.Yes) return;
+                if (MessageBox.Show(dlg, "Vorlage wirklich lÃ¶schen?", "BestÃ¤tigung", MessageBoxButtons.YesNo, MessageBoxIcon.Question) != DialogResult.Yes) return;
                 try
                 {
                     using (var db = new DatabaseHelperKassen()) await db.UpdateZahlungsVorlageAsync(editBeleg.Value, "Einzahlung", "Vorlage", "", null, null, null, "19");
                 }
-                catch (Exception ex) { MessageBox.Show(dlg, "Löschen fehlgeschlagen: " + ex.Message, "Fehler", MessageBoxButtons.OK, MessageBoxIcon.Error); return; }
+                catch (Exception ex) { MessageBox.Show(dlg, "LÃ¶schen fehlgeschlagen: " + ex.Message, "Fehler", MessageBoxButtons.OK, MessageBoxIcon.Error); return; }
                 await loadListAsync(); clearFields();
             };
             tbName.TextChanged += (s, e) => btnSave.Enabled = !string.IsNullOrWhiteSpace(tbName.Text);
@@ -667,7 +680,7 @@ namespace TaMi_Kassenclient
         private async System.Threading.Tasks.Task LoadPersonalAsync()
         {
             if (!int.TryParse(txtPid.Text.Trim(), out var pid) || pid <= 0)
-            { MessageBox.Show(this, "Bitte gültige Personalnummer eingeben.", "Hinweis", MessageBoxButtons.OK, MessageBoxIcon.Information); return; }
+            { MessageBox.Show(this, "Bitte gÃ¼ltige Personalnummer eingeben.", "Hinweis", MessageBoxButtons.OK, MessageBoxIcon.Information); return; }
             using (var db = new DatabaseHelperKassen())
             {
                 var p = await db.GetPersonalInfoAsync(pid);
@@ -683,11 +696,11 @@ namespace TaMi_Kassenclient
         {
             try
             {
-                if (_currentPid <= 0) { lblSaldoAktuell.Text = "Saldo: 0,00 €"; return; }
+                if (_currentPid <= 0) { lblSaldoAktuell.Text = "Saldo: 0,00 â‚¬"; return; }
                 var saldo = await db.GetLastPersonalGuthabenSaldoAsync(_currentPid);
-                lblSaldoAktuell.Text = $"Saldo: {saldo:0.00} €";
+                lblSaldoAktuell.Text = $"Saldo: {saldo:0.00} â‚¬";
             }
-            catch { try { lblSaldoAktuell.Text = "Saldo: –"; } catch { } }
+            catch { try { lblSaldoAktuell.Text = "Saldo: â€“"; } catch { } }
         }
 
         private async System.Threading.Tasks.Task LoadGuthabenHistoryAsync()
@@ -802,7 +815,7 @@ namespace TaMi_Kassenclient
 
         // ...rest of existing code (Save, LoadGuthaben, Presets etc.) remains unchanged...
 
-        // === Ergänzte fehlende Hilfsmethoden / Eventhandler (Re-Add) ===
+        // === ErgÃ¤nzte fehlende Hilfsmethoden / Eventhandler (Re-Add) ===
         private void PersonalForm_KeyDown(object sender, KeyEventArgs e)
         { if (e.KeyCode == Keys.Enter || e.KeyCode == Keys.Return) { e.SuppressKeyPress = true; e.Handled = true; } }
         private void PersonalForm_KeyPress(object sender, KeyPressEventArgs e)
@@ -811,7 +824,7 @@ namespace TaMi_Kassenclient
         private async Task LoadActivePersonalAsync()
         { try{ using(var db=new DatabaseHelperKassen()){ var dt=await db.GetActivePersonalAsync(); _suppressEvents=true; cboPerson.DisplayMember="Name"; cboPerson.ValueMember="PID"; cboPerson.DataSource=dt; cboPerson.SelectedIndex=-1; } } catch {} finally { _suppressEvents=false; } }
         private async Task LoadAccountingPresetsAsync()
-        { try{ using(var db=new DatabaseHelperKassen()){ var dt=await db.LoadZahlungsVorlagenAsync(); cboPreset.Items.Clear(); cboPreset.Items.Add(new ComboItem{Text="Vorlage auswählen",Row=null}); foreach(DataRow r in dt.Rows){ string name=Convert.ToString(r["VorlagenName"]); if(string.IsNullOrWhiteSpace(name)) continue; cboPreset.Items.Add(new ComboItem{Text=name,Row=r}); } if(cboPreset.Items.Count>0) cboPreset.SelectedIndex=0; } } catch {} }
+        { try{ using(var db=new DatabaseHelperKassen()){ var dt=await db.LoadZahlungsVorlagenAsync(); cboPreset.Items.Clear(); cboPreset.Items.Add(new ComboItem{Text="Vorlage auswÃ¤hlen",Row=null}); foreach(DataRow r in dt.Rows){ string name=Convert.ToString(r["VorlagenName"]); if(string.IsNullOrWhiteSpace(name)) continue; cboPreset.Items.Add(new ComboItem{Text=name,Row=r}); } if(cboPreset.Items.Count>0) cboPreset.SelectedIndex=0; } } catch {} }
         private void ApplyPresetToFields()
         { if(!(cboPreset.SelectedItem is ComboItem ci) || ci.Row==null) return; var row=ci.Row; txtNewPayText.Text = row.Table.Columns.Contains("Buchungstext")? Convert.ToString(row["Buchungstext"]): string.Empty; txtNewK1.Text = row.Table.Columns.Contains("Kost1")? Convert.ToString(row["Kost1"]): string.Empty; txtNewK2.Text = row.Table.Columns.Contains("Kost2")? Convert.ToString(row["Kost2"]): string.Empty; txtNewKonto.Text = row.Table.Columns.Contains("Konto")? Convert.ToString(row["Konto"]): string.Empty; var typ=row.Table.Columns.Contains("Typ")? Convert.ToString(row["Typ"]): null; if(!string.IsNullOrWhiteSpace(typ)){ int ix=cboNewType.FindStringExact(typ); if(ix>=0) cboNewType.SelectedIndex=ix; } try{ decimal m19=0,m7=0,m0=0; if(row.Table.Columns.Contains("Betrag19")&& row["Betrag19"]!=DBNull.Value) m19=Convert.ToDecimal(row["Betrag19"]); if(row.Table.Columns.Contains("Betrag7")&& row["Betrag7"]!=DBNull.Value) m7=Convert.ToDecimal(row["Betrag7"]); if(row.Table.Columns.Contains("Betrag0")&& row["Betrag0"]!=DBNull.Value) m0=Convert.ToDecimal(row["Betrag0"]); string target=null; if(m19==1m && m7==0m && m0==0m) target="19"; else if(m7==1m && m19==0m && m0==0m) target="7"; else if(m0==1m && m19==0m && m7==0m) target="0"; if(target!=null){ int mi=cboNewMwst.FindStringExact(target); if(mi>=0) cboNewMwst.SelectedIndex=mi; } } catch {}
         }
@@ -827,7 +840,7 @@ namespace TaMi_Kassenclient
             gv.ColumnHeadersBorderStyle = DataGridViewHeaderBorderStyle.Single;
             gv.CellBorderStyle = DataGridViewCellBorderStyle.SingleHorizontal;
             gv.ColumnHeadersHeightSizeMode = DataGridViewColumnHeadersHeightSizeMode.EnableResizing;
-            gv.ColumnHeadersHeight = 30; // Standardhöhe
+            gv.ColumnHeadersHeight = 30; // StandardhÃ¶he
             gv.ColumnHeadersDefaultCellStyle.Padding = new Padding(0, 2, 0, 2);
             gv.ColumnHeadersDefaultCellStyle.Font = new Font("Segoe UI", 9F, FontStyle.Regular);
             gv.DefaultCellStyle.Font = new Font("Segoe UI", 9F, FontStyle.Regular);
@@ -850,13 +863,13 @@ namespace TaMi_Kassenclient
         private void ApplyGuthabenGridFormatting(){ if(gvGuthabenHistory==null|| gvGuthabenHistory.DataSource==null) return; TrySetHeader(gvGuthabenHistory,"Saldo","Saldo"); TryFormatAmount(gvGuthabenHistory,"Saldo"); }
         private void GvOpenPayments_SelectionChanged(object sender,EventArgs e){ bool has= gvOpenPayments!=null && gvOpenPayments.CurrentRow!=null && gvOpenPayments.CurrentRow.DataBoundItem!=null; if(btnEditPayment!=null) btnEditPayment.Enabled=has; if(btnDeletePayment!=null) btnDeletePayment.Enabled=has; }
         private void LoadSelectedPaymentIntoFields(){ if(gvOpenPayments==null|| gvOpenPayments.CurrentRow==null) return; var drv=gvOpenPayments.CurrentRow.DataBoundItem as DataRowView; if(drv==null) return; var row=drv.Row; if(row.Table.Columns.Contains("Buchungstext")) txtNewPayText.Text=Convert.ToString(row["Buchungstext"])??string.Empty; decimal b19=0,b7=0,b0=0; try{ if(row.Table.Columns.Contains("Betrag19")&& row["Betrag19"]!=DBNull.Value) b19=Convert.ToDecimal(row["Betrag19"]);}catch{} try{ if(row.Table.Columns.Contains("Betrag7")&& row["Betrag7"]!=DBNull.Value) b7=Convert.ToDecimal(row["Betrag7"]);}catch{} try{ if(row.Table.Columns.Contains("Betrag0")&& row["Betrag0"]!=DBNull.Value) b0=Convert.ToDecimal(row["Betrag0"]);}catch{} string mw=b19>0?"19": (b7>0?"7": (b0>0?"0":null)); if(mw!=null){ int ix=cboNewMwst.FindStringExact(mw); if(ix>=0) cboNewMwst.SelectedIndex=ix; nudNewAmount.Value= Math.Max(nudNewAmount.Minimum, Math.Min(nudNewAmount.Maximum, b19>0?b19:(b7>0?b7:b0))); } txtNewK1.Text = row.Table.Columns.Contains("Kost1")&& row["Kost1"]!=DBNull.Value? Convert.ToString(row["Kost1"]): string.Empty; txtNewK2.Text = row.Table.Columns.Contains("Kost2")&& row["Kost2"]!=DBNull.Value? Convert.ToString(row["Kost2"]): string.Empty; txtNewKonto.Text = row.Table.Columns.Contains("Konto")&& row["Konto"]!=DBNull.Value? Convert.ToString(row["Konto"]): string.Empty; }
-        private void TryTakeLastNfc(){ try{ string token= Clipboard.ContainsText()? (Clipboard.GetText()??string.Empty).Trim(): null; if(!string.IsNullOrWhiteSpace(token)) txtNfc.Text=token; else MessageBox.Show(this,"Kein NFC-Wert verfügbar.","Hinweis",MessageBoxButtons.OK,MessageBoxIcon.Information);} catch { } }
+        private void TryTakeLastNfc(){ try{ string token= Clipboard.ContainsText()? (Clipboard.GetText()??string.Empty).Trim(): null; if(!string.IsNullOrWhiteSpace(token)) txtNfc.Text=token; else MessageBox.Show(this,"Kein NFC-Wert verfÃ¼gbar.","Hinweis",MessageBoxButtons.OK,MessageBoxIcon.Information);} catch { } }
         private async Task SaveAsync(){ if(_currentPid<=0){ MessageBox.Show(this,"Bitte zuerst Personal laden.","Hinweis",MessageBoxButtons.OK,MessageBoxIcon.Information); return;} using(var db=new DatabaseHelperKassen()){ try{ await db.SetFahrercodeAsync(_currentPid,string.IsNullOrWhiteSpace(txtFahrercode.Text)?null:txtFahrercode.Text.Trim()); await db.SetNfcAsync(_currentPid,string.IsNullOrWhiteSpace(txtNfc.Text)?null:txtNfc.Text.Trim()); MessageBox.Show(this,"Gespeichert.","Info",MessageBoxButtons.OK,MessageBoxIcon.Information);} catch(Exception ex){ MessageBox.Show(this,"Fehler beim Speichern: "+ex.Message,"Fehler",MessageBoxButtons.OK,MessageBoxIcon.Error);} } }
         private async Task CreatePaymentWithPresetAsync()
-        { if(_currentPid<=0){ MessageBox.Show(this,"Bitte zuerst Mitarbeiter laden/auswählen.","Hinweis",MessageBoxButtons.OK,MessageBoxIcon.Information); return;} using(var db=new DatabaseHelperKassen()){ try{ string mw=cboNewMwst.SelectedItem?.ToString(); decimal amount=nudNewAmount.Value; decimal b19=0,b7=0,b0=0; if(mw=="19") b19=amount; else if(mw=="7") b7=amount; else b0=amount; int? k1=int.TryParse(txtNewK1.Text,out var vk1)?(int?)vk1:null; int? k2=int.TryParse(txtNewK2.Text,out var vk2)?(int?)vk2:null; int? kto=int.TryParse(txtNewKonto.Text,out var vkto)?(int?)vkto:null; string text=txtNewPayText.Text?.Trim(); if(string.IsNullOrWhiteSpace(text)){ MessageBox.Show(this,"Bitte Buchungstext eingeben.","Hinweis",MessageBoxButtons.OK,MessageBoxIcon.Information); return;} string typText=cboNewType.SelectedItem as string; if(string.IsNullOrWhiteSpace(typText)){ MessageBox.Show(this,"Bitte Typ auswählen.","Hinweis",MessageBoxButtons.OK,MessageBoxIcon.Information); return;} string typCode= typText.Equals("Einzahlung",StringComparison.OrdinalIgnoreCase)?"2": (typText.Equals("Auszahlung",StringComparison.OrdinalIgnoreCase)?"3":typText); int manId=0; try{ if(cboMandant?.SelectedValue!=null) manId=Convert.ToInt32(cboMandant.SelectedValue);}catch{} await db.InsertOffeneZahlungAsync(_currentPid,typCode,text,b19,b7,b0,k1,k2,kto,manId); await BindOpenPaymentsAsync(db); txtNewPayText.Clear(); nudNewAmount.Value=0; cboNewMwst.SelectedIndex=-1; txtNewK1.Clear(); txtNewK2.Clear(); txtNewKonto.Clear(); MessageBox.Show(this,"Zahlung angelegt.","Info",MessageBoxButtons.OK,MessageBoxIcon.Information); GvOpenPayments_SelectionChanged(null,EventArgs.Empty);} catch(Exception ex){ MessageBox.Show(this,"Fehler beim Anlegen: "+ex.Message,"Fehler",MessageBoxButtons.OK,MessageBoxIcon.Error);} } }
+        { if(_currentPid<=0){ MessageBox.Show(this,"Bitte zuerst Mitarbeiter laden/auswÃ¤hlen.","Hinweis",MessageBoxButtons.OK,MessageBoxIcon.Information); return;} using(var db=new DatabaseHelperKassen()){ try{ string mw=cboNewMwst.SelectedItem?.ToString(); decimal amount=nudNewAmount.Value; decimal b19=0,b7=0,b0=0; if(mw=="19") b19=amount; else if(mw=="7") b7=amount; else b0=amount; int? k1=int.TryParse(txtNewK1.Text,out var vk1)?(int?)vk1:null; int? k2=int.TryParse(txtNewK2.Text,out var vk2)?(int?)vk2:null; int? kto=int.TryParse(txtNewKonto.Text,out var vkto)?(int?)vkto:null; string text=txtNewPayText.Text?.Trim(); if(string.IsNullOrWhiteSpace(text)){ MessageBox.Show(this,"Bitte Buchungstext eingeben.","Hinweis",MessageBoxButtons.OK,MessageBoxIcon.Information); return;} string typText=cboNewType.SelectedItem as string; if(string.IsNullOrWhiteSpace(typText)){ MessageBox.Show(this,"Bitte Typ auswÃ¤hlen.","Hinweis",MessageBoxButtons.OK,MessageBoxIcon.Information); return;} string typCode= typText.Equals("Einzahlung",StringComparison.OrdinalIgnoreCase)?"2": (typText.Equals("Auszahlung",StringComparison.OrdinalIgnoreCase)?"3":typText); int manId=0; try{ if(cboMandant?.SelectedValue!=null) manId=Convert.ToInt32(cboMandant.SelectedValue);}catch{} await db.InsertOffeneZahlungAsync(_currentPid,typCode,text,b19,b7,b0,k1,k2,kto,manId); await BindOpenPaymentsAsync(db); txtNewPayText.Clear(); nudNewAmount.Value=0; cboNewMwst.SelectedIndex=-1; txtNewK1.Clear(); txtNewK2.Clear(); txtNewKonto.Clear(); MessageBox.Show(this,"Zahlung angelegt.","Info",MessageBoxButtons.OK,MessageBoxIcon.Information); GvOpenPayments_SelectionChanged(null,EventArgs.Empty);} catch(Exception ex){ MessageBox.Show(this,"Fehler beim Anlegen: "+ex.Message,"Fehler",MessageBoxButtons.OK,MessageBoxIcon.Error);} } }
         private async Task EditSelectedPaymentAsync()
-        { if(_currentPid<=0){ MessageBox.Show(this,"Bitte zuerst Mitarbeiter laden.","Hinweis",MessageBoxButtons.OK,MessageBoxIcon.Information); return;} if(gvOpenPayments.CurrentRow?.DataBoundItem is DataRowView drv){ var row=drv.Row; if(!row.Table.Columns.Contains("Belegnummer")){ MessageBox.Show(this,"Belegnummer fehlt.","Hinweis",MessageBoxButtons.OK,MessageBoxIcon.Information); return;} int beleg=Convert.ToInt32(row["Belegnummer"]); string mw=cboNewMwst.SelectedItem?.ToString(); decimal amount=nudNewAmount.Value; decimal b19=0,b7=0,b0=0; if(mw=="19") b19=amount; else if(mw=="7") b7=amount; else b0=amount; int? k1=int.TryParse(txtNewK1.Text,out var vk1)?(int?)vk1:null; int? k2=int.TryParse(txtNewK2.Text,out var vk2)?(int?)vk2:null; int? kto=int.TryParse(txtNewKonto.Text,out var vkto)?(int?)vkto:null; string text=txtNewPayText.Text?.Trim(); if(string.IsNullOrWhiteSpace(text)){ MessageBox.Show(this,"Bitte Buchungstext eingeben.","Hinweis",MessageBoxButtons.OK,MessageBoxIcon.Information); return;} string typText=cboNewType.SelectedItem as string ?? "Auszahlung"; string typCode= typText.Equals("Einzahlung",StringComparison.OrdinalIgnoreCase)?"2": (typText.Equals("Auszahlung",StringComparison.OrdinalIgnoreCase)?"3":typText); using(var db=new DatabaseHelperKassen()){ try{ int n=await db.UpdateOffeneZahlungAsync(beleg,typCode,text,b19,b7,b0,k1,k2,kto); if(n<=0){ MessageBox.Show(this,"Zahlung konnte nicht geändert werden.","Hinweis",MessageBoxButtons.OK,MessageBoxIcon.Information); return;} await BindOpenPaymentsAsync(db); MessageBox.Show(this,"Zahlung geändert.","Info",MessageBoxButtons.OK,MessageBoxIcon.Information); GvOpenPayments_SelectionChanged(null,EventArgs.Empty);} catch(Exception ex){ MessageBox.Show(this,"Fehler beim Ändern: "+ex.Message,"Fehler",MessageBoxButtons.OK,MessageBoxIcon.Error);} } } }
+        { if(_currentPid<=0){ MessageBox.Show(this,"Bitte zuerst Mitarbeiter laden.","Hinweis",MessageBoxButtons.OK,MessageBoxIcon.Information); return;} if(gvOpenPayments.CurrentRow?.DataBoundItem is DataRowView drv){ var row=drv.Row; if(!row.Table.Columns.Contains("Belegnummer")){ MessageBox.Show(this,"Belegnummer fehlt.","Hinweis",MessageBoxButtons.OK,MessageBoxIcon.Information); return;} int beleg=Convert.ToInt32(row["Belegnummer"]); string mw=cboNewMwst.SelectedItem?.ToString(); decimal amount=nudNewAmount.Value; decimal b19=0,b7=0,b0=0; if(mw=="19") b19=amount; else if(mw=="7") b7=amount; else b0=amount; int? k1=int.TryParse(txtNewK1.Text,out var vk1)?(int?)vk1:null; int? k2=int.TryParse(txtNewK2.Text,out var vk2)?(int?)vk2:null; int? kto=int.TryParse(txtNewKonto.Text,out var vkto)?(int?)vkto:null; string text=txtNewPayText.Text?.Trim(); if(string.IsNullOrWhiteSpace(text)){ MessageBox.Show(this,"Bitte Buchungstext eingeben.","Hinweis",MessageBoxButtons.OK,MessageBoxIcon.Information); return;} string typText=cboNewType.SelectedItem as string ?? "Auszahlung"; string typCode= typText.Equals("Einzahlung",StringComparison.OrdinalIgnoreCase)?"2": (typText.Equals("Auszahlung",StringComparison.OrdinalIgnoreCase)?"3":typText); using(var db=new DatabaseHelperKassen()){ try{ int n=await db.UpdateOffeneZahlungAsync(beleg,typCode,text,b19,b7,b0,k1,k2,kto); if(n<=0){ MessageBox.Show(this,"Zahlung konnte nicht geÃ¤ndert werden.","Hinweis",MessageBoxButtons.OK,MessageBoxIcon.Information); return;} await BindOpenPaymentsAsync(db); MessageBox.Show(this,"Zahlung geÃ¤ndert.","Info",MessageBoxButtons.OK,MessageBoxIcon.Information); GvOpenPayments_SelectionChanged(null,EventArgs.Empty);} catch(Exception ex){ MessageBox.Show(this,"Fehler beim Ã„ndern: "+ex.Message,"Fehler",MessageBoxButtons.OK,MessageBoxIcon.Error);} } } }
         private async Task DeleteSelectedPaymentAsync()
-        { if(_currentPid<=0){ MessageBox.Show(this,"Bitte zuerst Mitarbeiter laden.","Hinweis",MessageBoxButtons.OK,MessageBoxIcon.Information); return;} if(gvOpenPayments.CurrentRow?.DataBoundItem is DataRowView drv){ var row=drv.Row; if(!row.Table.Columns.Contains("Belegnummer")) return; int beleg=Convert.ToInt32(row["Belegnummer"]); if(MessageBox.Show(this,$"Zahlung {beleg} wirklich löschen?","Bestätigung",MessageBoxButtons.YesNo,MessageBoxIcon.Question)!=DialogResult.Yes) return; using(var db=new DatabaseHelperKassen()){ try{ int n=await db.DeleteOffeneZahlungAsync(beleg); if(n<=0){ MessageBox.Show(this,"Zahlung konnte nicht gelöscht werden.","Hinweis",MessageBoxButtons.OK,MessageBoxIcon.Information); return;} await BindOpenPaymentsAsync(db); MessageBox.Show(this,"Zahlung gelöscht.","Info",MessageBoxButtons.OK,MessageBoxIcon.Information); GvOpenPayments_SelectionChanged(null,EventArgs.Empty);} catch(Exception ex){ MessageBox.Show(this,"Fehler beim Löschen: "+ex.Message,"Fehler",MessageBoxButtons.OK,MessageBoxIcon.Error);} } } }
+        { if(_currentPid<=0){ MessageBox.Show(this,"Bitte zuerst Mitarbeiter laden.","Hinweis",MessageBoxButtons.OK,MessageBoxIcon.Information); return;} if(gvOpenPayments.CurrentRow?.DataBoundItem is DataRowView drv){ var row=drv.Row; if(!row.Table.Columns.Contains("Belegnummer")) return; int beleg=Convert.ToInt32(row["Belegnummer"]); if(MessageBox.Show(this,$"Zahlung {beleg} wirklich lÃ¶schen?","BestÃ¤tigung",MessageBoxButtons.YesNo,MessageBoxIcon.Question)!=DialogResult.Yes) return; using(var db=new DatabaseHelperKassen()){ try{ int n=await db.DeleteOffeneZahlungAsync(beleg); if(n<=0){ MessageBox.Show(this,"Zahlung konnte nicht gelÃ¶scht werden.","Hinweis",MessageBoxButtons.OK,MessageBoxIcon.Information); return;} await BindOpenPaymentsAsync(db); MessageBox.Show(this,"Zahlung gelÃ¶scht.","Info",MessageBoxButtons.OK,MessageBoxIcon.Information); GvOpenPayments_SelectionChanged(null,EventArgs.Empty);} catch(Exception ex){ MessageBox.Show(this,"Fehler beim LÃ¶schen: "+ex.Message,"Fehler",MessageBoxButtons.OK,MessageBoxIcon.Error);} } } }
     }
 }
