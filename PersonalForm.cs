@@ -357,11 +357,12 @@ namespace TaMi_Kassenclient
                 startY += rowH;
                 var lblNfc = new Label { Text = "NFC:", Location = new Point(12, startY + 6), AutoSize = true, Width = labelW };
                 grpStammdaten.Controls.Add(lblNfc);
-                txtNfc = new TextBox { Location = new Point(fieldX, startY), Width = 200 };
+                // NFC Feld an Fahrercode-Höhe anpassen (Font 14, zentriert)
+                txtNfc = new TextBox { Location = new Point(fieldX, startY - 1), Width = 200, Font = new Font("Segoe UI", 14F), TextAlign = HorizontalAlignment.Center };
                 grpStammdaten.Controls.Add(txtNfc);
-                btnClearNfc = new Button { Text = "X", Size = new Size(32, 28), BackColor = Color.FromArgb(229,57,53), ForeColor = Color.White, FlatStyle = FlatStyle.Flat, Font = new Font("Segoe UI", 9F, FontStyle.Bold), Location = new Point(fieldX + 206, startY) };
+                btnClearNfc = new Button { Text = "X", Size = new Size(34, 30), BackColor = Color.FromArgb(229,57,53), ForeColor = Color.White, FlatStyle = FlatStyle.Flat, Font = new Font("Segoe UI", 9F, FontStyle.Bold), Location = new Point(fieldX + 206, startY - 1) };
                 btnClearNfc.FlatAppearance.BorderSize = 0; btnClearNfc.Click += (s,e) => txtNfc.Text = string.Empty; grpStammdaten.Controls.Add(btnClearNfc);
-                btnNfcUebernehmen = new Button { Text = "NFC", Size = new Size(72, 28), BackColor = Color.FromArgb(33,150,243), ForeColor = Color.White, FlatStyle = FlatStyle.Flat, Font = new Font("Segoe UI", 9F, FontStyle.Bold), Location = new Point(fieldX + 244, startY) };
+                btnNfcUebernehmen = new Button { Text = "NFC", Size = new Size(90, 30), BackColor = Color.FromArgb(33,150,243), ForeColor = Color.White, FlatStyle = FlatStyle.Flat, Font = new Font("Segoe UI", 9F, FontStyle.Bold), Location = new Point(fieldX + 245, startY - 1) };
                 btnNfcUebernehmen.FlatAppearance.BorderSize = 0; btnNfcUebernehmen.Click += (s,e) => TryTakeLastNfc(); grpStammdaten.Controls.Add(btnNfcUebernehmen);
 
                 startY += rowH;
@@ -392,7 +393,7 @@ namespace TaMi_Kassenclient
                 grpStammdaten.Resize += (s,e)=> { if(btnSave!=null) btnSave.Left = (grpStammdaten.ClientSize.Width - btnSave.Width)/2; };
 
                 // Neue Zahlung (schmal, keine Überlappung rechts)
-                grpNewPayment = new GroupBox { Text = "Neue Zahlung", Location = new Point(16, grpStammdaten.Bottom + 12), Size = new Size(470, 320) };
+                grpNewPayment = new GroupBox { Text = "Neue Zahlung", Location = new Point(16, grpStammdaten.Bottom + 12), Size = new Size(500, 250) };
                 Controls.Add(grpNewPayment);
 
                 int nzY = 26;
@@ -685,7 +686,7 @@ namespace TaMi_Kassenclient
             {
                 var p = await db.GetPersonalInfoAsync(pid);
                 if (p == null) { MessageBox.Show(this, "Personalnummer nicht gefunden.", "Hinweis", MessageBoxButtons.OK, MessageBoxIcon.Information); return; }
-                _currentPid = p.PID; lblName.Text = $"Name: {p.Name}"; lblVorname.Text = $"Vorname: {p.Vorname}"; txtNfc.Text = p.NFC ?? string.Empty; txtFahrercode.Text = p.Fahrercode ?? string.Empty;
+                _currentPid = p.PID; lblName.Text = $"{p.Name}"; lblVorname.Text = $"{p.Vorname}"; txtNfc.Text = p.NFC ?? string.Empty; txtFahrercode.Text = p.Fahrercode ?? string.Empty;
                 gvOpenShifts.DataSource = await db.GetOpenShiftsListAsync(_currentPid); ApplyOpenShiftsGridFormatting();
                 await BindOpenPaymentsAsync(db); // neue Ansicht
                 await LoadGuthabenHistoryAsync(); await UpdateSaldoLabelAsync(db); GvOpenPayments_SelectionChanged(null, EventArgs.Empty);
