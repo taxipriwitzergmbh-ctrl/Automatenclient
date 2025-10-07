@@ -13,6 +13,7 @@ namespace TaMi_Kassenclient
         private string _tblKassenbuch;   // z. B. [dbo].[TKassenbuch]
         private string _tblMandanten;    // z. B. [dbo].[TMandanten]
         private bool? _belegIstIdentity; // true, falls Belegnummer Identity ist
+        private string _tblDevices;      // NEU: [dbo].[TKassenbuchDevice]
 
         // Persistenz der Abrechnungsbedingungen
         private string _tblAbrechnungsRegeln;
@@ -84,6 +85,7 @@ namespace TaMi_Kassenclient
         {
             _tblKassenbuch = await ResolveQualifiedTableAsync("TKassenbuch") ?? "[dbo].[TKassenbuch]";
             _tblMandanten = await ResolveQualifiedTableAsync("TMandanten") ?? "[dbo].[TMandanten]";
+            _tblDevices = await ResolveQualifiedTableAsync("TKassenbuchDevice") ?? "[dbo].[TKassenbuchDevice]"; // neu
             _tblAbrechnungsRegeln = await ResolveQualifiedTableAsync("TAbrechnungsBedingungen") ?? "[dbo].[TAbrechnungsBedingungen]";
             _tblAbrechnungsClauses = await ResolveQualifiedTableAsync("TAbrechnungsBedingungenClause") ?? "[dbo].[TAbrechnungsBedingungenClause]";
             _tblPersonal = await ResolveQualifiedTableAsync("TPersonal") ?? "[dbo].[TPersonal]";
@@ -606,7 +608,6 @@ WHERE Belegnummer=@bnr AND (Verbucht=0 OR Verbucht IS NULL)";
 
         public async Task<DataTable> GetKassenListeAsync(IEnumerable<string> automatenNamen)
         {
-            // Parameter-Reuse: Liste enthält jetzt DeviceIDs (als String); parse zu Byte (tinyint)
             await EnsureOpenAsync();
             var ids = new List<byte>();
             foreach (var n in automatenNamen ?? Array.Empty<string>())
@@ -646,7 +647,7 @@ WHERE Belegnummer=@bnr AND (Verbucht=0 OR Verbucht IS NULL)";
 SELECT 
     x.FirmenId,
     x.DeviceID,
-    CAST(x.DeviceID AS varchar(10)) AS AutomatenName, -- Alias für Abwärtskompatibilität
+    COALESCE(NULLIF(LTRIM(RTRIM(d.AutomatenName)), ''), 'Gerät ' + CAST(x.DeviceID AS varchar(10))) AS AutomatenName,
     CASE 
         WHEN x.FirmenId = -1 THEN 'Personalguthaben'
         WHEN x.FirmenId BETWEEN 0 AND 255 THEN ISNULL(m.ManName, 'ID ' + CAST(x.FirmenId AS varchar(10)))
@@ -657,6 +658,7 @@ SELECT
     x.ErfasstAm
 FROM x
 LEFT JOIN {_tblMandanten} m ON (x.FirmenId BETWEEN 0 AND 255 AND m.ManID = x.FirmenId)
+LEFT JOIN {_tblDevices} d ON d.DeviceID = x.DeviceID
 WHERE x.rn = 1
 ORDER BY ManName ASC, x.DeviceID ASC;";
 

@@ -100,7 +100,7 @@ namespace TaMi_Kassenclient
             pnlKassen.Controls.Clear();
 
             if (AppSettings.AutomatenNamen.Count == 0)
-                AppSettings.LoadAutomatenNamenFromIni(); // Enthält jetzt DeviceIDs als String
+                AppSettings.LoadAutomatenNamenFromIni(); // (jetzt DeviceIDs als String)
 
             try
             {
@@ -121,19 +121,20 @@ namespace TaMi_Kassenclient
                         return;
                     }
 
-                    // Gruppierung nach DeviceID, Personalguthaben (FirmenId -1) zuletzt
+                    // Gruppierung nach DeviceID
                     var gruppen = dt.AsEnumerable()
                         .GroupBy(r => r.Field<byte>("DeviceID"))
-                        .OrderBy(g => 0) // DeviceID-Gruppen normal sortieren
+                        .OrderBy(g => g.Key)
                         .ToList();
 
                     foreach (var gruppe in gruppen)
                     {
-                        // Überschrift: "Gerät X"
-                        string headerText = "Gerät " + gruppe.Key;
+                        string deviceName = gruppe.Select(r => r.Field<string>("AutomatenName")).FirstOrDefault();
+                        if (string.IsNullOrWhiteSpace(deviceName)) deviceName = "Gerät " + gruppe.Key;
+
                         var lblGroup = new Label
                         {
-                            Text = headerText,
+                            Text = deviceName + " (ID " + gruppe.Key + ")",
                             AutoSize = false,
                             Width = pnlKassen.Width - 40,
                             Height = 32,
@@ -144,9 +145,8 @@ namespace TaMi_Kassenclient
                         };
                         pnlKassen.Controls.Add(lblGroup);
 
-                        // Sortierung: erst FirmenId >= 0, dann FirmenId < 0
                         var sortierteButtons = gruppe
-                            .OrderBy(r => Convert.ToInt32(r["FirmenId"]) < 0 ? 1 : 0)
+                            .OrderBy(r => Convert.ToInt32(r["FirmenId"]) < 0 ? 1 : 0) // Personalguthaben zuletzt
                             .ThenBy(r => Convert.ToInt32(r["FirmenId"]))
                             .ToList();
 
@@ -154,7 +154,7 @@ namespace TaMi_Kassenclient
                         {
                             int fid = row["FirmenId"] == DBNull.Value ? 0 : Convert.ToInt32(row["FirmenId"]);
                             byte deviceId = row.Field<byte>("DeviceID");
-                            string manName = row["ManName"] as string ?? ("ID " + fid);
+                            string manName = row.Field<string>("ManName") ?? ("ID " + fid);
                             decimal kb = row["Kassenbestand"] == DBNull.Value ? 0m : Convert.ToDecimal(row["Kassenbestand"]);
 
                             var btn = new Button
@@ -170,8 +170,7 @@ namespace TaMi_Kassenclient
                                 Tag = new { FirmenId = fid, DeviceID = deviceId, KassenName = manName }
                             };
                             btn.FlatAppearance.BorderSize = 0;
-
-                            btn.Text = $"{manName} – Gerät {deviceId}\r\nBestand: {kb:C2}";
+                            btn.Text = $"{manName} – {deviceName}\r\nBestand: {kb:C2}";
 
                             btn.Click += (s, e) =>
                             {
@@ -192,8 +191,7 @@ namespace TaMi_Kassenclient
             }
             catch (Exception ex)
             {
-                MessageBox.Show(this, $"Fehler beim Laden der Kassen:\r\n{ex.Message}", "Fehler",
-                    MessageBoxButtons.OK, MessageBoxIcon.Error);
+                MessageBox.Show(this, $"Fehler beim Laden der Kassen:\r\n{ex.Message}", "Fehler", MessageBoxButtons.OK, MessageBoxIcon.Error);
             }
         }
 
