@@ -1,0 +1,29 @@
+C:\Users\admin\source\repos\Geldautomat\TaMi-Kassenclient\bin\Debug\TaMi-Kassenclient.exe.config
+C:\Users\admin\source\repos\Geldautomat\TaMi-Kassenclient\bin\Debug\TaMi-Kassenclient.exe
+C:\Users\admin\source\repos\Geldautomat\TaMi-Kassenclient\bin\Debug\TaMi-Kassenclient.pdb
+C:\Users\admin\source\repos\Geldautomat\TaMi-Kassenclient\obj\Debug\TaMi-Kassenclient.csproj.AssemblyReference.cache
+C:\Users\admin\source\repos\Geldautomat\TaMi-Kassenclient\obj\Debug\TaMi_Kassenclient.Properties.Resources.resources
+C:\Users\admin\source\repos\Geldautomat\TaMi-Kassenclient\obj\Debug\TaMi-Kassenclient.csproj.GenerateResource.cache
+C:\Users\admin\source\repos\Geldautomat\TaMi-Kassenclient\obj\Debug\TaMi-Kassenclient.csproj.CoreCompileInputs.cache
+C:\Users\admin\source\repos\Geldautomat\TaMi-Kassenclient\obj\Debug\TaMi-Kassenclient.exe
+C:\Users\admin\source\repos\Geldautomat\TaMi-Kassenclient\obj\Debug\TaMi-Kassenclient.pdb
+C:\Users\admin\source\repos\Geldautomat\TaMi-Kassenclient\obj\Debug\TaMi-Kassenclient.exe.config
+C:\Users\m.priwitzer\source\repos\Geldautomat\TaMi-Kassenclient\bin\Debug\TaMi-Kassenclient.exe.config
+C:\Users\m.priwitzer\source\repos\Geldautomat\TaMi-Kassenclient\bin\Debug\TaMi-Kassenclient.exe
+C:\Users\m.priwitzer\source\repos\Geldautomat\TaMi-Kassenclient\bin\Debug\TaMi-Kassenclient.pdb
+C:\Users\m.priwitzer\source\repos\Geldautomat\TaMi-Kassenclient\obj\Debug\TaMi-Kassenclient.csproj.AssemblyReference.cache
+C:\Users\m.priwitzer\source\repos\Geldautomat\TaMi-Kassenclient\obj\Debug\TaMi_Kassenclient.Properties.Resources.resources
+C:\Users\m.priwitzer\source\repos\Geldautomat\TaMi-Kassenclient\obj\Debug\TaMi-Kassenclient.csproj.GenerateResource.cache
+C:\Users\m.priwitzer\source\repos\Geldautomat\TaMi-Kassenclient\obj\Debug\TaMi-Kassenclient.csproj.CoreCompileInputs.cache
+C:\Users\m.priwitzer\source\repos\Geldautomat\TaMi-Kassenclient\obj\Debug\TaMi-Kassenclient.exe
+C:\Users\m.priwitzer\source\repos\Geldautomat\TaMi-Kassenclient\obj\Debug\TaMi-Kassenclient.pdb
+C:\Users\m.priwitzer\source\repos\Geldautomat\TaMi-Kassenclient\obj\Debug\TaMi-Kassenclient.exe.config
+Z:\2. Abteilungsleitung\IT\Programierung\TaMi-Kassenclient\obj\Debug\TaMi-Kassenclient.csproj.AssemblyReference.cache
+Z:\2. Abteilungsleitung\IT\Programierung\TaMi-Kassenclient\obj\Debug\TaMi_Kassenclient.Properties.Resources.resources
+Z:\2. Abteilungsleitung\IT\Programierung\TaMi-Kassenclient\obj\Debug\TaMi-Kassenclient.csproj.GenerateResource.cache
+Z:\2. Abteilungsleitung\IT\Programierung\TaMi-Kassenclient\obj\Debug\TaMi-Kassenclient.csproj.CoreCompileInputs.cache
+Z:\2. Abteilungsleitung\IT\Programierung\TaMi-Kassenclient\obj\Debug\TaMi-Kassenclient.exe
+Z:\2. Abteilungsleitung\IT\Programierung\TaMi-Kassenclient\obj\Debug\TaMi-Kassenclient.pdb
+Z:\2. Abteilungsleitung\IT\Programierung\TaMi-Kassenclient\bin\Debug\TaMi-Kassenclient.exe.config
+Z:\2. Abteilungsleitung\IT\Programierung\TaMi-Kassenclient\bin\Debug\TaMi-Kassenclient.exe
+Z:\2. Abteilungsleitung\IT\Programierung\TaMi-Kassenclient\bin\Debug\TaMi-Kassenclient.pdb
