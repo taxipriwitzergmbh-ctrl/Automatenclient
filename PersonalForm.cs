@@ -5,6 +5,7 @@ using System.Windows.Forms;
 using System.Runtime.InteropServices;
 using System.Drawing.Drawing2D;
 using System.Threading.Tasks;
+using System.Collections.Generic;
 
 namespace TaMi_Kassenclient
 {
@@ -667,14 +668,9 @@ namespace TaMi_Kassenclient
                 var p = await db.GetPersonalInfoAsync(pid);
                 if (p == null) { MessageBox.Show(this, "Personalnummer nicht gefunden.", "Hinweis", MessageBoxButtons.OK, MessageBoxIcon.Information); return; }
                 _currentPid = p.PID; lblName.Text = $"Name: {p.Name}"; lblVorname.Text = $"Vorname: {p.Vorname}"; txtNfc.Text = p.NFC ?? string.Empty; txtFahrercode.Text = p.Fahrercode ?? string.Empty;
-                gvOpenShifts.DataSource = await db.GetOpenShiftsListAsync(_currentPid);
-                ApplyOpenShiftsGridFormatting();
-                gvOpenPayments.DataSource = await db.GetOffeneAuszahlungenAsync(_currentPid);
-                ApplyOpenPaymentsGridFormatting();
-                await LoadGuthabenHistoryAsync();
-                await UpdateSaldoLabelAsync(db);
-                // Nach dem Laden Auswahl-Status aktualisieren
-                GvOpenPayments_SelectionChanged(null, EventArgs.Empty);
+                gvOpenShifts.DataSource = await db.GetOpenShiftsListAsync(_currentPid); ApplyOpenShiftsGridFormatting();
+                await BindOpenPaymentsAsync(db); // neue Ansicht
+                await LoadGuthabenHistoryAsync(); await UpdateSaldoLabelAsync(db); GvOpenPayments_SelectionChanged(null, EventArgs.Empty);
             }
         }
 
@@ -736,348 +732,99 @@ namespace TaMi_Kassenclient
             catch { if (gvGuthabenHistory != null) gvGuthabenHistory.DataSource = null; }
         }
 
-        private async System.Threading.Tasks.Task CreatePaymentWithPresetAsync()
+        // === NEU: Mapping / Aufbau Offene Zahlungen analog ZahlungForm ===
+        private Dictionary<int,string> _firmenMap; private bool _firmenLoaded;
+        private static string MapTypCodeToText(string code)
         {
-            if (_currentPid <= 0) { MessageBox.Show(this, "Bitte zuerst Mitarbeiter laden/auswählen.", "Hinweis", MessageBoxButtons.OK, MessageBoxIcon.Information); return; }
-            using (var db = new DatabaseHelperKassen())
+            if (string.IsNullOrWhiteSpace(code)) return code;
+            switch(code.Trim())
             {
-                try
-                {
-                    string mwst = cboNewMwst.SelectedItem?.ToString();
-                    decimal amount = nudNewAmount.Value;
-                    decimal b19 = 0, b7 = 0, b0 = 0;
-                    if (mwst == "19") b19 = amount; else if (mwst == "7") b7 = amount; else b0 = amount;
-
-                    int? k1 = int.TryParse(txtNewK1.Text, out var vk1) ? (int?)vk1 : null;
-                    int? k2 = int.TryParse(txtNewK2.Text, out var vk2) ? (int?)vk2 : null;
-                    int? kto = int.TryParse(txtNewKonto.Text, out var vkto) ? (int?)vkto : null;
-                    string text = txtNewPayText.Text?.Trim();
-                    if (string.IsNullOrWhiteSpace(text)) { MessageBox.Show(this, "Bitte Buchungstext eingeben.", "Hinweis", MessageBoxButtons.OK, MessageBoxIcon.Information); return; }
-
-                    string typText = cboNewType.SelectedItem as string;
-                    if (string.IsNullOrWhiteSpace(typText)) { MessageBox.Show(this, "Bitte Typ auswählen.", "Hinweis", MessageBoxButtons.OK, MessageBoxIcon.Information); return; }
-                    string typCodeStr = typText.Equals("Einzahlung", StringComparison.OrdinalIgnoreCase) ? "2" :
-                                        typText.Equals("Auszahlung", StringComparison.OrdinalIgnoreCase) ? "3" : typText;
-
-                    int manId = 0; try { if (cboMandant?.SelectedValue != null) manId = Convert.ToInt32(cboMandant.SelectedValue); } catch { }
-
-                    await db.InsertOffeneZahlungAsync(_currentPid, typCodeStr, text, b19, b7, b0, k1, k2, kto, manId);
-
-                    gvOpenPayments.DataSource = await db.GetOffeneAuszahlungenAsync(_currentPid);
-                    ApplyOpenPaymentsGridFormatting();
-                    await LoadGuthabenHistoryAsync();
-                    txtNewPayText.Clear(); nudNewAmount.Value = 0; cboNewMwst.SelectedIndex = 0; txtNewK1.Clear(); txtNewK2.Clear(); txtNewKonto.Clear();
-                    MessageBox.Show(this, "Zahlung angelegt.", "Info", MessageBoxButtons.OK, MessageBoxIcon.Information);
-                    GvOpenPayments_SelectionChanged(null, EventArgs.Empty);
-                }
-                catch (Exception ex) { MessageBox.Show(this, "Fehler beim Anlegen: " + ex.Message, "Fehler", MessageBoxButtons.OK, MessageBoxIcon.Error); }
+                case "1": return "Anfangsbestand";
+                case "2": return "Einzahlung";
+                case "3": return "Auszahlung";
+                case "4": return "Schichtabrechnung";
+                case "5": return "Personalguthaben";
+                default: return code; // evtl. bereits Text
             }
         }
-
-        private async System.Threading.Tasks.Task EditSelectedPaymentAsync()
+        private async Task EnsureFirmenMapAsync(DatabaseHelperKassen db)
         {
-            if (_currentPid <= 0) { MessageBox.Show(this, "Bitte zuerst Mitarbeiter laden.", "Hinweis", MessageBoxButtons.OK, MessageBoxIcon.Information); return; }
-            if (gvOpenPayments.CurrentRow == null || gvOpenPayments.CurrentRow.DataBoundItem == null) { MessageBox.Show(this, "Bitte eine Zahlung auswählen.", "Hinweis", MessageBoxButtons.OK, MessageBoxIcon.Information); return; }
-            var drv = gvOpenPayments.CurrentRow.DataBoundItem as DataRowView; if (drv == null) return; var row = drv.Row;
-            if (!row.Table.Columns.Contains("Belegnummer")) { MessageBox.Show(this, "Belegnummer fehlt.", "Hinweis", MessageBoxButtons.OK, MessageBoxIcon.Information); return; }
-            int beleg = Convert.ToInt32(row["Belegnummer"]);
-
-            string typText = cboNewType.SelectedItem as string ?? "Auszahlung";
-            string typCodeStr = typText.Equals("Einzahlung", StringComparison.OrdinalIgnoreCase) ? "2" :
-                                typText.Equals("Auszahlung", StringComparison.OrdinalIgnoreCase) ? "3" : typText;
-            string txt = txtNewPayText.Text?.Trim();
-            if (string.IsNullOrWhiteSpace(txt)) { MessageBox.Show(this, "Bitte Buchungstext eingeben.", "Hinweis", MessageBoxButtons.OK, MessageBoxIcon.Information); return; }
-            string mwst = cboNewMwst.SelectedItem?.ToString();
-            decimal amount = nudNewAmount.Value;
-            decimal b19 = 0, b7 = 0, b0 = 0; if (mwst == "19") b19 = amount; else if (mwst == "7") b7 = amount; else b0 = amount;
-            int? k1 = int.TryParse(txtNewK1.Text, out var vk1) ? (int?)vk1 : null;
-            int? k2 = int.TryParse(txtNewK2.Text, out var vk2) ? (int?)vk2 : null;
-            int? kto = int.TryParse(txtNewKonto.Text, out var vkto) ? (int?)vkto : null;
-
-            using (var db = new DatabaseHelperKassen())
+            if (_firmenLoaded) return; _firmenMap = new Dictionary<int,string>();
+            try
             {
-                try
+                var man = await db.GetMandantenAsync();
+                foreach(DataRow r in man.Rows)
                 {
-                    int n = await db.UpdateOffeneZahlungAsync(beleg, typCodeStr, txt, b19, b7, b0, k1, k2, kto);
-                    if (n <= 0) { MessageBox.Show(this, "Zahlung konnte nicht geändert werden (evtl. bereits verbucht).", "Hinweis", MessageBoxButtons.OK, MessageBoxIcon.Information); return; }
-                    gvOpenPayments.DataSource = await db.GetOffeneAuszahlungenAsync(_currentPid);
-                    ApplyOpenPaymentsGridFormatting();
-                    await LoadGuthabenHistoryAsync();
-                    MessageBox.Show(this, "Zahlung geändert.", "Info", MessageBoxButtons.OK, MessageBoxIcon.Information);
-                    GvOpenPayments_SelectionChanged(null, EventArgs.Empty);
+                    int id; if(!int.TryParse(Convert.ToString(r["ManID"]), out id)) continue;
+                    string name = Convert.ToString(r["ManName"]) ?? ("ID "+id);
+                    if(!_firmenMap.ContainsKey(id)) _firmenMap.Add(id,name);
                 }
-                catch (Exception ex) { MessageBox.Show(this, "Fehler beim Ändern: " + ex.Message, "Fehler", MessageBoxButtons.OK, MessageBoxIcon.Error); }
             }
+            catch { }
+            _firmenLoaded = true;
         }
-
-        private async System.Threading.Tasks.Task DeleteSelectedPaymentAsync()
+        private string ResolveFirma(int fid){ if(_firmenMap!=null && _firmenMap.TryGetValue(fid,out var n)) return n; return fid==0?string.Empty:("ID "+fid); }
+        private DataTable BuildOpenPaymentsView(DataTable raw)
         {
-            if (_currentPid <= 0) { MessageBox.Show(this, "Bitte zuerst Mitarbeiter laden.", "Hinweis", MessageBoxButtons.OK, MessageBoxIcon.Information); return; }
-            if (gvOpenPayments.CurrentRow == null || gvOpenPayments.CurrentRow.DataBoundItem == null) { MessageBox.Show(this, "Bitte eine Zahlung auswählen.", "Hinweis", MessageBoxButtons.OK, MessageBoxIcon.Information); return; }
-            var drv = gvOpenPayments.CurrentRow.DataBoundItem as DataRowView; if (drv == null) return; var row = drv.Row;
-            if (!row.Table.Columns.Contains("Belegnummer")) { MessageBox.Show(this, "Belegnummer fehlt.", "Hinweis", MessageBoxButtons.OK, MessageBoxIcon.Information); return; }
-            int beleg = Convert.ToInt32(row["Belegnummer"]);
-
-            if (MessageBox.Show(this, $"Zahlung {beleg} wirklich löschen?", "Bestätigung", MessageBoxButtons.YesNo, MessageBoxIcon.Question) != DialogResult.Yes) return;
-
-            using (var db = new DatabaseHelperKassen())
+            var view=new DataTable(); view.Columns.Add("Belegnummer",typeof(int)); view.Columns.Add("Typ",typeof(string)); view.Columns.Add("BetragGesamt",typeof(decimal)); view.Columns.Add("MwSt",typeof(string)); view.Columns.Add("FirmenName",typeof(string)); view.Columns.Add("Buchungstext",typeof(string)); view.Columns.Add("Kost1",typeof(int)); view.Columns.Add("Kost2",typeof(int)); view.Columns.Add("Konto",typeof(int)); view.Columns.Add("Betrag19",typeof(decimal)); view.Columns.Add("Betrag7",typeof(decimal)); view.Columns.Add("Betrag0",typeof(decimal)); view.Columns.Add("FirmenID",typeof(int));
+            foreach(DataRow r in raw.Rows)
             {
-                try
-                {
-                    int n = await db.DeleteOffeneZahlungAsync(beleg);
-                    if (n <= 0) { MessageBox.Show(this, "Zahlung konnte nicht gelöscht werden (evtl. bereits verbucht).", "Hinweis", MessageBoxButtons.OK, MessageBoxIcon.Information); return; }
-                    gvOpenPayments.DataSource = await db.GetOffeneAuszahlungenAsync(_currentPid);
-                    ApplyOpenPaymentsGridFormatting();
-                    await LoadGuthabenHistoryAsync();
-                    MessageBox.Show(this, "Zahlung gelöscht.", "Info", MessageBoxButtons.OK, MessageBoxIcon.Information);
-                    GvOpenPayments_SelectionChanged(null, EventArgs.Empty);
-                }
-                catch (Exception ex) { MessageBox.Show(this, "Fehler beim Löschen: " + ex.Message, "Fehler", MessageBoxButtons.OK, MessageBoxIcon.Error); }
+                int beleg=0; try{ if(r.Table.Columns.Contains("Belegnummer") && r["Belegnummer"]!=DBNull.Value) beleg=Convert.ToInt32(r["Belegnummer"]);}catch{}
+                string typRaw = Convert.ToString(r["Typ"])??string.Empty; string typTxt = MapTypCodeToText(typRaw);
+                decimal b19 = r.Table.Columns.Contains("Betrag19") && r["Betrag19"]!=DBNull.Value? Convert.ToDecimal(r["Betrag19"]):0m;
+                decimal b7  = r.Table.Columns.Contains("Betrag7")  && r["Betrag7"] !=DBNull.Value? Convert.ToDecimal(r["Betrag7"]):0m;
+                decimal b0  = r.Table.Columns.Contains("Betrag0")  && r["Betrag0"] !=DBNull.Value? Convert.ToDecimal(r["Betrag0"]):0m;
+                decimal ges = r.Table.Columns.Contains("BetragGesamt") && r["BetragGesamt"]!=DBNull.Value? Convert.ToDecimal(r["BetragGesamt"]):(b19+b7+b0);
+                string mw = b19>0m?"19": (b7>0m?"7": (b0>0m?"0": string.Empty));
+                int fid=0; try{ if(r.Table.Columns.Contains("FirmenID") && r["FirmenID"]!=DBNull.Value) fid=Convert.ToInt32(r["FirmenID"]);}catch{}
+                string firma = ResolveFirma(fid);
+                int k1 = r.Table.Columns.Contains("Kost1") && r["Kost1"]!=DBNull.Value? Convert.ToInt32(r["Kost1"]):0;
+                int k2 = r.Table.Columns.Contains("Kost2") && r["Kost2"]!=DBNull.Value? Convert.ToInt32(r["Kost2"]):0;
+                int kto = r.Table.Columns.Contains("Konto") && r["Konto"]!=DBNull.Value? Convert.ToInt32(r["Konto"]):0;
+                string txt = Convert.ToString(r["Buchungstext"])??string.Empty;
+                view.Rows.Add(beleg,typTxt,ges,mw,firma,txt,k1,k2,kto,b19,b7,b0,fid);
             }
+            return view;
         }
-
-        private class ComboItem
+        private void ConfigureOpenPaymentsGrid()
         {
-            public string Text { get; set; }
-            public DataRow Row { get; set; }
-            public override string ToString() => Text;
+            if(gvOpenPayments==null) return; gvOpenPayments.AutoGenerateColumns=false; gvOpenPayments.Columns.Clear();
+            DataGridViewTextBoxColumn Add(string name,string header,int width=80,string format=null,bool fill=false){ var col=new DataGridViewTextBoxColumn{ DataPropertyName=name, HeaderText=header, Name=name, AutoSizeMode= fill? DataGridViewAutoSizeColumnMode.Fill: DataGridViewAutoSizeColumnMode.None, Width= fill?200:width}; if(format!=null) col.DefaultCellStyle.Format=format; gvOpenPayments.Columns.Add(col); return col; }
+            Add("Belegnummer","Belegnr.",60); Add("Typ","Typ",70); Add("BetragGesamt","Betrag",70,"0.00"); Add("MwSt","MwSt",50); Add("FirmenName","Firma",160); Add("Buchungstext","Text",0,null,true); Add("Kost1","Kost1",55); Add("Kost2","Kost2",55); Add("Konto","Konto",60);
         }
+        private async Task BindOpenPaymentsAsync(DatabaseHelperKassen db){ var raw= await db.GetOffeneAuszahlungenAsync(_currentPid); await EnsureFirmenMapAsync(db); var view= BuildOpenPaymentsView(raw); ConfigureOpenPaymentsGrid(); gvOpenPayments.DataSource=view; }
+        // === ENDE Neu ===
 
+        // ...rest of existing code (Save, LoadGuthaben, Presets etc.) remains unchanged...
+
+        // === Ergänzte fehlende Hilfsmethoden / Eventhandler (Re-Add) ===
         private void PersonalForm_KeyDown(object sender, KeyEventArgs e)
         { if (e.KeyCode == Keys.Enter || e.KeyCode == Keys.Return) { e.SuppressKeyPress = true; e.Handled = true; } }
         private void PersonalForm_KeyPress(object sender, KeyPressEventArgs e)
-        { if (e.KeyChar == '\r' || e.KeyChar == '\n') { e.Handled = true; } }
-
-        private void TryTakeLastNfc()
-        {
-            // Einfache Übernahme: NFC-Token aus Zwischenablage lesen (falls vorhanden)
-            try
-            {
-                string token = Clipboard.ContainsText() ? (Clipboard.GetText() ?? string.Empty).Trim() : null;
-                if (!string.IsNullOrWhiteSpace(token))
-                {
-                    txtNfc.Text = token;
-                }
-                else
-                {
-                    MessageBox.Show(this, "Kein NFC-Wert verfügbar. Bitte manuell eingeben.", "Hinweis", MessageBoxButtons.OK, MessageBoxIcon.Information);
-                }
-            }
-            catch
-            {
-                try { MessageBox.Show(this, "NFC konnte nicht übernommen werden.", "Hinweis", MessageBoxButtons.OK, MessageBoxIcon.Information); } catch { }
-            }
-        }
-
-        private async System.Threading.Tasks.Task SaveAsync()
-        {
-            if (_currentPid <= 0)
-            {
-                MessageBox.Show(this, "Bitte zuerst Personal laden.", "Hinweis", MessageBoxButtons.OK, MessageBoxIcon.Information);
-                return;
-            }
-
-            using (var db = new DatabaseHelperKassen())
-            {
-                try
-                {
-                    await db.SetFahrercodeAsync(_currentPid, string.IsNullOrWhiteSpace(txtFahrercode.Text) ? (string)null : txtFahrercode.Text.Trim());
-                    await db.SetNfcAsync(_currentPid, string.IsNullOrWhiteSpace(txtNfc.Text) ? (string)null : txtNfc.Text.Trim());
-                    MessageBox.Show(this, "Gespeichert.", "Info", MessageBoxButtons.OK, MessageBoxIcon.Information);
-                }
-                catch (Exception ex)
-                {
-                    MessageBox.Show(this, "Fehler beim Speichern: " + ex.Message, "Fehler", MessageBoxButtons.OK, MessageBoxIcon.Error);
-                }
-            }
-        }
-
-        // Neu: Auswahl-Handling und Übernahme der selektierten Zahlung in die Bearbeitungsfelder
-        private void GvOpenPayments_SelectionChanged(object sender, EventArgs e)
-        {
-            bool hasSelection = gvOpenPayments != null && gvOpenPayments.CurrentRow != null && gvOpenPayments.CurrentRow.DataBoundItem != null;
-            if (btnEditPayment != null) btnEditPayment.Enabled = hasSelection;
-            if (btnDeletePayment != null) btnDeletePayment.Enabled = hasSelection;
-        }
-
-        private void LoadSelectedPaymentIntoFields()
-        {
-            if (gvOpenPayments == null || gvOpenPayments.CurrentRow == null) return;
-            var drv = gvOpenPayments.CurrentRow.DataBoundItem as DataRowView; if (drv == null) return; var row = drv.Row;
-
-            // Typ übernehmen
-            if (row.Table.Columns.Contains("Typ"))
-            {
-                var typ = Convert.ToString(row["Typ"]);
-                if (!string.IsNullOrWhiteSpace(typ))
-                {
-                    int idx = cboNewType.FindStringExact(typ);
-                    if (idx >= 0) cboNewType.SelectedIndex = idx;
-                }
-            }
-
-            // Text
-            if (row.Table.Columns.Contains("Buchungstext"))
-                txtNewPayText.Text = Convert.ToString(row["Buchungstext"]) ?? string.Empty;
-
-            // Beträge/MwSt
-            decimal b19 = 0m, b7 = 0m, b0 = 0m;
-            try { if (row.Table.Columns.Contains("Betrag19")) b19 = row["Betrag19"] == DBNull.Value ? 0m : Convert.ToDecimal(row["Betrag19"]); } catch { }
-            try { if (row.Table.Columns.Contains("Betrag7")) b7 = row["Betrag7"] == DBNull.Value ? 0m : Convert.ToDecimal(row["Betrag7"]); } catch { }
-            try { if (row.Table.Columns.Contains("Betrag0")) b0 = row["Betrag0"] == DBNull.Value ? 0m : Convert.ToDecimal(row["Betrag0"]); } catch { }
-
-            string mwst = "19"; decimal amount = b19;
-            if (b7 != 0m) { mwst = "7"; amount = b7; }
-            else if (b0 != 0m) { mwst = "0"; amount = b0; }
-            int mwstIdx = cboNewMwst.FindStringExact(mwst);
-            if (mwstIdx >= 0) cboNewMwst.SelectedIndex = mwstIdx;
-            try { nudNewAmount.Value = Math.Max(nudNewAmount.Minimum, Math.Min(nudNewAmount.Maximum, amount)); } catch { }
-
-            // Kostenstellen/Konto
-            txtNewK1.Text = row.Table.Columns.Contains("Kost1") && row["Kost1"] != DBNull.Value ? Convert.ToString(row["Kost1"]) : string.Empty;
-            txtNewK2.Text = row.Table.Columns.Contains("Kost2") && row["Kost2"] != DBNull.Value ? Convert.ToString(row["Kost2"]) : string.Empty;
-            txtNewKonto.Text = row.Table.Columns.Contains("Konto") && row["Konto"] != DBNull.Value ? Convert.ToString(row["Konto"]) : string.Empty;
-        }
-
-        // --- RE-ADDED Hilfsmethoden ---
-        private void StyleGrid(DataGridView gv)
-        {
-            if (gv == null) return;
-            gv.BorderStyle = BorderStyle.None;
-            gv.EnableHeadersVisualStyles = false;
-            gv.ColumnHeadersDefaultCellStyle.BackColor = Color.FromArgb(33, 150, 243);
-            gv.ColumnHeadersDefaultCellStyle.ForeColor = Color.White;
-            gv.ColumnHeadersDefaultCellStyle.Font = new Font("Segoe UI", 10F, FontStyle.Bold);
-            gv.RowHeadersVisible = false;
-            gv.AlternatingRowsDefaultCellStyle.BackColor = Color.FromArgb(245, 247, 250);
-            gv.DefaultCellStyle.Font = new Font("Segoe UI", 10F);
-            gv.DefaultCellStyle.SelectionBackColor = Color.FromArgb(227, 242, 253);
-            gv.DefaultCellStyle.SelectionForeColor = Color.Black;
-        }
-
-        private static void TrySetHeader(DataGridView gv, string colName, string header)
-        {
-            if (gv == null) return; if (gv.Columns.Contains(colName)) gv.Columns[colName].HeaderText = header;
-        }
-        private static void TryHideColumn(DataGridView gv, string colName)
-        { if (gv == null) return; if (gv.Columns.Contains(colName)) gv.Columns[colName].Visible = false; }
-        private static void TryFormatAmount(DataGridView gv, string colName)
-        { if (gv == null) return; if (gv.Columns.Contains(colName)) gv.Columns[colName].DefaultCellStyle.Format = "N2"; }
-
-        private void ApplyGuthabenGridFormatting()
-        {
-            if (gvGuthabenHistory?.DataSource == null) return;
-            var gv = gvGuthabenHistory;
-            TrySetHeader(gv, "ErfasstAm", "Erfasst");
-            TrySetHeader(gv, "Zeit", "Erfasst");
-            TrySetHeader(gv, "Buchungstext", "Text");
-            TrySetHeader(gv, "Text", "Text");
-            TrySetHeader(gv, "Delta", "Änderung");
-            TrySetHeader(gv, "Saldo", "Saldo");
-            if (gv.Columns.Contains("Belegnummer")) gv.Columns["Belegnummer"].HeaderText = "B.-Nr";
-            try { if (gv.Columns.Contains("Belegnummer")) gv.Columns["Belegnummer"].DisplayIndex = 0; } catch { }
-            try { if (gv.Columns.Contains("ErfasstAm")) gv.Columns["ErfasstAm"].DisplayIndex = 1; else if (gv.Columns.Contains("Zeit")) gv.Columns["Zeit"].DisplayIndex = 1; } catch { }
-            try { if (gv.Columns.Contains("Buchungstext")) gv.Columns["Buchungstext"].DisplayIndex = 2; else if (gv.Columns.Contains("Text")) gv.Columns["Text"].DisplayIndex = 2; } catch { }
-            try { if (gv.Columns.Contains("Delta")) gv.Columns["Delta"].DisplayIndex = 3; } catch { }
-            try { if (gv.Columns.Contains("Saldo")) gv.Columns["Saldo"].DisplayIndex = 4; } catch { }
-            TryHideColumn(gv, "Typ"); TryHideColumn(gv, "Betrag19"); TryHideColumn(gv, "Betrag7"); TryHideColumn(gv, "Betrag0");
-            if (gv.Columns.Contains("Belegnummer")) gv.Columns["Belegnummer"].AutoSizeMode = DataGridViewAutoSizeColumnMode.DisplayedCells;
-            var cErfasst = gv.Columns.Contains("ErfasstAm") ? gv.Columns["ErfasstAm"] : (gv.Columns.Contains("Zeit") ? gv.Columns["Zeit"] : null);
-            if (cErfasst != null) cErfasst.AutoSizeMode = DataGridViewAutoSizeColumnMode.DisplayedCells;
-            var cText = gv.Columns.Contains("Buchungstext") ? gv.Columns["Buchungstext"] : (gv.Columns.Contains("Text") ? gv.Columns["Text"] : null);
-            if (cText != null) cText.AutoSizeMode = DataGridViewAutoSizeColumnMode.Fill;
-            if (gv.Columns.Contains("Delta")) { var c = gv.Columns["Delta"]; c.AutoSizeMode = DataGridViewAutoSizeColumnMode.DisplayedCells; c.DefaultCellStyle.Alignment = DataGridViewContentAlignment.MiddleRight; TryFormatAmount(gv, "Delta"); }
-            if (gv.Columns.Contains("Saldo")) { var c = gv.Columns["Saldo"]; c.AutoSizeMode = DataGridViewAutoSizeColumnMode.DisplayedCells; c.DefaultCellStyle.Alignment = DataGridViewContentAlignment.MiddleRight; TryFormatAmount(gv, "Saldo"); }
-        }
-
-        private void ApplyOpenShiftsGridFormatting()
-        {
-            if (gvOpenShifts?.DataSource == null) return;
-            TryHideColumn(gvOpenShifts, "PersId"); TryHideColumn(gvOpenShifts, "PersName"); TryHideColumn(gvOpenShifts, "FhzId");
-            TrySetHeader(gvOpenShifts, "Kennzeichen", "Kennzeichen");
-            TrySetHeader(gvOpenShifts, "StartZeit", "Start");
-            TrySetHeader(gvOpenShifts, "Belegnummer", "B.-Nr");
-            TrySetHeader(gvOpenShifts, "Betrag19", "19%");
-            TrySetHeader(gvOpenShifts, "Betrag7", "7%");
-            TrySetHeader(gvOpenShifts, "Betrag0", "0%");
-            TrySetHeader(gvOpenShifts, "OffenerBetrag", "Offen");
-            TryFormatAmount(gvOpenShifts, "Betrag19"); TryFormatAmount(gvOpenShifts, "Betrag7"); TryFormatAmount(gvOpenShifts, "Betrag0"); TryFormatAmount(gvOpenShifts, "OffenerBetrag");
-        }
-
-        private void ApplyOpenPaymentsGridFormatting()
-        {
-            if (gvOpenPayments?.DataSource == null) return;
-            TryHideColumn(gvOpenPayments, "PersId");
-            TrySetHeader(gvOpenPayments, "Typ", "Typ");
-            TrySetHeader(gvOpenPayments, "Buchungstext", "Text");
-            TrySetHeader(gvOpenPayments, "Betrag19", "19%");
-            TrySetHeader(gvOpenPayments, "Betrag7", "7%");
-            TrySetHeader(gvOpenPayments, "Betrag0", "0%");
-            TrySetHeader(gvOpenPayments, "ErfasstAm", "Erfasst");
-            TrySetHeader(gvOpenPayments, "Belegnummer", "B.-Nr");
-            TryFormatAmount(gvOpenPayments, "Betrag19"); TryFormatAmount(gvOpenPayments, "Betrag7"); TryFormatAmount(gvOpenPayments, "Betrag0");
-        }
-
-        private async System.Threading.Tasks.Task LoadActivePersonalAsync()
-        {
-            try
-            {
-                using (var db = new DatabaseHelperKassen())
-                {
-                    var dt = await db.GetActivePersonalAsync();
-                    _suppressEvents = true;
-                    cboPerson.DisplayMember = "Name"; cboPerson.ValueMember = "PID"; cboPerson.DataSource = dt; cboPerson.SelectedIndex = -1;
-                }
-            }
-            catch { }
-            finally { _suppressEvents = false; }
-        }
-
-        private async System.Threading.Tasks.Task LoadAccountingPresetsAsync()
-        {
-            try
-            {
-                using (var db = new DatabaseHelperKassen())
-                {
-                    var dt = await db.LoadZahlungsVorlagenAsync();
-                    cboPreset.Items.Clear();
-                    cboPreset.Items.Add(new ComboItem { Text = "Vorlage auswählen", Row = null });
-                    foreach (DataRow r in dt.Rows)
-                    {
-                        string name = Convert.ToString(r["VorlagenName"]);
-                        if (string.IsNullOrWhiteSpace(name)) continue;
-                        cboPreset.Items.Add(new ComboItem { Text = name, Row = r });
-                    }
-                    if (cboPreset.Items.Count > 0) cboPreset.SelectedIndex = 0;
-                }
-            }
-            catch { }
-        }
-
+        { if (e.KeyChar=='\r' || e.KeyChar=='\n') { e.Handled = true; } }
+        private class ComboItem { public string Text { get; set; } public DataRow Row { get; set; } public override string ToString()=>Text; }
+        private async Task LoadActivePersonalAsync()
+        { try{ using(var db=new DatabaseHelperKassen()){ var dt=await db.GetActivePersonalAsync(); _suppressEvents=true; cboPerson.DisplayMember="Name"; cboPerson.ValueMember="PID"; cboPerson.DataSource=dt; cboPerson.SelectedIndex=-1; } } catch {} finally { _suppressEvents=false; } }
+        private async Task LoadAccountingPresetsAsync()
+        { try{ using(var db=new DatabaseHelperKassen()){ var dt=await db.LoadZahlungsVorlagenAsync(); cboPreset.Items.Clear(); cboPreset.Items.Add(new ComboItem{Text="Vorlage auswählen",Row=null}); foreach(DataRow r in dt.Rows){ string name=Convert.ToString(r["VorlagenName"]); if(string.IsNullOrWhiteSpace(name)) continue; cboPreset.Items.Add(new ComboItem{Text=name,Row=r}); } if(cboPreset.Items.Count>0) cboPreset.SelectedIndex=0; } } catch {} }
         private void ApplyPresetToFields()
-        {
-            if (!(cboPreset.SelectedItem is ComboItem ci) || ci.Row == null) return;
-            var row = ci.Row;
-            string txt = row.Table.Columns.Contains("Buchungstext") ? Convert.ToString(row["Buchungstext"]) : null;
-            string k1 = row.Table.Columns.Contains("Kost1") ? Convert.ToString(row["Kost1"]) : null;
-            string k2 = row.Table.Columns.Contains("Kost2") ? Convert.ToString(row["Kost2"]) : null;
-            string kto = row.Table.Columns.Contains("Konto") ? Convert.ToString(row["Konto"]) : null;
-            string typ = row.Table.Columns.Contains("Typ") ? Convert.ToString(row["Typ"]) : null;
-            if (!string.IsNullOrWhiteSpace(txt)) txtNewPayText.Text = txt;
-            txtNewK1.Text = k1 ?? string.Empty; txtNewK2.Text = k2 ?? string.Empty; txtNewKonto.Text = kto ?? string.Empty;
-            if (!string.IsNullOrWhiteSpace(typ)) { int idx = cboNewType.FindStringExact(typ); if (idx >= 0) cboNewType.SelectedIndex = idx; }
-            try
-            {
-                decimal m19 = 0, m7 = 0, m0 = 0;
-                if (row.Table.Columns.Contains("Betrag19") && row["Betrag19"] != DBNull.Value) m19 = Convert.ToDecimal(row["Betrag19"]);
-                if (row.Table.Columns.Contains("Betrag7") && row["Betrag7"] != DBNull.Value) m7 = Convert.ToDecimal(row["Betrag7"]);
-                if (row.Table.Columns.Contains("Betrag0") && row["Betrag0"] != DBNull.Value) m0 = Convert.ToDecimal(row["Betrag0"]);
-                string target = null;
-                if (m19 == 1m && m7 == 0m && m0 == 0m) target = "19"; else if (m7 == 1m && m19 == 0m && m0 == 0m) target = "7"; else if (m0 == 1m && m19 == 0m && m7 == 0m) target = "0";
-                if (target != null) { int mwIdx = cboNewMwst.FindStringExact(target); if (mwIdx >= 0) cboNewMwst.SelectedIndex = mwIdx; }
-            }
-            catch { }
+        { if(!(cboPreset.SelectedItem is ComboItem ci) || ci.Row==null) return; var row=ci.Row; txtNewPayText.Text = row.Table.Columns.Contains("Buchungstext")? Convert.ToString(row["Buchungstext"]): string.Empty; txtNewK1.Text = row.Table.Columns.Contains("Kost1")? Convert.ToString(row["Kost1"]): string.Empty; txtNewK2.Text = row.Table.Columns.Contains("Kost2")? Convert.ToString(row["Kost2"]): string.Empty; txtNewKonto.Text = row.Table.Columns.Contains("Konto")? Convert.ToString(row["Konto"]): string.Empty; var typ=row.Table.Columns.Contains("Typ")? Convert.ToString(row["Typ"]): null; if(!string.IsNullOrWhiteSpace(typ)){ int ix=cboNewType.FindStringExact(typ); if(ix>=0) cboNewType.SelectedIndex=ix; } try{ decimal m19=0,m7=0,m0=0; if(row.Table.Columns.Contains("Betrag19")&& row["Betrag19"]!=DBNull.Value) m19=Convert.ToDecimal(row["Betrag19"]); if(row.Table.Columns.Contains("Betrag7")&& row["Betrag7"]!=DBNull.Value) m7=Convert.ToDecimal(row["Betrag7"]); if(row.Table.Columns.Contains("Betrag0")&& row["Betrag0"]!=DBNull.Value) m0=Convert.ToDecimal(row["Betrag0"]); string target=null; if(m19==1m && m7==0m && m0==0m) target="19"; else if(m7==1m && m19==0m && m0==0m) target="7"; else if(m0==1m && m19==0m && m7==0m) target="0"; if(target!=null){ int mi=cboNewMwst.FindStringExact(target); if(mi>=0) cboNewMwst.SelectedIndex=mi; } } catch {}
         }
-        // === Ende Hilfsmethoden ===
+        private void StyleGrid(DataGridView gv)
+        { if(gv==null) return; gv.BorderStyle=BorderStyle.None; gv.EnableHeadersVisualStyles=false; gv.ColumnHeadersDefaultCellStyle.BackColor=Color.FromArgb(33,150,243); gv.ColumnHeadersDefaultCellStyle.ForeColor=Color.White; gv.ColumnHeadersDefaultCellStyle.Font=new Font("Segoe UI",10F,FontStyle.Bold); gv.RowHeadersVisible=false; gv.AlternatingRowsDefaultCellStyle.BackColor=Color.FromArgb(245,247,250); gv.DefaultCellStyle.Font=new Font("Segoe UI",10F); gv.DefaultCellStyle.SelectionBackColor=Color.FromArgb(227,242,253); gv.DefaultCellStyle.SelectionForeColor=Color.Black; }
+        private static void TrySetHeader(DataGridView gv,string col,string header){ if(gv!=null && gv.Columns.Contains(col)) gv.Columns[col].HeaderText=header; }
+        private static void TryFormatAmount(DataGridView gv,string col){ if(gv!=null && gv.Columns.Contains(col)) gv.Columns[col].DefaultCellStyle.Format="N2"; }
+        private void ApplyOpenShiftsGridFormatting(){ if(gvOpenShifts==null|| gvOpenShifts.DataSource==null) return; TrySetHeader(gvOpenShifts,"StartZeit","Start"); TrySetHeader(gvOpenShifts,"OffenerBetrag","Offen"); TryFormatAmount(gvOpenShifts,"OffenerBetrag"); }
+        private void ApplyGuthabenGridFormatting(){ if(gvGuthabenHistory==null|| gvGuthabenHistory.DataSource==null) return; TrySetHeader(gvGuthabenHistory,"Saldo","Saldo"); TryFormatAmount(gvGuthabenHistory,"Saldo"); }
+        private void GvOpenPayments_SelectionChanged(object sender,EventArgs e){ bool has= gvOpenPayments!=null && gvOpenPayments.CurrentRow!=null && gvOpenPayments.CurrentRow.DataBoundItem!=null; if(btnEditPayment!=null) btnEditPayment.Enabled=has; if(btnDeletePayment!=null) btnDeletePayment.Enabled=has; }
+        private void LoadSelectedPaymentIntoFields(){ if(gvOpenPayments==null|| gvOpenPayments.CurrentRow==null) return; var drv=gvOpenPayments.CurrentRow.DataBoundItem as DataRowView; if(drv==null) return; var row=drv.Row; if(row.Table.Columns.Contains("Buchungstext")) txtNewPayText.Text=Convert.ToString(row["Buchungstext"])??string.Empty; decimal b19=0,b7=0,b0=0; try{ if(row.Table.Columns.Contains("Betrag19")&& row["Betrag19"]!=DBNull.Value) b19=Convert.ToDecimal(row["Betrag19"]);}catch{} try{ if(row.Table.Columns.Contains("Betrag7")&& row["Betrag7"]!=DBNull.Value) b7=Convert.ToDecimal(row["Betrag7"]);}catch{} try{ if(row.Table.Columns.Contains("Betrag0")&& row["Betrag0"]!=DBNull.Value) b0=Convert.ToDecimal(row["Betrag0"]);}catch{} string mw=b19>0?"19": (b7>0?"7": (b0>0?"0":null)); if(mw!=null){ int ix=cboNewMwst.FindStringExact(mw); if(ix>=0) cboNewMwst.SelectedIndex=ix; nudNewAmount.Value= Math.Max(nudNewAmount.Minimum, Math.Min(nudNewAmount.Maximum, b19>0?b19:(b7>0?b7:b0))); } txtNewK1.Text = row.Table.Columns.Contains("Kost1")&& row["Kost1"]!=DBNull.Value? Convert.ToString(row["Kost1"]): string.Empty; txtNewK2.Text = row.Table.Columns.Contains("Kost2")&& row["Kost2"]!=DBNull.Value? Convert.ToString(row["Kost2"]): string.Empty; txtNewKonto.Text = row.Table.Columns.Contains("Konto")&& row["Konto"]!=DBNull.Value? Convert.ToString(row["Konto"]): string.Empty; }
+        private void TryTakeLastNfc(){ try{ string token= Clipboard.ContainsText()? (Clipboard.GetText()??string.Empty).Trim(): null; if(!string.IsNullOrWhiteSpace(token)) txtNfc.Text=token; else MessageBox.Show(this,"Kein NFC-Wert verfügbar.","Hinweis",MessageBoxButtons.OK,MessageBoxIcon.Information);} catch { } }
+        private async Task SaveAsync(){ if(_currentPid<=0){ MessageBox.Show(this,"Bitte zuerst Personal laden.","Hinweis",MessageBoxButtons.OK,MessageBoxIcon.Information); return;} using(var db=new DatabaseHelperKassen()){ try{ await db.SetFahrercodeAsync(_currentPid,string.IsNullOrWhiteSpace(txtFahrercode.Text)?null:txtFahrercode.Text.Trim()); await db.SetNfcAsync(_currentPid,string.IsNullOrWhiteSpace(txtNfc.Text)?null:txtNfc.Text.Trim()); MessageBox.Show(this,"Gespeichert.","Info",MessageBoxButtons.OK,MessageBoxIcon.Information);} catch(Exception ex){ MessageBox.Show(this,"Fehler beim Speichern: "+ex.Message,"Fehler",MessageBoxButtons.OK,MessageBoxIcon.Error);} } }
+        private async Task CreatePaymentWithPresetAsync()
+        { if(_currentPid<=0){ MessageBox.Show(this,"Bitte zuerst Mitarbeiter laden/auswählen.","Hinweis",MessageBoxButtons.OK,MessageBoxIcon.Information); return;} using(var db=new DatabaseHelperKassen()){ try{ string mw=cboNewMwst.SelectedItem?.ToString(); decimal amount=nudNewAmount.Value; decimal b19=0,b7=0,b0=0; if(mw=="19") b19=amount; else if(mw=="7") b7=amount; else b0=amount; int? k1=int.TryParse(txtNewK1.Text,out var vk1)?(int?)vk1:null; int? k2=int.TryParse(txtNewK2.Text,out var vk2)?(int?)vk2:null; int? kto=int.TryParse(txtNewKonto.Text,out var vkto)?(int?)vkto:null; string text=txtNewPayText.Text?.Trim(); if(string.IsNullOrWhiteSpace(text)){ MessageBox.Show(this,"Bitte Buchungstext eingeben.","Hinweis",MessageBoxButtons.OK,MessageBoxIcon.Information); return;} string typText=cboNewType.SelectedItem as string; if(string.IsNullOrWhiteSpace(typText)){ MessageBox.Show(this,"Bitte Typ auswählen.","Hinweis",MessageBoxButtons.OK,MessageBoxIcon.Information); return;} string typCode= typText.Equals("Einzahlung",StringComparison.OrdinalIgnoreCase)?"2": (typText.Equals("Auszahlung",StringComparison.OrdinalIgnoreCase)?"3":typText); int manId=0; try{ if(cboMandant?.SelectedValue!=null) manId=Convert.ToInt32(cboMandant.SelectedValue);}catch{} await db.InsertOffeneZahlungAsync(_currentPid,typCode,text,b19,b7,b0,k1,k2,kto,manId); await BindOpenPaymentsAsync(db); txtNewPayText.Clear(); nudNewAmount.Value=0; cboNewMwst.SelectedIndex=-1; txtNewK1.Clear(); txtNewK2.Clear(); txtNewKonto.Clear(); MessageBox.Show(this,"Zahlung angelegt.","Info",MessageBoxButtons.OK,MessageBoxIcon.Information); GvOpenPayments_SelectionChanged(null,EventArgs.Empty);} catch(Exception ex){ MessageBox.Show(this,"Fehler beim Anlegen: "+ex.Message,"Fehler",MessageBoxButtons.OK,MessageBoxIcon.Error);} } }
+        private async Task EditSelectedPaymentAsync()
+        { if(_currentPid<=0){ MessageBox.Show(this,"Bitte zuerst Mitarbeiter laden.","Hinweis",MessageBoxButtons.OK,MessageBoxIcon.Information); return;} if(gvOpenPayments.CurrentRow?.DataBoundItem is DataRowView drv){ var row=drv.Row; if(!row.Table.Columns.Contains("Belegnummer")){ MessageBox.Show(this,"Belegnummer fehlt.","Hinweis",MessageBoxButtons.OK,MessageBoxIcon.Information); return;} int beleg=Convert.ToInt32(row["Belegnummer"]); string mw=cboNewMwst.SelectedItem?.ToString(); decimal amount=nudNewAmount.Value; decimal b19=0,b7=0,b0=0; if(mw=="19") b19=amount; else if(mw=="7") b7=amount; else b0=amount; int? k1=int.TryParse(txtNewK1.Text,out var vk1)?(int?)vk1:null; int? k2=int.TryParse(txtNewK2.Text,out var vk2)?(int?)vk2:null; int? kto=int.TryParse(txtNewKonto.Text,out var vkto)?(int?)vkto:null; string text=txtNewPayText.Text?.Trim(); if(string.IsNullOrWhiteSpace(text)){ MessageBox.Show(this,"Bitte Buchungstext eingeben.","Hinweis",MessageBoxButtons.OK,MessageBoxIcon.Information); return;} string typText=cboNewType.SelectedItem as string ?? "Auszahlung"; string typCode= typText.Equals("Einzahlung",StringComparison.OrdinalIgnoreCase)?"2": (typText.Equals("Auszahlung",StringComparison.OrdinalIgnoreCase)?"3":typText); using(var db=new DatabaseHelperKassen()){ try{ int n=await db.UpdateOffeneZahlungAsync(beleg,typCode,text,b19,b7,b0,k1,k2,kto); if(n<=0){ MessageBox.Show(this,"Zahlung konnte nicht geändert werden.","Hinweis",MessageBoxButtons.OK,MessageBoxIcon.Information); return;} await BindOpenPaymentsAsync(db); MessageBox.Show(this,"Zahlung geändert.","Info",MessageBoxButtons.OK,MessageBoxIcon.Information); GvOpenPayments_SelectionChanged(null,EventArgs.Empty);} catch(Exception ex){ MessageBox.Show(this,"Fehler beim Ändern: "+ex.Message,"Fehler",MessageBoxButtons.OK,MessageBoxIcon.Error);} } } }
+        private async Task DeleteSelectedPaymentAsync()
+        { if(_currentPid<=0){ MessageBox.Show(this,"Bitte zuerst Mitarbeiter laden.","Hinweis",MessageBoxButtons.OK,MessageBoxIcon.Information); return;} if(gvOpenPayments.CurrentRow?.DataBoundItem is DataRowView drv){ var row=drv.Row; if(!row.Table.Columns.Contains("Belegnummer")) return; int beleg=Convert.ToInt32(row["Belegnummer"]); if(MessageBox.Show(this,$"Zahlung {beleg} wirklich löschen?","Bestätigung",MessageBoxButtons.YesNo,MessageBoxIcon.Question)!=DialogResult.Yes) return; using(var db=new DatabaseHelperKassen()){ try{ int n=await db.DeleteOffeneZahlungAsync(beleg); if(n<=0){ MessageBox.Show(this,"Zahlung konnte nicht gelöscht werden.","Hinweis",MessageBoxButtons.OK,MessageBoxIcon.Information); return;} await BindOpenPaymentsAsync(db); MessageBox.Show(this,"Zahlung gelöscht.","Info",MessageBoxButtons.OK,MessageBoxIcon.Information); GvOpenPayments_SelectionChanged(null,EventArgs.Empty);} catch(Exception ex){ MessageBox.Show(this,"Fehler beim Löschen: "+ex.Message,"Fehler",MessageBoxButtons.OK,MessageBoxIcon.Error);} } } }
     }
 }
