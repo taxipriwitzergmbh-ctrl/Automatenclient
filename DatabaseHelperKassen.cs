@@ -266,14 +266,14 @@ ORDER BY s.StartZeit DESC;";
                 int safeK1 = k1 ?? 0;
                 int safeK2 = k2 ?? 0;
                 int safeKto = kto ?? 0;
-                string safeTyp = typ ?? string.Empty;
+                string safeTyp = typ ?? string.Empty; // kann bereits numerischer Code sein ("2"/"3")
                 string safeTxt = buchungstext ?? string.Empty;
-                string automatName = "Offene Zahlung"; // NOT NULL in TKassenbuchZahlungen
 
+                // Neu: Kein AutomatenName mehr setzen, stattdessen DeviceID = 0 erzwingen
                 cmd.CommandText = $@"INSERT INTO {_tblZahlungen}
-(PersId, Typ, Buchungstext, Betrag19, Betrag7, Betrag0, BetragGesamt, Kost1, Kost2, Konto, FirmenID, AutomatenName, Verbucht, ErfasstAm)
+(PersId, Typ, Buchungstext, Betrag19, Betrag7, Betrag0, BetragGesamt, Kost1, Kost2, Konto, FirmenID, DeviceID, Verbucht, ErfasstAm)
 OUTPUT INSERTED.Belegnummer
-VALUES(@pid,@typ,@txt,@b19,@b7,@b0,@bg,@k1,@k2,@kto,@fid,@an,0,SYSDATETIME());";
+VALUES(@pid,@typ,@txt,@b19,@b7,@b0,@bg,@k1,@k2,@kto,@fid,0,0,SYSDATETIME());";
                 cmd.Parameters.AddWithValue("@pid", persId);
                 cmd.Parameters.AddWithValue("@typ", safeTyp);
                 cmd.Parameters.AddWithValue("@txt", safeTxt);
@@ -285,7 +285,6 @@ VALUES(@pid,@typ,@txt,@b19,@b7,@b0,@bg,@k1,@k2,@kto,@fid,@an,0,SYSDATETIME());";
                 cmd.Parameters.AddWithValue("@k2", safeK2);
                 cmd.Parameters.AddWithValue("@kto", safeKto);
                 cmd.Parameters.AddWithValue("@fid", firmenId);
-                cmd.Parameters.AddWithValue("@an", automatName);
                 var o = await cmd.ExecuteScalarAsync();
                 if (o == null || o == DBNull.Value) return 0;
                 int id; if (o is int) id = (int)o; else if (o is decimal) id = Convert.ToInt32((decimal)o); else int.TryParse(Convert.ToString(o), out id);
@@ -546,7 +545,8 @@ WHERE Belegnummer=@bnr AND (Verbucht=0 OR Verbucht IS NULL)";
             await EnsureOpenAsync();
             using (var cmd = _connection.CreateCommand())
             {
-                cmd.CommandText = $@"UPDATE {_tblZahlungen} SET Verbucht=1, AutomatenName='Storniert' WHERE Belegnummer=@bnr AND (Verbucht=0 OR Verbucht IS NULL)";
+                // AutomatenName nicht mehr verändern, nur Verbucht setzen
+                cmd.CommandText = $@"UPDATE {_tblZahlungen} SET Verbucht=1 WHERE Belegnummer=@bnr AND (Verbucht=0 OR Verbucht IS NULL)";
                 cmd.Parameters.AddWithValue("@bnr", belegnummer);
                 return await cmd.ExecuteNonQueryAsync();
             }
@@ -1042,6 +1042,24 @@ WHERE Id=@Id; SELECT @Id;";
                 }
 
                 tx.Commit();
+            }
+        }
+
+        private static byte MapTypStringToCode(string t)
+        {
+            if (string.IsNullOrWhiteSpace(t)) return 0;
+            t = t.Trim();
+            // Neu: numerische Codes direkt erlauben
+            if (byte.TryParse(t, out var num) && num >= 1 && num <= 5)
+                return num;
+            switch (t.ToLowerInvariant())
+            {
+                case "anfangsbestand": return 1;
+                case "einzahlung": return 2;
+                case "auszahlung": return 3;
+                case "schichtabrechnung": return 4;
+                case "personalguthaben": return 5;
+                default: return 0;
             }
         }
 

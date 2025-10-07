@@ -104,7 +104,7 @@ namespace TaMi_Kassenclient
             {
                 SetStyle(ControlStyles.AllPaintingInWmPaint | ControlStyles.OptimizedDoubleBuffer | ControlStyles.UserPaint | ControlStyles.ResizeRedraw, true);
                 var pi = ctl.GetType().GetProperty("DoubleBuffered", System.Reflection.BindingFlags.Instance | System.Reflection.BindingFlags.NonPublic);
-                pi?.SetValue(ctl, true, null);
+                pi?.SetValue( ctl, true, null);
                 foreach (Control c in ctl.Controls)
                 {
                     EnableDoubleBuffer(c);
@@ -754,13 +754,14 @@ namespace TaMi_Kassenclient
                     string text = txtNewPayText.Text?.Trim();
                     if (string.IsNullOrWhiteSpace(text)) { MessageBox.Show(this, "Bitte Buchungstext eingeben.", "Hinweis", MessageBoxButtons.OK, MessageBoxIcon.Information); return; }
 
-                    string typ = cboNewType.SelectedItem as string;
-                    if (string.IsNullOrWhiteSpace(typ)) { MessageBox.Show(this, "Bitte Typ auswählen.", "Hinweis", MessageBoxButtons.OK, MessageBoxIcon.Information); return; }
+                    string typText = cboNewType.SelectedItem as string;
+                    if (string.IsNullOrWhiteSpace(typText)) { MessageBox.Show(this, "Bitte Typ auswählen.", "Hinweis", MessageBoxButtons.OK, MessageBoxIcon.Information); return; }
+                    string typCodeStr = typText.Equals("Einzahlung", StringComparison.OrdinalIgnoreCase) ? "2" :
+                                        typText.Equals("Auszahlung", StringComparison.OrdinalIgnoreCase) ? "3" : typText;
 
-                    int manId = 0;
-                    try { if (cboMandant?.SelectedValue != null) manId = Convert.ToInt32(cboMandant.SelectedValue); } catch { }
+                    int manId = 0; try { if (cboMandant?.SelectedValue != null) manId = Convert.ToInt32(cboMandant.SelectedValue); } catch { }
 
-                    await db.InsertOffeneZahlungAsync(_currentPid, typ, text, b19, b7, b0, k1, k2, kto, manId);
+                    await db.InsertOffeneZahlungAsync(_currentPid, typCodeStr, text, b19, b7, b0, k1, k2, kto, manId);
 
                     gvOpenPayments.DataSource = await db.GetOffeneAuszahlungenAsync(_currentPid);
                     ApplyOpenPaymentsGridFormatting();
@@ -781,7 +782,9 @@ namespace TaMi_Kassenclient
             if (!row.Table.Columns.Contains("Belegnummer")) { MessageBox.Show(this, "Belegnummer fehlt.", "Hinweis", MessageBoxButtons.OK, MessageBoxIcon.Information); return; }
             int beleg = Convert.ToInt32(row["Belegnummer"]);
 
-            string typ = cboNewType.SelectedItem as string ?? "Auszahlung"; // aus Eingabemaske übernehmen
+            string typText = cboNewType.SelectedItem as string ?? "Auszahlung";
+            string typCodeStr = typText.Equals("Einzahlung", StringComparison.OrdinalIgnoreCase) ? "2" :
+                                typText.Equals("Auszahlung", StringComparison.OrdinalIgnoreCase) ? "3" : typText;
             string txt = txtNewPayText.Text?.Trim();
             if (string.IsNullOrWhiteSpace(txt)) { MessageBox.Show(this, "Bitte Buchungstext eingeben.", "Hinweis", MessageBoxButtons.OK, MessageBoxIcon.Information); return; }
             string mwst = cboNewMwst.SelectedItem?.ToString();
@@ -795,7 +798,7 @@ namespace TaMi_Kassenclient
             {
                 try
                 {
-                    int n = await db.UpdateOffeneZahlungAsync(beleg, typ, txt, b19, b7, b0, k1, k2, kto);
+                    int n = await db.UpdateOffeneZahlungAsync(beleg, typCodeStr, txt, b19, b7, b0, k1, k2, kto);
                     if (n <= 0) { MessageBox.Show(this, "Zahlung konnte nicht geändert werden (evtl. bereits verbucht).", "Hinweis", MessageBoxButtons.OK, MessageBoxIcon.Information); return; }
                     gvOpenPayments.DataSource = await db.GetOffeneAuszahlungenAsync(_currentPid);
                     ApplyOpenPaymentsGridFormatting();

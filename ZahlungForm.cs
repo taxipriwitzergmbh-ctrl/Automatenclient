@@ -211,7 +211,9 @@ namespace TaMi_Kassenclient
             txtK1.Text = row.Table.Columns.Contains("Kost1")? Convert.ToString(row["Kost1"]) : string.Empty;
             txtK2.Text = row.Table.Columns.Contains("Kost2")? Convert.ToString(row["Kost2"]) : string.Empty;
             txtKto.Text = row.Table.Columns.Contains("Konto")? Convert.ToString(row["Konto"]) : string.Empty;
-            string typ = row.Table.Columns.Contains("Typ")? Convert.ToString(row["Typ"]) : null; if(!string.IsNullOrWhiteSpace(typ)){ int idx=cboTyp.FindStringExact(typ); if(idx>=0) cboTyp.SelectedIndex=idx; }
+            string typRaw = row.Table.Columns.Contains("Typ")? Convert.ToString(row["Typ"]) : null;
+            string typText = MapTypCodeToText(typRaw ?? string.Empty);
+            if(!string.IsNullOrWhiteSpace(typText)){ int idx=cboTyp.FindStringExact(typText); if(idx>=0) cboTyp.SelectedIndex=idx; }
             try{
                 decimal m19=0,m7=0,m0=0; if(row.Table.Columns.Contains("Betrag19") && row["Betrag19"]!=DBNull.Value) m19=Convert.ToDecimal(row["Betrag19"]); if(row.Table.Columns.Contains("Betrag7") && row["Betrag7"]!=DBNull.Value) m7=Convert.ToDecimal(row["Betrag7"]); if(row.Table.Columns.Contains("Betrag0") && row["Betrag0"]!=DBNull.Value) m0=Convert.ToDecimal(row["Betrag0"]);
                 string target=null; if(m19==1m && m7==0m && m0==0m) target="19"; else if(m7==1m && m19==0m && m0==0m) target="7"; else if(m0==1m && m19==0m && m7==0m) target="0"; if(target!=null){ int ix=cboMwst.FindStringExact(target); if(ix>=0) cboMwst.SelectedIndex=ix; }
@@ -235,8 +237,10 @@ namespace TaMi_Kassenclient
         private async Task CreatePaymentAsync()
         {
             if(!ValidateEntry(false, out var msg)){ if(msg!=null) MessageBox.Show(this,msg,"Hinweis",MessageBoxButtons.OK,MessageBoxIcon.Information); return; }
-            string typ=cboTyp.SelectedItem as string; string mwst=cboMwst.SelectedItem as string; decimal amount=nudAmount.Value; decimal b19=0,b7=0,b0=0; if(mwst=="19") b19=amount; else if(mwst=="7") b7=amount; else b0=amount; int? k1=int.TryParse(txtK1.Text,out var vk1)?(int?)vk1:null; int? k2=int.TryParse(txtK2.Text,out var vk2)?(int?)vk2:null; int? kto=int.TryParse(txtKto.Text,out var vkto)?(int?)vkto:null; int fid=0; try{ fid=Convert.ToInt32(cboFirma.SelectedValue);}catch{}
-            try{ using(var db=new DatabaseHelperKassen()) await db.InsertOffeneZahlungAsync(int.Parse(txtPid.Text.Trim()), typ, txtText.Text.Trim(), b19,b7,b0, k1,k2,kto,fid); lblInfo.Text=$"Zahlung gespeichert ({typ}, {amount:0.00} EUR)."; ResetEntryFields(); await LoadOpenPaymentsAsync(); }
+            string typText=cboTyp.SelectedItem as string; // Benutzer-Text
+            string typCode = MapTypTextToCode(typText);
+            string mwst=cboMwst.SelectedItem as string; decimal amount=nudAmount.Value; decimal b19=0,b7=0,b0=0; if(mwst=="19") b19=amount; else if(mwst=="7") b7=amount; else b0=amount; int? k1=int.TryParse(txtK1.Text,out var vk1)?(int?)vk1:null; int? k2=int.TryParse(txtK2.Text,out var vk2)?(int?)vk2:null; int? kto=int.TryParse(txtKto.Text,out var vkto)?(int?)vkto:null; int fid=0; try{ fid=Convert.ToInt32(cboFirma.SelectedValue);}catch{}
+            try{ using(var db=new DatabaseHelperKassen()) await db.InsertOffeneZahlungAsync(int.Parse(txtPid.Text.Trim()), typCode, txtText.Text.Trim(), b19,b7,b0, k1,k2,kto,fid); lblInfo.Text=$"Zahlung gespeichert ({typText}, {amount:0.00} EUR)."; ResetEntryFields(); await LoadOpenPaymentsAsync(); }
             catch(Exception ex){ MessageBox.Show(this,"Fehler: "+ex.Message,"Fehler",MessageBoxButtons.OK,MessageBoxIcon.Error);} }
 
         private void ResetEntryFields(){ txtText.Clear(); nudAmount.Value=0; txtK1.Clear(); txtK2.Clear(); txtKto.Clear(); cboTyp.SelectedIndex=0; cboMwst.SelectedIndex=0; if(cboFirma.Items.Count>0) cboFirma.SelectedIndex=0; _editBeleg=null; btnSaveChanges.Enabled=false; }
@@ -246,7 +250,7 @@ namespace TaMi_Kassenclient
         {
             if(dgvOpen?.CurrentRow==null) return; var drv=dgvOpen.CurrentRow.DataBoundItem as DataRowView; if(drv==null) return; var row=drv.Row;
             _editBeleg = row.Table.Columns.Contains("Belegnummer") && row["Belegnummer"]!=DBNull.Value ? (int?)Convert.ToInt32(row["Belegnummer"]) : null;
-            string typ = Convert.ToString(row["Typ"]) ?? string.Empty; if(!string.IsNullOrWhiteSpace(typ)){ int ix=cboTyp.FindStringExact(typ); if(ix>=0) cboTyp.SelectedIndex=ix; }
+            string typRaw = Convert.ToString(row["Typ"]) ?? string.Empty; string typText = MapTypCodeToText(typRaw); if(!string.IsNullOrWhiteSpace(typText)){ int ix=cboTyp.FindStringExact(typText); if(ix>=0) cboTyp.SelectedIndex=ix; }
             decimal b19 = row.Table.Columns.Contains("Betrag19") && row["Betrag19"]!=DBNull.Value ? Convert.ToDecimal(row["Betrag19"]) : 0m;
             decimal b7  = row.Table.Columns.Contains("Betrag7")  && row["Betrag7"] !=DBNull.Value ? Convert.ToDecimal(row["Betrag7"])  : 0m;
             decimal b0  = row.Table.Columns.Contains("Betrag0")  && row["Betrag0"] !=DBNull.Value ? Convert.ToDecimal(row["Betrag0"])  : 0m;
@@ -264,8 +268,8 @@ namespace TaMi_Kassenclient
         private async Task SaveEditedPaymentAsync()
         {
             if(!ValidateEntry(true, out var msg)){ if(msg!=null) MessageBox.Show(this,msg,"Hinweis",MessageBoxButtons.OK,MessageBoxIcon.Information); return; }
-            if(!_editBeleg.HasValue) return; string typ=cboTyp.SelectedItem as string; string mwst=cboMwst.SelectedItem as string; decimal amount=nudAmount.Value; decimal b19=0,b7=0,b0=0; if(mwst=="19") b19=amount; else if(mwst=="7") b7=amount; else b0=amount; int? k1=int.TryParse(txtK1.Text,out var vk1)?(int?)vk1:null; int? k2=int.TryParse(txtK2.Text,out var vk2)?(int?)vk2:null; int? kto=int.TryParse(txtKto.Text,out var vkto)?(int?)vkto:null; int fid=0; try{ fid=Convert.ToInt32(cboFirma.SelectedValue);}catch{}
-            try{ using(var db=new DatabaseHelperKassen()){ int n=await db.UpdateOffeneZahlungAsync(_editBeleg.Value, typ, txtText.Text.Trim(), b19,b7,b0, k1,k2,kto); if(n<=0){ MessageBox.Show(this,"Änderung nicht möglich (evtl. verbucht).","Hinweis",MessageBoxButtons.OK,MessageBoxIcon.Information); return; } } lblInfo.Text="Änderungen gespeichert."; _editBeleg=null; btnSaveChanges.Enabled=false; await LoadOpenPaymentsAsync(); }
+            if(!_editBeleg.HasValue) return; string typText=cboTyp.SelectedItem as string; string typCode=MapTypTextToCode(typText); string mwst=cboMwst.SelectedItem as string; decimal amount=nudAmount.Value; decimal b19=0,b7=0,b0=0; if(mwst=="19") b19=amount; else if(mwst=="7") b7=amount; else b0=amount; int? k1=int.TryParse(txtK1.Text,out var vk1)?(int?)vk1:null; int? k2=int.TryParse(txtK2.Text,out var vk2)?(int?)vk2:null; int? kto=int.TryParse(txtKto.Text,out var vkto)?(int?)vkto:null; int fid=0; try{ fid=Convert.ToInt32(cboFirma.SelectedValue);}catch{}
+            try{ using(var db=new DatabaseHelperKassen()){ int n=await db.UpdateOffeneZahlungAsync(_editBeleg.Value, typCode, txtText.Text.Trim(), b19,b7,b0, k1,k2,kto); if(n<=0){ MessageBox.Show(this,"Änderung nicht möglich (evtl. verbucht).","Hinweis",MessageBoxButtons.OK,MessageBoxIcon.Information); return; } } lblInfo.Text="Änderungen gespeichert."; _editBeleg=null; btnSaveChanges.Enabled=false; await LoadOpenPaymentsAsync(); }
             catch(Exception ex){ MessageBox.Show(this,"Fehler beim Speichern: "+ex.Message,"Fehler",MessageBoxButtons.OK,MessageBoxIcon.Error);} }
 
         // --- Storno ---
@@ -299,7 +303,7 @@ namespace TaMi_Kassenclient
                     foreach(DataRow r in raw.Rows)
                     {
                         int beleg = r.Table.Columns.Contains("Belegnummer") && r["Belegnummer"]!=DBNull.Value ? Convert.ToInt32(r["Belegnummer"]) : 0;
-                        string typ = Convert.ToString(r["Typ"]) ?? string.Empty;
+                        string typRaw = Convert.ToString(r["Typ"]) ?? string.Empty; string typText = MapTypCodeToText(typRaw);
                         decimal b19 = r.Table.Columns.Contains("Betrag19") && r["Betrag19"]!=DBNull.Value ? Convert.ToDecimal(r["Betrag19"]) : 0m;
                         decimal b7  = r.Table.Columns.Contains("Betrag7")  && r["Betrag7"] !=DBNull.Value ? Convert.ToDecimal(r["Betrag7"])  : 0m;
                         decimal b0  = r.Table.Columns.Contains("Betrag0")  && r["Betrag0"] !=DBNull.Value ? Convert.ToDecimal(r["Betrag0"])  : 0m;
@@ -311,7 +315,7 @@ namespace TaMi_Kassenclient
                         int k2 = r.Table.Columns.Contains("Kost2") && r["Kost2"]!=DBNull.Value ? Convert.ToInt32(r["Kost2"]) : 0;
                         int kto = r.Table.Columns.Contains("Konto") && r["Konto"]!=DBNull.Value ? Convert.ToInt32(r["Konto"]) : 0;
                         string textVal = Convert.ToString(r["Buchungstext"]) ?? string.Empty;
-                        view.Rows.Add(beleg,typ,ges,mw,firma,textVal,k1,k2,kto,b19,b7,b0,fid);
+                        view.Rows.Add(beleg,typText,ges,mw,firma,textVal,k1,k2,kto,b19,b7,b0,fid);
                     }
                     ConfigureOpenGridColumns(); dgvOpen.DataSource=view; lblOpenCaption.Text = $"Offene Zahlungen: {view.Rows.Count}";
                 }
@@ -509,6 +513,35 @@ namespace TaMi_Kassenclient
                 _ = LoadAccountingPresetsAsync().ContinueWith(t => { try { if (InvokeRequired) BeginInvoke(new Action(() => SelectPresetByName(lastName))); else SelectPresetByName(lastName); } catch { } });
             }
             dlg.Dispose();
+        }
+
+        // Hilfsmethoden für Typ-Mapping (minimalinvasiv)
+        private static string MapTypTextToCode(string text)
+        {
+            if (string.IsNullOrWhiteSpace(text)) return string.Empty;
+            switch (text.Trim().ToLowerInvariant())
+            {
+                case "einzahlung": return "2";
+                case "auszahlung": return "3";
+                // ggf. weitere Typen später:
+                case "anfangsbestand": return "1";
+                case "schichtabrechnung": return "4";
+                case "personalguthaben": return "5";
+                default: return text; // falls bereits numerisch oder unbekannt
+            }
+        }
+        private static string MapTypCodeToText(string code)
+        {
+            if (string.IsNullOrWhiteSpace(code)) return code;
+            switch (code.Trim())
+            {
+                case "1": return "Anfangsbestand";
+                case "2": return "Einzahlung";
+                case "3": return "Auszahlung";
+                case "4": return "Schichtabrechnung";
+                case "5": return "Personalguthaben";
+                default: return code; // schon Text oder unbekannt
+            }
         }
     }
 }
