@@ -170,8 +170,13 @@ namespace TaMi_Kassenclient
 
                 grpOpenPayments = new GroupBox { Text = "Offene Zahlungen", Location = new Point(540, grpOpenShifts.Bottom + 12), Size = new Size(ClientSize.Width - 564, 280), Anchor = AnchorStyles.Top | AnchorStyles.Left | AnchorStyles.Right };
                 grpOpenPayments.SuspendLayout();
-                gvOpenPayments = new DataGridView { Location = new Point(10, 24), Size = new Size(grpOpenPayments.Width - 20, grpOpenPayments.Height - 34), ReadOnly = true, AllowUserToAddRows = false, AllowUserToDeleteRows = false, AutoSizeColumnsMode = DataGridViewAutoSizeColumnsMode.Fill, Anchor = AnchorStyles.Top | AnchorStyles.Left | AnchorStyles.Right };
+                gvOpenPayments = new DataGridView { Location = new Point(10, 24), Size = new Size(grpOpenPayments.Width - 20, grpOpenPayments.Height - 34), ReadOnly = true, AllowUserToAddRows = false, AllowUserToDeleteRows = false, AutoSizeColumnsMode = DataGridViewAutoSizeColumnsMode.Fill, Anchor = AnchorStyles.Top | AnchorStyles.Left | AnchorStyles.Right, SelectionMode = DataGridViewSelectionMode.FullRowSelect, MultiSelect = false, BackgroundColor = Color.White, BorderStyle = BorderStyle.FixedSingle };
                 StyleGrid(gvOpenPayments); EnableDgvDoubleBuffer(gvOpenPayments);
+                // Auswahl wie in ZahlungForm: komplette Zeile in Blau
+                gvOpenPayments.DefaultCellStyle.SelectionBackColor = Color.FromArgb(33,150,243);
+                gvOpenPayments.DefaultCellStyle.SelectionForeColor = Color.White;
+                gvOpenPayments.AlternatingRowsDefaultCellStyle.SelectionBackColor = Color.FromArgb(33,150,243);
+                gvOpenPayments.AlternatingRowsDefaultCellStyle.SelectionForeColor = Color.White;
                 gvOpenPayments.SelectionChanged += GvOpenPayments_SelectionChanged;
                 gvOpenPayments.CellDoubleClick += (s, e) => LoadSelectedPaymentIntoFields();
                 grpOpenPayments.Controls.Add(gvOpenPayments);
@@ -811,7 +816,34 @@ namespace TaMi_Kassenclient
         { if(!(cboPreset.SelectedItem is ComboItem ci) || ci.Row==null) return; var row=ci.Row; txtNewPayText.Text = row.Table.Columns.Contains("Buchungstext")? Convert.ToString(row["Buchungstext"]): string.Empty; txtNewK1.Text = row.Table.Columns.Contains("Kost1")? Convert.ToString(row["Kost1"]): string.Empty; txtNewK2.Text = row.Table.Columns.Contains("Kost2")? Convert.ToString(row["Kost2"]): string.Empty; txtNewKonto.Text = row.Table.Columns.Contains("Konto")? Convert.ToString(row["Konto"]): string.Empty; var typ=row.Table.Columns.Contains("Typ")? Convert.ToString(row["Typ"]): null; if(!string.IsNullOrWhiteSpace(typ)){ int ix=cboNewType.FindStringExact(typ); if(ix>=0) cboNewType.SelectedIndex=ix; } try{ decimal m19=0,m7=0,m0=0; if(row.Table.Columns.Contains("Betrag19")&& row["Betrag19"]!=DBNull.Value) m19=Convert.ToDecimal(row["Betrag19"]); if(row.Table.Columns.Contains("Betrag7")&& row["Betrag7"]!=DBNull.Value) m7=Convert.ToDecimal(row["Betrag7"]); if(row.Table.Columns.Contains("Betrag0")&& row["Betrag0"]!=DBNull.Value) m0=Convert.ToDecimal(row["Betrag0"]); string target=null; if(m19==1m && m7==0m && m0==0m) target="19"; else if(m7==1m && m19==0m && m0==0m) target="7"; else if(m0==1m && m19==0m && m7==0m) target="0"; if(target!=null){ int mi=cboNewMwst.FindStringExact(target); if(mi>=0) cboNewMwst.SelectedIndex=mi; } } catch {}
         }
         private void StyleGrid(DataGridView gv)
-        { if(gv==null) return; gv.BorderStyle=BorderStyle.None; gv.EnableHeadersVisualStyles=false; gv.ColumnHeadersDefaultCellStyle.BackColor=Color.FromArgb(33,150,243); gv.ColumnHeadersDefaultCellStyle.ForeColor=Color.White; gv.ColumnHeadersDefaultCellStyle.Font=new Font("Segoe UI",10F,FontStyle.Bold); gv.RowHeadersVisible=false; gv.AlternatingRowsDefaultCellStyle.BackColor=Color.FromArgb(245,247,250); gv.DefaultCellStyle.Font=new Font("Segoe UI",10F); gv.DefaultCellStyle.SelectionBackColor=Color.FromArgb(227,242,253); gv.DefaultCellStyle.SelectionForeColor=Color.Black; }
+        {
+            if (gv == null) return;
+            gv.BorderStyle = BorderStyle.FixedSingle;
+            gv.EnableHeadersVisualStyles = true; // System Look wie in ZahlungForm
+            gv.RowHeadersVisible = false;
+            gv.SelectionMode = DataGridViewSelectionMode.FullRowSelect;
+            gv.MultiSelect = false;
+            gv.BackgroundColor = Color.White;
+            gv.ColumnHeadersBorderStyle = DataGridViewHeaderBorderStyle.Single;
+            gv.CellBorderStyle = DataGridViewCellBorderStyle.SingleHorizontal;
+            gv.ColumnHeadersHeightSizeMode = DataGridViewColumnHeadersHeightSizeMode.EnableResizing;
+            gv.ColumnHeadersHeight = 30; // Standardhöhe
+            gv.ColumnHeadersDefaultCellStyle.Padding = new Padding(0, 2, 0, 2);
+            gv.ColumnHeadersDefaultCellStyle.Font = new Font("Segoe UI", 9F, FontStyle.Regular);
+            gv.DefaultCellStyle.Font = new Font("Segoe UI", 9F, FontStyle.Regular);
+            gv.RowTemplate.Height = 22;
+            gv.AlternatingRowsDefaultCellStyle.BackColor = Color.FromArgb(248, 250, 252);
+            gv.DefaultCellStyle.BackColor = Color.White;
+            gv.DefaultCellStyle.ForeColor = Color.Black;
+            // Einheitliche blaue Auswahl wie ZahlungForm
+            var selBack = Color.FromArgb(33, 150, 243);
+            var selFore = Color.White;
+            gv.DefaultCellStyle.SelectionBackColor = selBack;
+            gv.DefaultCellStyle.SelectionForeColor = selFore;
+            gv.AlternatingRowsDefaultCellStyle.SelectionBackColor = selBack;
+            gv.AlternatingRowsDefaultCellStyle.SelectionForeColor = selFore;
+            gv.GridColor = Color.FromArgb(220, 225, 230);
+        }
         private static void TrySetHeader(DataGridView gv,string col,string header){ if(gv!=null && gv.Columns.Contains(col)) gv.Columns[col].HeaderText=header; }
         private static void TryFormatAmount(DataGridView gv,string col){ if(gv!=null && gv.Columns.Contains(col)) gv.Columns[col].DefaultCellStyle.Format="N2"; }
         private void ApplyOpenShiftsGridFormatting(){ if(gvOpenShifts==null|| gvOpenShifts.DataSource==null) return; TrySetHeader(gvOpenShifts,"StartZeit","Start"); TrySetHeader(gvOpenShifts,"OffenerBetrag","Offen"); TryFormatAmount(gvOpenShifts,"OffenerBetrag"); }

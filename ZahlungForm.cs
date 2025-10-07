@@ -132,6 +132,11 @@ namespace TaMi_Kassenclient
             btnStorno.FlatAppearance.BorderSize=0; btnStorno.Enabled=false; btnStorno.Click += async (s,e)=> await StorniereAuswahlAsync(); content.Controls.Add(btnStorno); y+=60;
             lblOpenCaption = new Label { Text="Offene Zahlungen:", Left=24, Top=y, Width=content.Width-48, Font=new Font("Segoe UI",9.5f) }; content.Controls.Add(lblOpenCaption); y+=22;
             dgvOpen = new DataGridView { Left=24, Top=y, Width=content.Width-48, Height=5*26+28, ReadOnly=true, AllowUserToAddRows=false, AllowUserToDeleteRows=false, AllowUserToResizeRows=false, RowHeadersVisible=false, SelectionMode=DataGridViewSelectionMode.FullRowSelect, MultiSelect=false, BackgroundColor=Color.White, BorderStyle=BorderStyle.FixedSingle, AutoGenerateColumns=false, Anchor=AnchorStyles.Top|AnchorStyles.Left|AnchorStyles.Right };
+            // Hervorhebung komplette Zeile in Blau
+            dgvOpen.DefaultCellStyle.SelectionBackColor = Accent;
+            dgvOpen.DefaultCellStyle.SelectionForeColor = Color.White;
+            dgvOpen.AlternatingRowsDefaultCellStyle.SelectionBackColor = Accent;
+            dgvOpen.AlternatingRowsDefaultCellStyle.SelectionForeColor = Color.White;
             dgvOpen.SelectionChanged += (s,e)=> { btnStorno.Enabled = dgvOpen.CurrentRow!=null; };
             dgvOpen.CellDoubleClick += (s,e)=> { if(e.RowIndex>=0) LoadSelectedPaymentIntoFields(); };
             content.Controls.Add(dgvOpen);
@@ -390,7 +395,7 @@ namespace TaMi_Kassenclient
             {
                 using (var lg = new LinearGradientBrush(header.ClientRectangle, Accent, AccentDark, 0f))
                     e.Graphics.FillRectangle(lg, header.ClientRectangle);
-                using (var pen = new Pen(Color.FromArgb(13, 71, 161)))
+                using (var pen = new Pen(Color.FromArgb(13, 71,161)))
                     e.Graphics.DrawLine(pen, 0, header.Height - 1, header.Width, header.Height - 1);
             };
             var hdrLabel = new Label { Text = "Vorlagen verwalten", AutoSize = false, Left = 20, Top = 0, Width = 400, Height = 54, Font = new Font("Segoe UI", 16f, FontStyle.Bold), ForeColor = Color.White, TextAlign = ContentAlignment.MiddleLeft, BackColor = Color.Transparent };
