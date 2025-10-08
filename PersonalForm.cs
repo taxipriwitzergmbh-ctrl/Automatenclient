@@ -620,11 +620,32 @@ namespace TaMi_Kassenclient
                     tbK1.Text = r["Kost1"] == DBNull.Value ? string.Empty : Convert.ToString(r["Kost1"]);
                     tbK2.Text = r["Kost2"] == DBNull.Value ? string.Empty : Convert.ToString(r["Kost2"]);
                     tbKto.Text = r["Konto"] == DBNull.Value ? string.Empty : Convert.ToString(r["Konto"]);
-                    // MwSt Marker
                     string mw = "19"; try { decimal m19 = r["Betrag19"] == DBNull.Value ? 0 : Convert.ToDecimal(r["Betrag19"]); decimal m7 = r["Betrag7"] == DBNull.Value ? 0 : Convert.ToDecimal(r["Betrag7"]); decimal m0 = r["Betrag0"] == DBNull.Value ? 0 : Convert.ToDecimal(r["Betrag0"]); if (m7 == 1m && m19 == 0m && m0 == 0m) mw = "7"; else if (m0 == 1m && m19 == 0m && m7 == 0m) mw = "0"; } catch { }
                     cbMwst.SelectedIndex = cbMwst.FindStringExact(mw);
-                    // FirmenID setzen
-                    try { if (r.Table.Columns.Contains("FirmenID") && r["FirmenID"] != DBNull.Value) { int fid = Convert.ToInt32(r["FirmenID"]); for (int i = 0; i < cbFirma.Items.Count; i++) { var drv = cbFirma.Items[i] as DataRowView; if (drv != null && Convert.ToInt32(drv["ManID"]) == fid) { cbFirma.SelectedIndex = i; break; } } } } catch { }
+                    // FirmenID setzen / zurücksetzen
+                    try
+                    {
+                        int fid = 0;
+                        if (r.Table.Columns.Contains("FirmenID") && r["FirmenID"] != DBNull.Value)
+                            fid = Convert.ToInt32(r["FirmenID"]);
+                        if (fid <= 0)
+                        {
+                            // Platzhalter (Index 0) wählen
+                            if (cbFirma.Items.Count > 0) cbFirma.SelectedIndex = 0;
+                        }
+                        else
+                        {
+                            bool set = false;
+                            for (int i = 0; i < cbFirma.Items.Count; i++)
+                            {
+                                var drv = cbFirma.Items[i] as DataRowView;
+                                if (drv != null && Convert.ToInt32(drv["ManID"]) == fid)
+                                { cbFirma.SelectedIndex = i; set = true; break; }
+                            }
+                            if (!set && cbFirma.Items.Count > 0) cbFirma.SelectedIndex = 0; // Fallback
+                        }
+                    }
+                    catch { try { if (cbFirma.Items.Count > 0) cbFirma.SelectedIndex = 0; } catch { } }
                     btnSave.Enabled = !string.IsNullOrWhiteSpace(tbName.Text);
                 }
             };
