@@ -433,7 +433,7 @@ namespace TaMi_Kassenclient
                     foreach (DataRow row in dt.Rows)
                     {
                         DateTime ts = row.Field<DateTime>("ErfasstAm");
-                        string typ = row["Typ"] as string ?? "";
+                        string typ = MapTypCodeToText(row.Table.Columns.Contains("Typ") ? row["Typ"] : null);
                         string txt = row["Buchungstext"] as string ?? "";
                         decimal betrag = row["Betrag"] == DBNull.Value ? 0m : Convert.ToDecimal(row["Betrag"]);
                         decimal kb = row["Kassenbestand"] == DBNull.Value ? 0m : Convert.ToDecimal(row["Kassenbestand"]);
@@ -743,6 +743,34 @@ namespace TaMi_Kassenclient
         {
             if (o == null || o == System.DBNull.Value) return null;
             int v; return int.TryParse(o.ToString(), out v) ? (int?)v : null;
+        }
+
+        private static string MapTypCodeToText(object val)
+        {
+            if (val == null || val == DBNull.Value) return string.Empty;
+            // Already a descriptive string?
+            var s = val as string;
+            if (!string.IsNullOrWhiteSpace(s))
+            {
+                // If it's a number as string, convert; otherwise assume already mapped
+                byte bNum;
+                if (!byte.TryParse(s, out bNum)) return s; // e.g. "Einzahlung"
+                val = bNum; // fall through to numeric mapping
+            }
+            try
+            {
+                var code = Convert.ToInt32(val);
+                switch (code)
+                {
+                    case 1: return "Anfangsbestand";
+                    case 2: return "Einzahlung";
+                    case 3: return "Auszahlung";
+                    case 4: return "Schichtabrechnung";
+                    case 5: return "Personalguthaben";
+                    default: return code.ToString();
+                }
+            }
+            catch { return string.Empty; }
         }
 
         [DllImport("gdi32.dll", SetLastError = true)]

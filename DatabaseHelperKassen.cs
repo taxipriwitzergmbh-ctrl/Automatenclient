@@ -447,7 +447,7 @@ ORDER BY VorlagenName ASC, Typ ASC";
             await EnsureOpenAsync();
             using (var cmd = _connection.CreateCommand())
             {
-                cmd.CommandText = $@"SELECT TOP 1 SaldoPersonalguthaben FROM {_tblKassenbuch} WITH (NOLOCK) WHERE PersId = @PersId AND Typ = 'Personalguthaben' ORDER BY ErfasstAm DESC";
+                cmd.CommandText = $@"SELECT TOP 1 SaldoPersonalguthaben FROM {_tblKassenbuch} WITH (NOLOCK) WHERE PersId = @PersId AND Typ = '5' ORDER BY ErfasstAm DESC";
                 cmd.Parameters.AddWithValue("@PersId", persId);
                 var o = await cmd.ExecuteScalarAsync();
                 return (o == null || o == DBNull.Value) ? 0m : Convert.ToDecimal(o);
@@ -472,7 +472,7 @@ SELECT TOP 500
     Betrag0,
     Belegnummer
 FROM {_tblKassenbuch} WITH (NOLOCK)
-WHERE PersId = @PersId AND Typ = 'Personalguthaben' AND ISNULL(RevIsOld,0) = 0
+WHERE PersId = @PersId AND Typ = '5' AND ISNULL(RevIsOld,0) = 0
 ORDER BY ErfasstAm DESC, Belegnummer DESC;";
                 cmd.Parameters.AddWithValue("@PersId", persId);
                 using (var rdr = await cmd.ExecuteReaderAsync())
