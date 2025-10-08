@@ -14,6 +14,7 @@ namespace TaMi_Kassenclient
         private string _tblMandanten;    // z. B. [dbo].[TMandanten]
         private bool? _belegIstIdentity; // true, falls Belegnummer Identity ist
         private string _tblDevices;      // NEU: [dbo].[TKassenbuchDevice]
+        private string _tblVorlagen;     // NEU: [dbo].[TKassenbuchVorlagen]
 
         // Persistenz der Abrechnungsbedingungen
         private string _tblAbrechnungsRegeln;
@@ -91,6 +92,7 @@ namespace TaMi_Kassenclient
             _tblPersonal = await ResolveQualifiedTableAsync("TPersonal") ?? "[dbo].[TPersonal]";
             _tblZahlungen = await ResolveQualifiedTableAsync("TKassenbuchZahlungen") ?? "[dbo].[TKassenbuchZahlungen]";
             _tblFahrzeuge = await ResolveQualifiedTableAsync("TFahrzeuge") ?? "[dbo].[TFahrzeuge]"; // NEU
+            _tblVorlagen  = await ResolveQualifiedTableAsync("TKassenbuchVorlagen") ?? "[dbo].[TKassenbuchVorlagen]"; // NEU
 
             using (var cmd = _connection.CreateCommand())
             {
@@ -274,7 +276,8 @@ ORDER BY s.StartZeit DESC;";
 OUTPUT INSERTED.Belegnummer
 VALUES(@pid,@typ,@txt,@b19,@b7,@b0,@bg,@k1,@k2,@kto,@fid,0,0,SYSDATETIME());";
                 cmd.Parameters.AddWithValue("@pid", persId);
-                cmd.Parameters.AddWithValue("@typ", safeTyp);
+                // Typ als tinyint ablegen
+                cmd.Parameters.Add("@typ", SqlDbType.TinyInt).Value = MapTypStringToCode(safeTyp);
                 cmd.Parameters.AddWithValue("@txt", safeTxt);
                 cmd.Parameters.AddWithValue("@b19", safeB19);
                 cmd.Parameters.AddWithValue("@b7", safeB7);
@@ -291,100 +294,84 @@ VALUES(@pid,@typ,@txt,@b19,@b7,@b0,@bg,@k1,@k2,@kto,@fid,0,0,SYSDATETIME());";
             }
         }
 
-        // Vorlagen (Templates) – Erkennung: PersId = 0 UND Verbucht = 1
-        public async Task<int> InsertZahlungsVorlageAsync(string typ, string vorlagenName, string buchungstext, string kost1, string kost2, string konto, string mwst)
+        // Vorlagen (Templates) – Erkennung: eigene Tabelle TKassenbuchVorlagen (NEU)
+        public async Task<int> InsertZahlungsVorlageAsync(string typ, string vorlagenName, string buchungstext, string kost1, string kost2, string konto, string mwst, int firmenId = 0)
         {
             await EnsureOpenAsync();
-            bool belegIstIdentity = false;
-            string tName = ExtractTableName(_tblZahlungen) ?? "TKassenbuchZahlungen";
-            using (var cmdCheck = _connection.CreateCommand())
-            {
-                cmdCheck.CommandText = @"SELECT CASE WHEN EXISTS(
-SELECT 1 FROM sys.tables t JOIN sys.columns c ON c.object_id=t.object_id
-WHERE t.name=@tn AND c.name='Belegnummer' AND c.is_identity=1) THEN 1 ELSE 0 END";
-                cmdCheck.Parameters.AddWithValue("@tn", tName);
-                var o = await cmdCheck.ExecuteScalarAsync();
-                belegIstIdentity = (o != null && o != DBNull.Value) && Convert.ToInt32(o) == 1;
-            }
-
-            int? manualBeleg = null;
-            if (!belegIstIdentity)
-            {
-                using (var cmdMax = _connection.CreateCommand())
-                {
-                    cmdMax.CommandText = $"SELECT ISNULL(MAX(Belegnummer),0)+1 FROM {_tblZahlungen} WITH (HOLDLOCK, UPDLOCK)";
-                    var o = await cmdMax.ExecuteScalarAsync();
-                    manualBeleg = (o == null || o == DBNull.Value) ? 1 : Convert.ToInt32(o);
-                }
-            }
-
-            decimal m19 = 0m, m7 = 0m, m0 = 0m;
+            byte typCode = MapTypStringToCode(typ);
+            decimal b19 = 0m, b7 = 0m, b0 = 0m;
             switch ((mwst ?? string.Empty).Trim())
             {
-                case "19": m19 = 1m; break;
-                case "7": m7 = 1m; break;
-                case "0": m0 = 1m; break;
+                case "19": b19 = 1m; break;
+                case "7":  b7  = 1m; break;
+                case "0":  b0  = 1m; break;
             }
-
-            string baseText = string.IsNullOrWhiteSpace(buchungstext) ? (vorlagenName ?? string.Empty) : buchungstext.Trim();
-
+            string vName = (vorlagenName ?? string.Empty).Trim();
+            string bText = (buchungstext ?? string.Empty).Trim();
+            if (string.IsNullOrWhiteSpace(vName)) vName = bText;
+            if (string.IsNullOrWhiteSpace(bText)) bText = vName;
+            if (string.IsNullOrEmpty(vName)) vName = "(leer)";
+            if (string.IsNullOrEmpty(bText)) bText = vName;
+            string k1 = string.IsNullOrWhiteSpace(kost1) ? "0" : kost1.Trim();
+            string k2 = string.IsNullOrWhiteSpace(kost2) ? "0" : kost2.Trim();
+            string kto = string.IsNullOrWhiteSpace(konto) ? "0" : konto.Trim();
             using (var cmd = _connection.CreateCommand())
             {
-                if (!belegIstIdentity && manualBeleg.HasValue)
-                {
-                    cmd.CommandText = $@"INSERT INTO {_tblZahlungen}
-(Belegnummer, Typ, Buchungstext, Betrag19, Betrag7, Betrag0, PersId, ErfasstAm, FirmenID, BetragGesamt, Kost1, Kost2, Konto, Verbucht)
-OUTPUT INSERTED.Belegnummer
-VALUES(@bnr,@typ,@txt,@b19,@b7,@b0,0,SYSDATETIME(),0,0,@k1,@k2,@kto,1);";
-                    cmd.Parameters.AddWithValue("@bnr", manualBeleg.Value);
-                }
-                else
-                {
-                    cmd.CommandText = $@"INSERT INTO {_tblZahlungen}
-(Typ, Buchungstext, Betrag19, Betrag7, Betrag0, PersId, ErfasstAm, FirmenID, BetragGesamt, Kost1, Kost2, Konto, Verbucht)
-OUTPUT INSERTED.Belegnummer
-VALUES(@typ,@txt,@b19,@b7,@b0,0,SYSDATETIME(),0,0,@k1,@k2,@kto,1);";
-                }
-                cmd.Parameters.AddWithValue("@typ", (typ ?? string.Empty));
-                cmd.Parameters.AddWithValue("@txt", baseText ?? string.Empty);
-                cmd.Parameters.AddWithValue("@b19", m19);
-                cmd.Parameters.AddWithValue("@b7", m7);
-                cmd.Parameters.AddWithValue("@b0", m0);
-                cmd.Parameters.AddWithValue("@k1", string.IsNullOrWhiteSpace(kost1) ? (object)DBNull.Value : kost1);
-                cmd.Parameters.AddWithValue("@k2", string.IsNullOrWhiteSpace(kost2) ? (object)DBNull.Value : kost2);
-                cmd.Parameters.AddWithValue("@kto", string.IsNullOrWhiteSpace(konto) ? (object)DBNull.Value : konto);
-                var o2 = await cmd.ExecuteScalarAsync();
-                if (o2 == null || o2 == DBNull.Value) return manualBeleg ?? 0;
-                int id; if (o2 is int) id = (int)o2; else if (o2 is decimal) id = Convert.ToInt32((decimal)o2); else int.TryParse(Convert.ToString(o2), out id);
+                cmd.CommandText = $@"INSERT INTO {_tblVorlagen}
+(Typ,VorlagenName,Buchungstext,Betrag19,Betrag7,Betrag0,FirmenID,Kost1,Kost2,Konto)
+OUTPUT INSERTED.ID
+VALUES(@Typ,@VName,@BText,@B19,@B7,@B0,@FID,@K1,@K2,@Kto);";
+                cmd.Parameters.AddWithValue("@Typ", typCode);
+                cmd.Parameters.AddWithValue("@VName", vName);
+                cmd.Parameters.AddWithValue("@BText", bText);
+                cmd.Parameters.AddWithValue("@B19", b19);
+                cmd.Parameters.AddWithValue("@B7", b7);
+                cmd.Parameters.AddWithValue("@B0", b0);
+                cmd.Parameters.AddWithValue("@FID", firmenId);
+                cmd.Parameters.AddWithValue("@K1", k1);
+                cmd.Parameters.AddWithValue("@K2", k2);
+                cmd.Parameters.AddWithValue("@Kto", kto);
+                var o = await cmd.ExecuteScalarAsync();
+                int id = 0; if (o is int) id = (int)o; else if (o is decimal) id = Convert.ToInt32((decimal)o); else int.TryParse(Convert.ToString(o), out id);
                 return id;
             }
         }
 
-        public async Task<int> UpdateZahlungsVorlageAsync(int belegnummer, string typ, string vorlagenName, string buchungstext, string kost1, string kost2, string konto, string mwst)
+        public async Task<int> UpdateZahlungsVorlageAsync(int belegnummer, string typ, string vorlagenName, string buchungstext, string kost1, string kost2, string konto, string mwst, int firmenId = 0)
         {
             await EnsureOpenAsync();
-            decimal m19 = 0m, m7 = 0m, m0 = 0m;
+            byte typCode = MapTypStringToCode(typ);
+            decimal b19 = 0m, b7 = 0m, b0 = 0m;
             switch ((mwst ?? string.Empty).Trim())
             {
-                case "19": m19 = 1m; break;
-                case "7": m7 = 1m; break;
-                case "0": m0 = 1m; break;
+                case "19": b19 = 1m; break; case "7": b7 = 1m; break; case "0": b0 = 1m; break;
             }
-            string baseText = string.IsNullOrWhiteSpace(buchungstext) ? (vorlagenName ?? string.Empty) : buchungstext.Trim();
+            string vName = (vorlagenName ?? string.Empty).Trim();
+            string bText = (buchungstext ?? string.Empty).Trim();
+            if (string.IsNullOrWhiteSpace(vName)) vName = bText;
+            if (string.IsNullOrWhiteSpace(bText)) bText = vName;
+            if (string.IsNullOrEmpty(vName)) vName = "(leer)";
+            if (string.IsNullOrEmpty(bText)) bText = vName;
+            string k1 = string.IsNullOrWhiteSpace(kost1) ? "0" : kost1.Trim();
+            string k2 = string.IsNullOrWhiteSpace(kost2) ? "0" : kost2.Trim();
+            string kto = string.IsNullOrWhiteSpace(konto) ? "0" : konto.Trim();
             using (var cmd = _connection.CreateCommand())
             {
-                cmd.CommandText = $@"UPDATE {_tblZahlungen}
-SET Typ=@typ, Buchungstext=@txt, Betrag19=@b19, Betrag7=@b7, Betrag0=@b0, Kost1=@k1, Kost2=@k2, Konto=@kto
-WHERE Belegnummer=@bnr AND Verbucht=1 AND PersId=0"; // Vorlagen-Kriterium
-                cmd.Parameters.AddWithValue("@typ", (typ ?? string.Empty));
-                cmd.Parameters.AddWithValue("@txt", baseText ?? string.Empty);
-                cmd.Parameters.AddWithValue("@b19", m19);
-                cmd.Parameters.AddWithValue("@b7", m7);
-                cmd.Parameters.AddWithValue("@b0", m0);
-                cmd.Parameters.AddWithValue("@k1", string.IsNullOrWhiteSpace(kost1) ? (object)DBNull.Value : kost1);
-                cmd.Parameters.AddWithValue("@k2", string.IsNullOrWhiteSpace(kost2) ? (object)DBNull.Value : kost2);
-                cmd.Parameters.AddWithValue("@kto", string.IsNullOrWhiteSpace(konto) ? (object)DBNull.Value : konto);
-                cmd.Parameters.AddWithValue("@bnr", belegnummer);
+                cmd.CommandText = $@"UPDATE {_tblVorlagen}
+SET Typ=@Typ, VorlagenName=@VName, Buchungstext=@BText, Betrag19=@B19, Betrag7=@B7, Betrag0=@B0,
+    FirmenID=@FID, Kost1=@K1, Kost2=@K2, Konto=@Kto
+WHERE ID=@ID";
+                cmd.Parameters.AddWithValue("@Typ", typCode);
+                cmd.Parameters.AddWithValue("@VName", vName);
+                cmd.Parameters.AddWithValue("@BText", bText);
+                cmd.Parameters.AddWithValue("@B19", b19);
+                cmd.Parameters.AddWithValue("@B7", b7);
+                cmd.Parameters.AddWithValue("@B0", b0);
+                cmd.Parameters.AddWithValue("@FID", firmenId);
+                cmd.Parameters.AddWithValue("@K1", k1);
+                cmd.Parameters.AddWithValue("@K2", k2);
+                cmd.Parameters.AddWithValue("@Kto", kto);
+                cmd.Parameters.AddWithValue("@ID", belegnummer);
                 return await cmd.ExecuteNonQueryAsync();
             }
         }
@@ -394,10 +381,20 @@ WHERE Belegnummer=@bnr AND Verbucht=1 AND PersId=0"; // Vorlagen-Kriterium
             await EnsureOpenAsync();
             using (var cmd = _connection.CreateCommand())
             {
-                cmd.CommandText = $@"SELECT Belegnummer, Typ, Buchungstext, Buchungstext AS VorlagenName, Kost1, Kost2, Konto, Betrag19, Betrag7, Betrag0
-FROM {_tblZahlungen} WITH (NOLOCK)
-WHERE PersId=0 AND Verbucht=1
-ORDER BY VorlagenName ASC, Typ ASC";
+                cmd.CommandText = $@"SELECT 
+    v.ID AS Belegnummer,
+    CASE v.Typ WHEN 2 THEN 'Einzahlung' WHEN 3 THEN 'Auszahlung' ELSE CONVERT(varchar(3),v.Typ) END AS Typ,
+    v.VorlagenName,
+    v.Buchungstext,
+    v.Kost1,
+    v.Kost2,
+    v.Konto,
+    v.Betrag19,
+    v.Betrag7,
+    v.Betrag0,
+    v.FirmenID
+FROM {_tblVorlagen} v WITH (NOLOCK)
+ORDER BY v.VorlagenName ASC, v.Typ ASC;";
                 using (var rdr = await cmd.ExecuteReaderAsync())
                 {
                     var dt = new DataTable(); dt.Load(rdr); return dt;
@@ -495,13 +492,12 @@ ORDER BY ErfasstAm DESC, Belegnummer DESC;";
                 int safeK1 = k1 ?? 0;
                 int safeK2 = k2 ?? 0;
                 int safeKto = kto ?? 0;
-                string safeTyp = typ ?? string.Empty;
                 string safeTxt = buchungstext ?? string.Empty;
 
                 cmd.CommandText = $@"UPDATE {_tblZahlungen}
 SET Typ=@typ, Buchungstext=@txt, Betrag19=@b19, Betrag7=@b7, Betrag0=@b0, BetragGesamt=@bg, Kost1=@k1, Kost2=@k2, Konto=@kto
 WHERE Belegnummer=@bnr AND (Verbucht=0 OR Verbucht IS NULL)";
-                cmd.Parameters.AddWithValue("@typ", safeTyp);
+                cmd.Parameters.Add("@typ", SqlDbType.TinyInt).Value = MapTypStringToCode(typ);
                 cmd.Parameters.AddWithValue("@txt", safeTxt);
                 cmd.Parameters.AddWithValue("@b19", safeB19);
                 cmd.Parameters.AddWithValue("@b7", safeB7);
