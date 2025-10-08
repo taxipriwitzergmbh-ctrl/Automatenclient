@@ -870,7 +870,60 @@ namespace TaMi_Kassenclient
         private async Task LoadAccountingPresetsAsync()
         { try{ using(var db=new DatabaseHelperKassen()){ var dt=await db.LoadZahlungsVorlagenAsync(); cboPreset.Items.Clear(); cboPreset.Items.Add(new ComboItem{Text="Vorlage auswählen",Row=null}); foreach(DataRow r in dt.Rows){ string name=Convert.ToString(r["VorlagenName"]); if(string.IsNullOrWhiteSpace(name)) continue; cboPreset.Items.Add(new ComboItem{Text=name,Row=r}); } if(cboPreset.Items.Count>0) cboPreset.SelectedIndex=0; } } catch {} }
         private void ApplyPresetToFields()
-        { if(!(cboPreset.SelectedItem is ComboItem ci) || ci.Row==null) return; var row=ci.Row; txtNewPayText.Text = row.Table.Columns.Contains("Buchungstext")? Convert.ToString(row["Buchungstext"]): string.Empty; txtNewK1.Text = row.Table.Columns.Contains("Kost1")? Convert.ToString(row["Kost1"]): string.Empty; txtNewK2.Text = row.Table.Columns.Contains("Kost2")? Convert.ToString(row["Kost2"]): string.Empty; txtNewKonto.Text = row.Table.Columns.Contains("Konto")? Convert.ToString(row["Konto"]): string.Empty; var typ=row.Table.Columns.Contains("Typ")? Convert.ToString(row["Typ"]): null; if(!string.IsNullOrWhiteSpace(typ)){ int ix=cboNewType.FindStringExact(typ); if(ix>=0) cboNewType.SelectedIndex=ix; } try{ decimal m19=0,m7=0,m0=0; if(row.Table.Columns.Contains("Betrag19")&& row["Betrag19"]!=DBNull.Value) m19=Convert.ToDecimal(row["Betrag19"]); if(row.Table.Columns.Contains("Betrag7")&& row["Betrag7"]!=DBNull.Value) m7=Convert.ToDecimal(row["Betrag7"]); if(row.Table.Columns.Contains("Betrag0")&& row["Betrag0"]!=DBNull.Value) m0=Convert.ToDecimal(row["Betrag0"]); string target=null; if(m19==1m && m7==0m && m0==0m) target="19"; else if(m7==1m && m19==0m && m0==0m) target="7"; else if(m0==1m && m19==0m && m7==0m) target="0"; if(target!=null){ int mi=cboNewMwst.FindStringExact(target); if(mi>=0) cboNewMwst.SelectedIndex=mi; } } catch {}
+        { 
+            if(!(cboPreset.SelectedItem is ComboItem ci) || ci.Row==null) return; 
+            var row=ci.Row; 
+            // Buchungstext / Kontierungen
+            txtNewPayText.Text = row.Table.Columns.Contains("Buchungstext")? Convert.ToString(row["Buchungstext"]): string.Empty; 
+            txtNewK1.Text = row.Table.Columns.Contains("Kost1")? Convert.ToString(row["Kost1"]): string.Empty; 
+            txtNewK2.Text = row.Table.Columns.Contains("Kost2")? Convert.ToString(row["Kost2"]): string.Empty; 
+            txtNewKonto.Text = row.Table.Columns.Contains("Konto")? Convert.ToString(row["Konto"]): string.Empty; 
+            // Typ
+            var typ=row.Table.Columns.Contains("Typ")? Convert.ToString(row["Typ"]): null; 
+            if(!string.IsNullOrWhiteSpace(typ)){ int ix=cboNewType.FindStringExact(typ); if(ix>=0) cboNewType.SelectedIndex=ix; } 
+            // MwSt anhand Betrag* Spalten (1.00 Muster) erkennen
+            try{ 
+                decimal m19=0,m7=0,m0=0; 
+                if(row.Table.Columns.Contains("Betrag19")&& row["Betrag19"]!=DBNull.Value) m19=Convert.ToDecimal(row["Betrag19"]); 
+                if(row.Table.Columns.Contains("Betrag7")&& row["Betrag7"]!=DBNull.Value) m7=Convert.ToDecimal(row["Betrag7"]); 
+                if(row.Table.Columns.Contains("Betrag0")&& row["Betrag0"]!=DBNull.Value) m0=Convert.ToDecimal(row["Betrag0"]); 
+                string target=null; 
+                if(m19==1m && m7==0m && m0==0m) target="19"; 
+                else if(m7==1m && m19==0m && m0==0m) target="7"; 
+                else if(m0==1m && m19==0m && m7==0m) target="0"; 
+                if(target!=null){ int mi=cboNewMwst.FindStringExact(target); if(mi>=0) cboNewMwst.SelectedIndex=mi; } 
+            } catch {}
+            // Kasse (FirmenID) automatisch setzen
+            try
+            {
+                int fid = 0;
+                if (row.Table.Columns.Contains("FirmenID") && row["FirmenID"] != DBNull.Value)
+                    fid = Convert.ToInt32(row["FirmenID"]);
+                if (cboMandant != null && cboMandant.DataSource != null)
+                {
+                    if (fid <= 0)
+                    {
+                        // Leereintrag (Index 0) wählen, falls vorhanden
+                        if (cboMandant.Items.Count > 0) cboMandant.SelectedIndex = 0;
+                    }
+                    else
+                    {
+                        // Versuche direkte Value-Selektion
+                        try { cboMandant.SelectedValue = fid; }
+                        catch
+                        {
+                            // Fallback: manuell iterieren
+                            for (int i = 0; i < cboMandant.Items.Count; i++)
+                            {
+                                var drv = cboMandant.Items[i] as DataRowView;
+                                if (drv != null && Convert.ToInt32(drv["ManID"]) == fid)
+                                { cboMandant.SelectedIndex = i; break; }
+                            }
+                        }
+                    }
+                }
+            }
+            catch { }
         }
         private void StyleGrid(DataGridView gv)
         {
