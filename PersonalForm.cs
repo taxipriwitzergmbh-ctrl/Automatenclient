@@ -490,12 +490,16 @@ namespace TaMi_Kassenclient
                 using (var db = new DatabaseHelperKassen())
                 {
                     var dt = await db.GetMandantenAsync();
+                    // Blank option (ID=0, empty text)
+                    if (!dt.Columns.Contains("ManID")) dt.Columns.Add("ManID", typeof(int));
+                    if (!dt.Columns.Contains("ManName")) dt.Columns.Add("ManName", typeof(string));
+                    var blank = dt.NewRow(); blank["ManID"] = 0; blank["ManName"] = string.Empty; dt.Rows.InsertAt(blank, 0);
                     _suppressEvents = true;
                     cboMandant.DisplayMember = "ManName";
                     cboMandant.ValueMember = "ManID";
                     cboMandant.DataSource = dt;
-                    // Keine Vorauswahl
-                    cboMandant.SelectedIndex = -1;
+                    // Default blank selected
+                    if (cboMandant.Items.Count > 0) cboMandant.SelectedIndex = 0;
                 }
             }
             catch { }
@@ -519,14 +523,17 @@ namespace TaMi_Kassenclient
                 BackColor = Color.White,
                 ShowInTaskbar = false
             };
-            Button btnSave = null;
             dlg.KeyPreview = true;
+            Button btnSave = null;
+            ComboBox cbFirma = null;
+
             dlg.KeyDown += (s, e) =>
             {
                 if (e.KeyCode == Keys.Escape) { dlg.DialogResult = DialogResult.Cancel; dlg.Close(); }
                 else if (e.KeyCode == Keys.Enter && btnSave != null && btnSave.Enabled) btnSave.PerformClick();
             };
 
+            // Header
             var header = new Panel { Left = 0, Top = 0, Width = dlg.ClientSize.Width, Height = 54, Anchor = AnchorStyles.Top | AnchorStyles.Left | AnchorStyles.Right };
             header.Paint += (s, e) =>
             {
@@ -535,17 +542,18 @@ namespace TaMi_Kassenclient
                 using (var pen = new Pen(Color.FromArgb(13, 71, 161)))
                     e.Graphics.DrawLine(pen, 0, header.Height - 1, header.Width, header.Height - 1);
             };
-            var hdrLabel = new Label { Text = "Vorlagen verwalten", AutoSize = false, Left = 20, Top = 0, Width = 400, Height = 54, Font = new Font("Segoe UI", 16f, FontStyle.Bold), ForeColor = Color.White, TextAlign = ContentAlignment.MiddleLeft, BackColor = Color.Transparent };
-            var hdrClose = new Button { Text = "X", FlatStyle = FlatStyle.Flat, Font = new Font("Segoe UI", 11f, FontStyle.Bold), ForeColor = Color.White, BackColor = Color.Transparent, Size = new Size(48, 48), Location = new Point(header.Width - 56, 3), Anchor = AnchorStyles.Top | AnchorStyles.Right, TabStop = false };
-            hdrClose.FlatAppearance.BorderSize = 0; hdrClose.FlatAppearance.MouseOverBackColor = Color.FromArgb(229, 57, 53); hdrClose.Click += (s, e) => { dlg.DialogResult = DialogResult.Cancel; dlg.Close(); };
+            var hdrLabel = new Label { Text = "Vorlagen verwalten", Left = 20, Top = 0, Width = 400, Height = 54, Font = new Font("Segoe UI", 16f, FontStyle.Bold), ForeColor = Color.White, TextAlign = ContentAlignment.MiddleLeft, BackColor = Color.Transparent };
+            var hdrClose = new Button { Text = "X", FlatStyle = FlatStyle.Flat, Font = new Font("Segoe UI", 11f, FontStyle.Bold), ForeColor = Color.White, BackColor = Color.Transparent, Size = new Size(48, 48), Location = new Point(header.Width - 56, 3), Anchor = AnchorStyles.Top | AnchorStyles.Right };
+            hdrClose.FlatAppearance.BorderSize = 0; hdrClose.FlatAppearance.MouseOverBackColor = Color.FromArgb(229,57,53);
+            hdrClose.Click += (s, e) => { dlg.DialogResult = DialogResult.Cancel; dlg.Close(); };
             header.Controls.Add(hdrLabel); header.Controls.Add(hdrClose); dlg.Controls.Add(header);
 
+            // Body
             var body = new Panel { Left = 0, Top = header.Bottom, Width = dlg.ClientSize.Width, Height = dlg.ClientSize.Height - header.Height, Anchor = AnchorStyles.Top | AnchorStyles.Left | AnchorStyles.Right | AnchorStyles.Bottom, BackColor = Color.White };
             dlg.Controls.Add(body);
 
             string searchPlaceholder = "Suchen...";
-            var txtSearch = new TextBox { Left = 24, Top = 12, Width = 220 };
-            txtSearch.ForeColor = Color.Gray; txtSearch.Text = searchPlaceholder;
+            var txtSearch = new TextBox { Left = 24, Top = 12, Width = 220, Text = searchPlaceholder, ForeColor = Color.Gray };
             txtSearch.GotFocus += (s, e) => { if (txtSearch.Text == searchPlaceholder) { txtSearch.Text = string.Empty; txtSearch.ForeColor = Color.Black; } };
             txtSearch.LostFocus += (s, e) => { if (string.IsNullOrWhiteSpace(txtSearch.Text)) { txtSearch.Text = searchPlaceholder; txtSearch.ForeColor = Color.Gray; } };
             var lst = new ListBox { Left = 24, Top = txtSearch.Bottom + 6, Width = 220, Height = 300, Anchor = AnchorStyles.Top | AnchorStyles.Left | AnchorStyles.Bottom, BorderStyle = BorderStyle.FixedSingle };
@@ -561,10 +569,11 @@ namespace TaMi_Kassenclient
             var cbTyp = new ComboBox { Left = baseX + wLabel + 4, Top = curY, Width = 140, DropDownStyle = ComboBoxStyle.DropDownList };
             cbTyp.Items.AddRange(new object[] { "Einzahlung", "Auszahlung" }); cbTyp.SelectedIndex = 0; body.Controls.Add(makeLbl("Typ:")); body.Controls.Add(cbTyp); curY += spacing;
             var tbName = new TextBox { Left = baseX + wLabel + 4, Top = curY, Width = 280 }; body.Controls.Add(makeLbl("Name:")); body.Controls.Add(tbName); curY += spacing;
-            var cbMwst = new ComboBox { Left = baseX + wLabel + 4, Top = curY, Width = 60, DropDownStyle = ComboBoxStyle.DropDownList }; cbMwst.Items.AddRange(new object[] { "19", "7", "0" }); cbMwst.SelectedIndex = 0; body.Controls.Add(makeLbl("MwSt:")); body.Controls.Add(cbMwst); curY += spacing;
+            var cbMwst = new ComboBox { Left = baseX + wLabel + 4, Top = curY, Width = 60, DropDownStyle = ComboBoxStyle.DropDownList };
+            cbMwst.Items.AddRange(new object[] { "19", "7", "0" }); cbMwst.SelectedIndex = 0; body.Controls.Add(makeLbl("MwSt:")); body.Controls.Add(cbMwst); curY += spacing;
             var tbTxt = new TextBox { Left = baseX + wLabel + 4, Top = curY, Width = 340 }; body.Controls.Add(makeLbl("Text:")); body.Controls.Add(tbTxt); curY += spacing;
-            // NEU: Kasse (Mandant)
-            var cbFirma = new ComboBox { Left = baseX + wLabel + 4, Top = curY, Width = 200, DropDownStyle = ComboBoxStyle.DropDownList }; body.Controls.Add(makeLbl("Kasse:")); body.Controls.Add(cbFirma); curY += spacing;
+            cbFirma = new ComboBox { Left = baseX + wLabel + 4, Top = curY, Width = 200, DropDownStyle = ComboBoxStyle.DropDownList };
+            body.Controls.Add(makeLbl("Kasse:")); body.Controls.Add(cbFirma); curY += spacing;
             var tbK1 = new TextBox { Left = baseX + wLabel + 4, Top = curY, Width = 70 }; var lblK2 = new Label { Text = "Kost2:", Left = tbK1.Right + 14, Top = curY + 4, Width = 45, ForeColor = Color.FromArgb(55,71,79) }; var tbK2 = new TextBox { Left = lblK2.Right + 4, Top = curY, Width = 70 }; var lblKto = new Label { Text = "Konto:", Left = tbK2.Right + 14, Top = curY + 4, Width = 50, ForeColor = Color.FromArgb(55,71,79) }; var tbKto = new TextBox { Left = lblKto.Right + 4, Top = curY, Width = 80 }; body.Controls.Add(makeLbl("Kost1:")); body.Controls.Add(tbK1); body.Controls.Add(lblK2); body.Controls.Add(tbK2); body.Controls.Add(lblKto); body.Controls.Add(tbKto); curY += spacing + 6;
 
             var btnCancel = new Button { Text = "Abbrechen", Left = baseX + wLabel + 4, Top = body.Height - 46, Width = 140, Height = 40, Anchor = AnchorStyles.Right | AnchorStyles.Bottom, BackColor = Color.Gainsboro, FlatStyle = FlatStyle.Flat };
@@ -572,9 +581,9 @@ namespace TaMi_Kassenclient
             btnSave = new Button { Text = "Speichern", Left = btnCancel.Right + 12, Top = body.Height - 46, Width = 160, Height = 40, Anchor = AnchorStyles.Right | AnchorStyles.Bottom, BackColor = Color.FromArgb(46,125,50), ForeColor = Color.White, FlatStyle = FlatStyle.Flat, Enabled = false };
             btnSave.FlatAppearance.BorderSize = 0; body.Controls.Add(btnCancel); body.Controls.Add(btnSave);
 
-            int? editBeleg = null; var allItems = new System.Collections.Generic.List<ComboItem>();
+            int? editBeleg = null; var allItems = new List<ComboItem>();
             Action applyFilter = () => { string f = (txtSearch.Text == searchPlaceholder ? string.Empty : txtSearch.Text).Trim().ToLowerInvariant(); lst.BeginUpdate(); lst.Items.Clear(); foreach (var item in allItems) if (f.Length == 0 || item.Text.ToLowerInvariant().Contains(f)) lst.Items.Add(item); lst.EndUpdate(); };
-            Action clearFields = () => { editBeleg = null; cbTyp.SelectedIndex = 0; cbMwst.SelectedIndex = 0; tbName.Clear(); tbTxt.Clear(); tbK1.Clear(); tbK2.Clear(); tbKto.Clear(); if (cbFirma.Items.Count>0) cbFirma.SelectedIndex = -1; lst.ClearSelected(); btnSave.Enabled = false; };
+            Action clearFields = () => { editBeleg = null; cbTyp.SelectedIndex = 0; cbMwst.SelectedIndex = 0; tbName.Clear(); tbTxt.Clear(); tbK1.Clear(); tbK2.Clear(); tbKto.Clear(); if (cbFirma.Items.Count > 0) cbFirma.SelectedIndex = 0; lst.ClearSelected(); btnSave.Enabled = false; };
 
             async Task loadMandantenAsync()
             {
@@ -583,7 +592,11 @@ namespace TaMi_Kassenclient
                     using (var db = new DatabaseHelperKassen())
                     {
                         var dt = await db.GetMandantenAsync();
-                        cbFirma.DisplayMember = "ManName"; cbFirma.ValueMember = "ManID"; cbFirma.DataSource = dt; cbFirma.SelectedIndex = -1;
+                        // Blank option (ID=0, empty text)
+                        if (!dt.Columns.Contains("ManID")) dt.Columns.Add("ManID", typeof(int));
+                        if (!dt.Columns.Contains("ManName")) dt.Columns.Add("ManName", typeof(string));
+                        var blank = dt.NewRow(); blank["ManID"] = 0; blank["ManName"] = string.Empty; dt.Rows.InsertAt(blank, 0);
+                        cbFirma.DisplayMember = "ManName"; cbFirma.ValueMember = "ManID"; cbFirma.DataSource = dt; cbFirma.SelectedIndex = 0; // blank
                     }
                 }
                 catch { }
@@ -622,7 +635,6 @@ namespace TaMi_Kassenclient
                     tbKto.Text = r["Konto"] == DBNull.Value ? string.Empty : Convert.ToString(r["Konto"]);
                     string mw = "19"; try { decimal m19 = r["Betrag19"] == DBNull.Value ? 0 : Convert.ToDecimal(r["Betrag19"]); decimal m7 = r["Betrag7"] == DBNull.Value ? 0 : Convert.ToDecimal(r["Betrag7"]); decimal m0 = r["Betrag0"] == DBNull.Value ? 0 : Convert.ToDecimal(r["Betrag0"]); if (m7 == 1m && m19 == 0m && m0 == 0m) mw = "7"; else if (m0 == 1m && m19 == 0m && m7 == 0m) mw = "0"; } catch { }
                     cbMwst.SelectedIndex = cbMwst.FindStringExact(mw);
-                    // FirmenID setzen / zurücksetzen
                     try
                     {
                         int fid = 0;
@@ -630,8 +642,7 @@ namespace TaMi_Kassenclient
                             fid = Convert.ToInt32(r["FirmenID"]);
                         if (fid <= 0)
                         {
-                            // Platzhalter (Index 0) wählen
-                            if (cbFirma.Items.Count > 0) cbFirma.SelectedIndex = 0;
+                            if (cbFirma.Items.Count > 0) cbFirma.SelectedIndex = 0; // blank
                         }
                         else
                         {
@@ -642,10 +653,10 @@ namespace TaMi_Kassenclient
                                 if (drv != null && Convert.ToInt32(drv["ManID"]) == fid)
                                 { cbFirma.SelectedIndex = i; set = true; break; }
                             }
-                            if (!set && cbFirma.Items.Count > 0) cbFirma.SelectedIndex = 0; // Fallback
+                            if (!set && cbFirma.Items.Count > 0) cbFirma.SelectedIndex = 0;
                         }
                     }
-                    catch { try { if (cbFirma.Items.Count > 0) cbFirma.SelectedIndex = 0; } catch { } }
+                    catch { if (cbFirma.Items.Count > 0) cbFirma.SelectedIndex = 0; }
                     btnSave.Enabled = !string.IsNullOrWhiteSpace(tbName.Text);
                 }
             };
