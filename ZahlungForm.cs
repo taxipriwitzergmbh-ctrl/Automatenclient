@@ -223,6 +223,21 @@ namespace TaMi_Kassenclient
                 decimal m19=0,m7=0,m0=0; if(row.Table.Columns.Contains("Betrag19") && row["Betrag19"]!=DBNull.Value) m19=Convert.ToDecimal(row["Betrag19"]); if(row.Table.Columns.Contains("Betrag7") && row["Betrag7"]!=DBNull.Value) m7=Convert.ToDecimal(row["Betrag7"]); if(row.Table.Columns.Contains("Betrag0") && row["Betrag0"]!=DBNull.Value) m0=Convert.ToDecimal(row["Betrag0"]);
                 string target=null; if(m19==1m && m7==0m && m0==0m) target="19"; else if(m7==1m && m19==0m && m0==0m) target="7"; else if(m0==1m && m19==0m && m7==0m) target="0"; if(target!=null){ int ix=cboMwst.FindStringExact(target); if(ix>=0) cboMwst.SelectedIndex=ix; }
             }catch{}
+            // FirmenID automatisch setzen (Kasse)
+            try
+            {
+                int fid=0; if(row.Table.Columns.Contains("FirmenID") && row["FirmenID"]!=DBNull.Value) fid=Convert.ToInt32(row["FirmenID"]);
+                Action assign = () => {
+                    if(cboFirma.DataSource is DataTable man)
+                    {
+                        if(fid<=0){ if(cboFirma.Items.Count>0) cboFirma.SelectedIndex=0; return; }
+                        for(int i=0;i<man.Rows.Count;i++) if(Convert.ToInt32(man.Rows[i]["ManID"])==fid){ cboFirma.SelectedIndex=i; return; }
+                    }
+                };
+                if(!_mandantenLoaded){ _ = LoadMandantenAsync().ContinueWith(t=> { try { if(IsHandleCreated) BeginInvoke(assign); else assign(); } catch { } }); }
+                else assign();
+            }
+            catch { }
         }
 
         // --- Validierung ---
@@ -378,11 +393,12 @@ namespace TaMi_Kassenclient
                 Text = "Vorlagen verwalten",
                 FormBorderStyle = FormBorderStyle.None,
                 StartPosition = FormStartPosition.CenterParent,
-                ClientSize = new Size(740, 500),
+                ClientSize = new Size(760, 520),
                 BackColor = Color.White,
                 ShowInTaskbar = false
             };
             Button btnSave = null;
+            ComboBox cbFirma = null; // Kasse Auswahl
             dlg.KeyPreview = true;
             dlg.KeyDown += (s, e) =>
             {
@@ -407,11 +423,10 @@ namespace TaMi_Kassenclient
             dlg.Controls.Add(body);
 
             string searchPlaceholder = "Suchen...";
-            var txtSearch = new TextBox { Left = 24, Top = 12, Width = 220 };
-            txtSearch.ForeColor = Color.Gray; txtSearch.Text = searchPlaceholder;
+            var txtSearch = new TextBox { Left = 24, Top = 12, Width = 220, Text = searchPlaceholder, ForeColor = Color.Gray };
             txtSearch.GotFocus += (s, e) => { if (txtSearch.Text == searchPlaceholder) { txtSearch.Text = string.Empty; txtSearch.ForeColor = Color.Black; } };
             txtSearch.LostFocus += (s, e) => { if (string.IsNullOrWhiteSpace(txtSearch.Text)) { txtSearch.Text = searchPlaceholder; txtSearch.ForeColor = Color.Gray; } };
-            var lst = new ListBox { Left = 24, Top = txtSearch.Bottom + 6, Width = 220, Height = 300, Anchor = AnchorStyles.Top | AnchorStyles.Left | AnchorStyles.Bottom, BorderStyle = BorderStyle.FixedSingle };
+            var lst = new ListBox { Left = 24, Top = txtSearch.Bottom + 6, Width = 220, Height = 320, Anchor = AnchorStyles.Top | AnchorStyles.Left | AnchorStyles.Bottom, BorderStyle = BorderStyle.FixedSingle };
             body.Controls.Add(txtSearch); body.Controls.Add(lst);
 
             var btnNeu = new Button { Text = "Neu", Left = 24, Width = 80, Height = 34, Top = body.Height - 46, Anchor = AnchorStyles.Left | AnchorStyles.Bottom, BackColor = Accent, ForeColor = Color.White, FlatStyle = FlatStyle.Flat };
@@ -419,14 +434,15 @@ namespace TaMi_Kassenclient
             var btnDelete = new Button { Text = "Löschen", Left = btnNeu.Right + 8, Width = 90, Height = 34, Top = body.Height - 46, Anchor = AnchorStyles.Left | AnchorStyles.Bottom, BackColor = Color.FromArgb(229, 57, 53), ForeColor = Color.White, FlatStyle = FlatStyle.Flat };
             btnDelete.FlatAppearance.BorderSize = 0; body.Controls.Add(btnNeu); body.Controls.Add(btnDelete);
 
-            int baseX = 260; int wLabel = 60; int curY = 14; int spacing = 30;
+            int baseX = 270; int wLabel = 70; int curY = 14; int spacing = 30;
             Func<string, Label> makeLbl = t => new Label { Text = t, Left = baseX, Top = curY + 4, Width = wLabel, ForeColor = Color.FromArgb(55, 71, 79) };
-            var cbTyp = new ComboBox { Left = baseX + wLabel + 4, Top = curY, Width = 140, DropDownStyle = ComboBoxStyle.DropDownList };
+            var cbTyp = new ComboBox { Left = baseX + wLabel + 4, Top = curY, Width = 150, DropDownStyle = ComboBoxStyle.DropDownList };
             cbTyp.Items.AddRange(new object[] { "Einzahlung", "Auszahlung" }); cbTyp.SelectedIndex = 0; body.Controls.Add(makeLbl("Typ:")); body.Controls.Add(cbTyp); curY += spacing;
-            var tbName = new TextBox { Left = baseX + wLabel + 4, Top = curY, Width = 280 }; body.Controls.Add(makeLbl("Name:")); body.Controls.Add(tbName); curY += spacing;
-            var cbMwst = new ComboBox { Left = baseX + wLabel + 4, Top = curY, Width = 60, DropDownStyle = ComboBoxStyle.DropDownList }; cbMwst.Items.AddRange(new object[] { "19", "7", "0" }); cbMwst.SelectedIndex = 0; body.Controls.Add(makeLbl("MwSt:")); body.Controls.Add(cbMwst); curY += spacing;
-            var tbTxt = new TextBox { Left = baseX + wLabel + 4, Top = curY, Width = 340 }; body.Controls.Add(makeLbl("Text:")); body.Controls.Add(tbTxt); curY += spacing;
-            var tbK1 = new TextBox { Left = baseX + wLabel + 4, Top = curY, Width = 70 }; var lblK2 = new Label { Text = "Kost2:", Left = tbK1.Right + 14, Top = curY + 4, Width = 45, ForeColor = Color.FromArgb(55, 71, 79) }; var tbK2 = new TextBox { Left = lblK2.Right + 4, Top = curY, Width = 70 }; var lblKto = new Label { Text = "Konto:", Left = tbK2.Right + 14, Top = curY + 4, Width = 50, ForeColor = Color.FromArgb(55, 71, 79) }; var tbKto = new TextBox { Left = lblKto.Right + 4, Top = curY, Width = 80 }; body.Controls.Add(makeLbl("Kost1:")); body.Controls.Add(tbK1); body.Controls.Add(lblK2); body.Controls.Add(tbK2); body.Controls.Add(lblKto); body.Controls.Add(tbKto); curY += spacing + 6;
+            var tbName = new TextBox { Left = baseX + wLabel + 4, Top = curY, Width = 300 }; body.Controls.Add(makeLbl("Name:")); body.Controls.Add(tbName); curY += spacing;
+            var cbMwst = new ComboBox { Left = baseX + wLabel + 4, Top = curY, Width = 70, DropDownStyle = ComboBoxStyle.DropDownList }; cbMwst.Items.AddRange(new object[] { "19", "7", "0" }); cbMwst.SelectedIndex = 0; body.Controls.Add(makeLbl("MwSt:")); body.Controls.Add(cbMwst); curY += spacing;
+            var tbTxt = new TextBox { Left = baseX + wLabel + 4, Top = curY, Width = 360 }; body.Controls.Add(makeLbl("Text:")); body.Controls.Add(tbTxt); curY += spacing;
+            cbFirma = new ComboBox { Left = baseX + wLabel + 4, Top = curY, Width = 250, DropDownStyle = ComboBoxStyle.DropDownList }; body.Controls.Add(makeLbl("Kasse:")); body.Controls.Add(cbFirma); curY += spacing;
+            var tbK1 = new TextBox { Left = baseX + wLabel + 4, Top = curY, Width = 70 }; var lblK2 = new Label { Text = "Kost2:", Left = tbK1.Right + 14, Top = curY + 4, Width = 50, ForeColor = Color.FromArgb(55, 71, 79) }; var tbK2 = new TextBox { Left = lblK2.Right + 4, Top = curY, Width = 70 }; var lblKto = new Label { Text = "Konto:", Left = tbK2.Right + 14, Top = curY + 4, Width = 50, ForeColor = Color.FromArgb(55, 71, 79) }; var tbKto = new TextBox { Left = lblKto.Right + 4, Top = curY, Width = 80 }; body.Controls.Add(makeLbl("Kost1:")); body.Controls.Add(tbK1); body.Controls.Add(lblK2); body.Controls.Add(tbK2); body.Controls.Add(lblKto); body.Controls.Add(tbKto); curY += spacing + 6;
 
             var btnCancel = new Button { Text = "Abbrechen", Left = baseX + wLabel + 4, Top = body.Height - 46, Width = 140, Height = 40, Anchor = AnchorStyles.Right | AnchorStyles.Bottom, BackColor = Color.Gainsboro, FlatStyle = FlatStyle.Flat };
             btnCancel.FlatAppearance.BorderSize = 0; btnCancel.Click += (s, e) => { dlg.DialogResult = DialogResult.Cancel; dlg.Close(); };
@@ -435,7 +451,23 @@ namespace TaMi_Kassenclient
 
             int? editBeleg = null; var allItems = new List<PresetListItem>();
             Action applyFilter = () => { string f = (txtSearch.Text == searchPlaceholder ? string.Empty : txtSearch.Text).Trim().ToLowerInvariant(); lst.BeginUpdate(); lst.Items.Clear(); foreach (var item in allItems) if (f.Length == 0 || item.Text.ToLowerInvariant().Contains(f)) lst.Items.Add(item); lst.EndUpdate(); };
-            Action clearFields = () => { editBeleg = null; cbTyp.SelectedIndex = 0; cbMwst.SelectedIndex = 0; tbName.Clear(); tbTxt.Clear(); tbK1.Clear(); tbK2.Clear(); tbKto.Clear(); lst.ClearSelected(); btnSave.Enabled = false; };
+            Action clearFields = () => { editBeleg = null; cbTyp.SelectedIndex = 0; cbMwst.SelectedIndex = 0; tbName.Clear(); tbTxt.Clear(); tbK1.Clear(); tbK2.Clear(); tbKto.Clear(); if (cbFirma.Items.Count>0) cbFirma.SelectedIndex = 0; lst.ClearSelected(); btnSave.Enabled = false; };
+
+            async Task loadMandantenAsync()
+            {
+                try
+                {
+                    using (var db = new DatabaseHelperKassen())
+                    {
+                        var dt = await db.GetMandantenAsync();
+                        if(!dt.Columns.Contains("ManID")) dt.Columns.Add("ManID", typeof(int));
+                        if(!dt.Columns.Contains("ManName")) dt.Columns.Add("ManName", typeof(string));
+                        var blank = dt.NewRow(); blank["ManID"] = 0; blank["ManName"] = "(leer)"; dt.Rows.InsertAt(blank,0);
+                        cbFirma.DisplayMember = "ManName"; cbFirma.ValueMember = "ManID"; cbFirma.DataSource = dt; cbFirma.SelectedIndex = 0;
+                    }
+                }
+                catch { }
+            }
 
             async Task loadListAsync()
             {
@@ -468,16 +500,18 @@ namespace TaMi_Kassenclient
                     tbK1.Text = r["Kost1"] == DBNull.Value ? string.Empty : Convert.ToString(r["Kost1"]);
                     tbK2.Text = r["Kost2"] == DBNull.Value ? string.Empty : Convert.ToString(r["Kost2"]);
                     tbKto.Text = r["Konto"] == DBNull.Value ? string.Empty : Convert.ToString(r["Konto"]);
-                    string mw = "19";
+                    string mw = "19"; try { decimal m19 = r["Betrag19"] == DBNull.Value ? 0 : Convert.ToDecimal(r["Betrag19"]); decimal m7 = r["Betrag7"] == DBNull.Value ? 0 : Convert.ToDecimal(r["Betrag7"]); decimal m0 = r["Betrag0"] == DBNull.Value ? 0 : Convert.ToDecimal(r["Betrag0"]); if (m7 == 1m && m19 == 0m && m0 == 0m) mw = "7"; else if (m0 == 1m && m19 == 0m && m7 == 0m) mw = "0"; } catch { }
+                    cbMwst.SelectedIndex = cbMwst.FindStringExact(mw);
+                    // FirmenID -> cbFirma
                     try
                     {
-                        decimal m19 = r["Betrag19"] == DBNull.Value ? 0 : Convert.ToDecimal(r["Betrag19"]);
-                        decimal m7 = r["Betrag7"] == DBNull.Value ? 0 : Convert.ToDecimal(r["Betrag7"]);
-                        decimal m0 = r["Betrag0"] == DBNull.Value ? 0 : Convert.ToDecimal(r["Betrag0"]);
-                        if (m7 == 1m && m19 == 0m && m0 == 0m) mw = "7"; else if (m0 == 1m && m19 == 0m && m7 == 0m) mw = "0";
+                        int fid=0; if(r.Table.Columns.Contains("FirmenID") && r["FirmenID"]!=DBNull.Value) fid=Convert.ToInt32(r["FirmenID"]);
+                        if(cbFirma.DataSource is DataTable man){
+                            bool set=false; for(int i=0;i<man.Rows.Count;i++){ if(Convert.ToInt32(man.Rows[i]["ManID"])==fid){ cbFirma.SelectedIndex=i; set=true; break; }}
+                            if(!set && cbFirma.Items.Count>0) cbFirma.SelectedIndex=0;
+                        }
                     }
-                    catch { }
-                    cbMwst.SelectedIndex = cbMwst.FindStringExact(mw);
+                    catch { if(cbFirma.Items.Count>0) cbFirma.SelectedIndex=0; }
                     btnSave.Enabled = !string.IsNullOrWhiteSpace(tbName.Text);
                 }
             };
@@ -487,7 +521,7 @@ namespace TaMi_Kassenclient
                 if (MessageBox.Show(dlg, "Vorlage wirklich löschen?", "Bestätigung", MessageBoxButtons.YesNo, MessageBoxIcon.Question) != DialogResult.Yes) return;
                 try
                 {
-                    using (var db = new DatabaseHelperKassen()) await db.UpdateZahlungsVorlageAsync(editBeleg.Value, "Einzahlung", "Vorlage", "", null, null, null, "19");
+                    using (var db = new DatabaseHelperKassen()) await db.UpdateZahlungsVorlageAsync(editBeleg.Value, "Einzahlung", "Vorlage", string.Empty, null, null, null, "19", 0);
                 }
                 catch (Exception ex) { MessageBox.Show(dlg, "Löschen fehlgeschlagen: " + ex.Message, "Fehler", MessageBoxButtons.OK, MessageBoxIcon.Error); return; }
                 await loadListAsync(); clearFields();
@@ -495,21 +529,22 @@ namespace TaMi_Kassenclient
             tbName.TextChanged += (s, e) => btnSave.Enabled = !string.IsNullOrWhiteSpace(tbName.Text);
             btnSave.Click += async (s, e) =>
             {
-                string typ = cbTyp.SelectedItem as string; string name = tbName.Text?.Trim(); if (string.IsNullOrWhiteSpace(name)) return; string mwst = cbMwst.SelectedItem as string; string txtVal = tbTxt.Text?.Trim(); string k1Val = string.IsNullOrWhiteSpace(tbK1.Text) ? null : tbK1.Text.Trim(); string k2Val = string.IsNullOrWhiteSpace(tbK2.Text) ? null : tbK2.Text.Trim(); string ktoVal = string.IsNullOrWhiteSpace(tbKto.Text) ? null : tbKto.Text.Trim();
+                string typ = cbTyp.SelectedItem as string; string name = tbName.Text?.Trim(); if (string.IsNullOrWhiteSpace(name)) return; string mwst = cbMwst.SelectedItem as string; string txtVal = tbTxt.Text?.Trim(); string k1Val = string.IsNullOrWhiteSpace(tbK1.Text) ? null : tbK1.Text.Trim(); string k2Val = string.IsNullOrWhiteSpace(tbK2.Text) ? null : tbK2.Text.Trim(); string ktoVal = string.IsNullOrWhiteSpace(tbKto.Text) ? null : tbKto.Text.Trim(); int fid=0; try{ if(cbFirma.SelectedValue!=null) fid=Convert.ToInt32(cbFirma.SelectedValue);}catch{}
                 try
                 {
                     using (var db = new DatabaseHelperKassen())
                     {
                         if (editBeleg.HasValue)
-                            await db.UpdateZahlungsVorlageAsync(editBeleg.Value, typ, name, txtVal, k1Val, k2Val, ktoVal, mwst);
+                            await db.UpdateZahlungsVorlageAsync(editBeleg.Value, typ, name, txtVal, k1Val, k2Val, ktoVal, mwst, fid);
                         else
-                            await db.InsertZahlungsVorlageAsync(typ, name, txtVal, k1Val, k2Val, ktoVal, mwst);
+                            await db.InsertZahlungsVorlageAsync(typ, name, txtVal, k1Val, k2Val, ktoVal, mwst, fid);
                     }
                     dlg.Tag = name; dlg.DialogResult = DialogResult.OK; dlg.Close();
                 }
                 catch (Exception ex2) { MessageBox.Show(dlg, "Fehler: " + ex2.Message, "Fehler", MessageBoxButtons.OK, MessageBoxIcon.Error); }
             };
 
+            await loadMandantenAsync();
             await loadListAsync();
             dlg.Shown += (s, e) => { if (txtSearch.Text == searchPlaceholder) txtSearch.Select(0, 0); else txtSearch.Focus(); };
             if (dlg.ShowDialog(this) == DialogResult.OK)
