@@ -789,6 +789,8 @@ ORDER BY ErfasstAm ASC, Belegnummer ASC;";
                     { "Betrag0", betrag0 },
                     { "Kassenbestand", kbAfterNew }
                 };
+                // RevPersId (falls Spalte existiert) mit aktuell eingeloggter PID belegen
+                try { overrides["RevPersId"] = (object)(AppSession.CurrentUser?.PID ?? 0); } catch { overrides["RevPersId"] = 0; }
                 if (kost1.HasValue) overrides["Kost1"] = kost1.Value; if (kost2.HasValue) overrides["Kost2"] = kost2.Value; if (konto.HasValue) overrides["Konto"] = konto.Value;
                 // KassenBelegnummer übernehmen, falls vorhanden
                 if (r.Table.Columns.Contains("KassenBelegnummer")) overrides["KassenBelegnummer"] = r["KassenBelegnummer"];
@@ -841,6 +843,8 @@ ORDER BY ErfasstAm ASC, Belegnummer ASC;";
                         { "Betrag0", 0m },
                         { "Kassenbestand", Math.Round(kbBefore + running, 2) }
                     };
+                    // RevPersId (falls vorhanden) mit eingeloggter PID setzen
+                    try { o["RevPersId"] = (object)(AppSession.CurrentUser?.PID ?? 0); } catch { o["RevPersId"] = 0; }
                     if (k1_19.HasValue) o["Kost1"] = k1_19.Value; if (k2_19.HasValue) o["Kost2"] = k2_19.Value; if (kto_19.HasValue) o["Konto"] = kto_19.Value;
                     if (!(kassenBeleg is DBNull)) o["KassenBelegnummer"] = kassenBeleg;
                     await InsertCloneWithSameBelegnummerAsync(tx, r, o, nextRev++);
@@ -856,6 +860,8 @@ ORDER BY ErfasstAm ASC, Belegnummer ASC;";
                         { "Betrag0", 0m },
                         { "Kassenbestand", Math.Round(kbBefore + running, 2) }
                     };
+                    // RevPersId (falls vorhanden) mit eingeloggter PID setzen
+                    try { o["RevPersId"] = (object)(AppSession.CurrentUser?.PID ?? 0); } catch { o["RevPersId"] = 0; }
                     if (k1_7.HasValue) o["Kost1"] = k1_7.Value; if (k2_7.HasValue) o["Kost2"] = k2_7.Value; if (kto_7.HasValue) o["Konto"] = kto_7.Value;
                     if (!(kassenBeleg is DBNull)) o["KassenBelegnummer"] = kassenBeleg;
                     await InsertCloneWithSameBelegnummerAsync(tx, r, o, nextRev++);
@@ -871,6 +877,8 @@ ORDER BY ErfasstAm ASC, Belegnummer ASC;";
                         { "Betrag0", b0 },
                         { "Kassenbestand", Math.Round(kbBefore + running, 2) }
                     };
+                    // RevPersId (falls vorhanden) mit eingeloggter PID setzen
+                    try { o["RevPersId"] = (object)(AppSession.CurrentUser?.PID ?? 0); } catch { o["RevPersId"] = 0; }
                     if (k1_0.HasValue) o["Kost1"] = k1_0.Value; if (k2_0.HasValue) o["Kost2"] = k2_0.Value; if (kto_0.HasValue) o["Konto"] = kto_0.Value;
                     if (!(kassenBeleg is DBNull)) o["KassenBelegnummer"] = kassenBeleg;
                     await InsertCloneWithSameBelegnummerAsync(tx, r, o, nextRev++);

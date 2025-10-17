@@ -61,6 +61,8 @@
     <Reference Include="System.Xml" />
   </ItemGroup>
   <ItemGroup>
+    <Compile Include="AbrechnungsBedingungenForm.cs" />
+    <Compile Include="DayViewForm.cs" />
     <Compile Include="Form\AbrechnungsBedingungEditorForm.cs">
       <SubType>Form</SubType>
     </Compile>
