@@ -20,6 +20,14 @@ namespace TaMi_Kassenclient
 
                 Application.EnableVisualStyles();
                 Application.SetCompatibleTextRenderingDefault(false);
+                // Login erzwingen: Nur bei erfolgreichem Login Programm starten
+                var user = LoginForm.ShowLogin();
+                if (user == null)
+                {
+                    // Abgebrochen oder fehlgeschlagen -> Anwendung beenden
+                    return;
+                }
+
                 Application.Run(new MenueForm());
             }
             catch (Exception ex)
