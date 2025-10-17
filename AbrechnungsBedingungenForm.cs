@@ -40,7 +40,11 @@ namespace TaMi_Kassenclient
             lvRegeln = new ListView { Dock = DockStyle.Fill, View = View.Details, FullRowSelect = true, GridLines = true, HideSelection = false }; lvRegeln.Columns.Add("Name",220); lvRegeln.Columns.Add("Bedingung",520); lvRegeln.Columns.Add("Fallback",90); lvRegeln.Columns.Add("Ergebnis",300); lvRegeln.Resize += (s,e)=>AdjustListColumns(); split.Panel1.Controls.Add(lvRegeln);
             var pnlBtns = new FlowLayoutPanel { Dock = DockStyle.Bottom, Height = 64, FlowDirection = FlowDirection.LeftToRight, Padding = new Padding(8)};
             btnNeu = MakeBtn("Neu", Accent); btnBearbeiten = MakeBtn("Bearbeiten", Color.FromArgb(0,172,193)); btnDuplizieren = MakeBtn("Duplizieren", Color.FromArgb(3,155,229)); btnLoeschen = MakeBtn("Löschen", Color.IndianRed); btnSpeichernAlle = MakeBtn("Speichern", Color.FromArgb(76,175,80));
-            btnNeu.Click += (s,e)=> NewRuleViaPopup(); btnBearbeiten.Click += (s,e)=> EditSelectedViaPopup(); btnDuplizieren.Click += (s,e)=> DuplicateSelectedViaPopup(); btnLoeschen.Click += (s,e)=> DeleteSelected(); btnSpeichernAlle.Click += (s,e)=> SaveAll();
+            btnNeu.Click += async (s,e)=> await NewRuleViaPopupAsync();
+            btnBearbeiten.Click += async (s,e)=> await EditSelectedViaPopupAsync();
+            btnDuplizieren.Click += async (s,e)=> await DuplicateSelectedViaPopupAsync();
+            btnLoeschen.Click += (s,e)=> DeleteSelected();
+            btnSpeichernAlle.Click += (s,e)=> SaveAll();
             pnlBtns.Controls.AddRange(new Control[]{btnNeu, btnBearbeiten, btnDuplizieren, btnLoeschen, btnSpeichernAlle}); split.Panel1.Controls.Add(pnlBtns); AdjustListColumns();
         }
         private void PositionCloseButton()
@@ -53,7 +57,7 @@ namespace TaMi_Kassenclient
             }
             catch { }
         }
-        private Button MakeBtn(string txt, Color c){ return new Button{ Text=txt, Width=110, Height=34, BackColor=c, ForeColor=Color.White, FlatStyle=FlatStyle.Flat, FlatAppearance={ BorderSize=0 } }; }
+        private Button MakeBtn(string txt, Color c){ var b = new Button{ Text=txt, Width=110, Height=34, BackColor=c, ForeColor=Color.White, FlatStyle=FlatStyle.Flat }; try{ b.FlatAppearance.BorderSize=0; }catch{} return b; }
 
         private void RefreshList()
         {
@@ -62,9 +66,29 @@ namespace TaMi_Kassenclient
         private void AdjustListColumns(){ try { if(lvRegeln.Columns.Count==0) return; int w = lvRegeln.ClientSize.Width - SystemInformation.VerticalScrollBarWidth; if (w<=0) return; if(lvRegeln.Columns.Count>=4){ int nameW=Math.Max(180,(int)(w*0.22)); int fallbackW=Math.Max(80,(int)(w*0.10)); int ergW=Math.Max(180,(int)(w*0.25)); int bedW=Math.Max(300,w-(nameW+fallbackW+ergW)-8); lvRegeln.Columns[0].Width=nameW; lvRegeln.Columns[1].Width=bedW; lvRegeln.Columns[2].Width=fallbackW; lvRegeln.Columns[3].Width=ergW; } } catch { } }
         private AbrechnungsRegel GetSelectedRule(){ if(lvRegeln.SelectedItems.Count==0) return null; return lvRegeln.SelectedItems[0].Tag as AbrechnungsRegel; }
 
-        private void NewRuleViaPopup(){ using(var editor=new AbrechnungsBedingungEditorForm()){ if(editor.ShowDialog(this)==DialogResult.OK){ var r=MapFromEditor(editor); r.Name= string.IsNullOrWhiteSpace(editor.RuleName)?$"Regel {DateTime.Now:HHmmss}":editor.RuleName.Trim(); _regeln.Add(r); RefreshList(); } } }
-        private void EditSelectedViaPopup(){ var r=GetSelectedRule(); if(r==null) return; using(var editor=new AbrechnungsBedingungEditorForm()){ try{ editor.LoadFromRule(r);}catch{} if(editor.ShowDialog(this)==DialogResult.OK){ var upd=MapFromEditor(editor); upd.Name = string.IsNullOrWhiteSpace(editor.RuleName)? r.Name : editor.RuleName.Trim(); r.Clauses = upd.Clauses; r.ResultKost1=upd.ResultKost1; r.ResultKost2=upd.ResultKost2; r.ResultKonto=upd.ResultKonto; r.ResultBuchungstext=upd.ResultBuchungstext; r.Name=upd.Name; r.IsDefault=upd.IsDefault; r.Priority=upd.Priority; RefreshList(); } } }
-        private void DuplicateSelectedViaPopup(){ var r=GetSelectedRule(); if(r==null) return; using(var editor=new AbrechnungsBedingungEditorForm()){ try{editor.LoadFromRule(r);}catch{} if(editor.ShowDialog(this)==DialogResult.OK){ var copy=MapFromEditor(editor); copy.Name= string.IsNullOrWhiteSpace(editor.RuleName)? (r.Name??"Regel")+" (Kopie)" : editor.RuleName.Trim(); copy.Id=0; _regeln.Add(copy); RefreshList(); } } }
+        private async Task NewRuleViaPopupAsync(){ using(var editor=new AbrechnungsBedingungEditorForm()){ if(editor.ShowDialog(this)==DialogResult.OK){ var r=MapFromEditor(editor); r.Name= string.IsNullOrWhiteSpace(editor.RuleName)?$"Regel {DateTime.Now:HHmmss}":editor.RuleName.Trim(); _regeln.Add(r); RefreshList(); await SaveRuleNowAsync(r); } } }
+        private async Task EditSelectedViaPopupAsync(){ var r=GetSelectedRule(); if(r==null) return; using(var editor=new AbrechnungsBedingungEditorForm()){ try{ editor.LoadFromRule(r);}catch{} if(editor.ShowDialog(this)==DialogResult.OK){ var upd=MapFromEditor(editor); upd.Name = string.IsNullOrWhiteSpace(editor.RuleName)? r.Name : editor.RuleName.Trim(); r.Clauses = upd.Clauses; r.ResultKost1=upd.ResultKost1; r.ResultKost2=upd.ResultKost2; r.ResultKonto=upd.ResultKonto; r.ResultBuchungstext=upd.ResultBuchungstext; r.Name=upd.Name; r.IsDefault=upd.IsDefault; r.Priority=upd.Priority; RefreshList(); await SaveRuleNowAsync(r); } } }
+        private async Task DuplicateSelectedViaPopupAsync(){ var r=GetSelectedRule(); if(r==null) return; using(var editor=new AbrechnungsBedingungEditorForm()){ try{editor.LoadFromRule(r);}catch{} if(editor.ShowDialog(this)==DialogResult.OK){ var copy=MapFromEditor(editor); copy.Name= string.IsNullOrWhiteSpace(editor.RuleName)? (r.Name??"Regel")+" (Kopie)" : editor.RuleName.Trim(); copy.Id=0; _regeln.Add(copy); RefreshList(); await SaveRuleNowAsync(copy); } } }
+
+        // Speichert eine einzelne Regel sofort in die Datenbank
+        private async Task SaveRuleNowAsync(AbrechnungsRegel rule)
+        {
+            if (rule == null) return;
+            try
+            {
+                using (var db = new DatabaseHelperKassen())
+                {
+                    // Alte JSON-Felder leeren, DB-Seite generiert strukturierte Persistenz
+                    rule.RawConditionsJson = null;
+                    rule.RawResultsJson = null;
+                    rule.Id = await db.SaveAbrechnungsRegelAsync(rule);
+                }
+            }
+            catch (Exception ex)
+            {
+                MessageBox.Show(this, "Regel konnte nicht gespeichert werden:\r\n" + ex.Message, "Fehler", MessageBoxButtons.OK, MessageBoxIcon.Error);
+            }
+        }
         private async void DeleteSelected(){ var r=GetSelectedRule(); if(r==null) return; if(MessageBox.Show(this,$"Regel '{r.Name}' löschen?","Bestätigen",MessageBoxButtons.YesNo,MessageBoxIcon.Question)!=DialogResult.Yes) return; try { await SoftDeleteRuleBySqlAsync(r.Id);} catch { } await LoadRulesAsync(); }
         private async Task<int> SoftDeleteRuleBySqlAsync(int ruleId){ if(ruleId<=0) return 0; var cs=DatabaseHelperKassen.GetConnectionString(); using(var conn=new SqlConnection(cs)){ await conn.OpenAsync(); string tblRules= await ResolveQualifiedTableAsync(conn,"TAbrechnungsBedingungen") ?? "[dbo].[TAbrechnungsBedingungen]"; string tblClauses= await ResolveQualifiedTableAsync(conn,"TAbrechnungsBedingungenClause") ?? "[dbo].[TAbrechnungsBedingungenClause]"; using(var tx=conn.BeginTransaction()) using(var cmd=conn.CreateCommand()){ cmd.Transaction=tx; cmd.CommandText=$"UPDATE {tblRules} SET IsActive=0, ModifiedAt=SYSUTCDATETIME() WHERE Id=@Id"; cmd.Parameters.AddWithValue("@Id", ruleId); int affected= await cmd.ExecuteNonQueryAsync(); cmd.Parameters.Clear(); try { cmd.CommandText=$"DELETE FROM {tblClauses} WHERE RuleId=@R"; cmd.Parameters.AddWithValue("@R", ruleId); await cmd.ExecuteNonQueryAsync(); cmd.Parameters.Clear(); } catch { cmd.Parameters.Clear(); } tx.Commit(); return affected; } } }
         private static async Task<string> ResolveQualifiedTableAsync(SqlConnection conn,string tableName){ using(var cmd=conn.CreateCommand()){ cmd.CommandText=@"SELECT '[' + s.name + '].[' + t.name + ']' FROM sys.tables t JOIN sys.schemas s ON s.schema_id=t.schema_id WHERE t.name=@n"; cmd.Parameters.AddWithValue("@n", tableName); var o= await cmd.ExecuteScalarAsync(); return (o==null||o==DBNull.Value)? null : Convert.ToString(o);} }
