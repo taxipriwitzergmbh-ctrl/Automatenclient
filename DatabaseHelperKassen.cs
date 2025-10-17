@@ -259,6 +259,23 @@ ORDER BY s.StartZeit DESC;";
         public async Task<int> InsertOffeneZahlungAsync(int persId, string typ, string buchungstext, decimal b19, decimal b7, decimal b0, int? k1 = null, int? k2 = null, int? kto = null, int firmenId = 0)
         {
             await EnsureOpenAsync();
+
+            // Optional: Spalte 'UserAnlage' (int) verwenden, falls vorhanden
+            bool hasUserAnlage = false;
+            try
+            {
+                using (var chk = _connection.CreateCommand())
+                {
+                    // _tblZahlungen liegt in Form [schema].[name] vor -> Klammern entfernen für OBJECT_ID
+                    string obj = (_tblZahlungen ?? "[dbo].[TKassenbuchZahlungen]").Replace("[", string.Empty).Replace("]", string.Empty);
+                    chk.CommandText = "SELECT 1 FROM sys.columns WHERE Name='UserAnlage' AND object_id = OBJECT_ID(@obj)";
+                    chk.Parameters.AddWithValue("@obj", obj);
+                    var exists = await chk.ExecuteScalarAsync();
+                    hasUserAnlage = exists != null && exists != DBNull.Value;
+                }
+            }
+            catch { hasUserAnlage = false; }
+
             using (var cmd = _connection.CreateCommand())
             {
                 decimal safeB19 = b19;
@@ -271,10 +288,21 @@ ORDER BY s.StartZeit DESC;";
                 string safeTyp = typ ?? string.Empty; // kann bereits numerischer Code sein ("2"/"3")
                 string safeTxt = buchungstext ?? string.Empty;
 
-                cmd.CommandText = $@"INSERT INTO {_tblZahlungen}
+                if (hasUserAnlage)
+                {
+                    cmd.CommandText = $@"INSERT INTO {_tblZahlungen}
+(PersId, Typ, Buchungstext, Betrag19, Betrag7, Betrag0, BetragGesamt, Kost1, Kost2, Konto, FirmenID, DeviceID, Verbucht, ErfasstAm, UserAnlage)
+OUTPUT INSERTED.Belegnummer
+VALUES(@pid,@typ,@txt,@b19,@b7,@b0,@bg,@k1,@k2,@kto,@fid,0,0,SYSDATETIME(),@ua);";
+                }
+                else
+                {
+                    cmd.CommandText = $@"INSERT INTO {_tblZahlungen}
 (PersId, Typ, Buchungstext, Betrag19, Betrag7, Betrag0, BetragGesamt, Kost1, Kost2, Konto, FirmenID, DeviceID, Verbucht, ErfasstAm)
 OUTPUT INSERTED.Belegnummer
 VALUES(@pid,@typ,@txt,@b19,@b7,@b0,@bg,@k1,@k2,@kto,@fid,0,0,SYSDATETIME());";
+                }
+
                 cmd.Parameters.AddWithValue("@pid", persId);
                 // Typ als tinyint ablegen
                 cmd.Parameters.Add("@typ", SqlDbType.TinyInt).Value = MapTypStringToCode(safeTyp);
@@ -287,6 +315,12 @@ VALUES(@pid,@typ,@txt,@b19,@b7,@b0,@bg,@k1,@k2,@kto,@fid,0,0,SYSDATETIME());";
                 cmd.Parameters.AddWithValue("@k2", safeK2);
                 cmd.Parameters.AddWithValue("@kto", safeKto);
                 cmd.Parameters.AddWithValue("@fid", firmenId);
+                if (hasUserAnlage)
+                {
+                    int ua = 0; try { ua = AppSession.CurrentUser?.PID ?? 0; } catch { ua = 0; }
+                    cmd.Parameters.AddWithValue("@ua", ua);
+                }
+
                 var o = await cmd.ExecuteScalarAsync();
                 if (o == null || o == DBNull.Value) return 0;
                 int id; if (o is int) id = (int)o; else if (o is decimal) id = Convert.ToInt32((decimal)o); else int.TryParse(Convert.ToString(o), out id);
