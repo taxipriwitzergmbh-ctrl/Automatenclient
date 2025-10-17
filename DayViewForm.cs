@@ -767,6 +767,7 @@ namespace TaMi_Kassenclient
                     case 3: return "Auszahlung";
                     case 4: return "Schichtabrechnung";
                     case 5: return "Personalguthaben";
+                    case 6: return "Trinkgeld Auszahlung";
                     default: return code.ToString();
                 }
             }
