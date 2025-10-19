@@ -35,6 +35,11 @@ namespace TaMi_Kassenclient
         private readonly int _firmenId;
         private readonly string _typ;
         private readonly int? _fhzId;
+        // Ursprung: Gruppe, aus der automatisch aufgeteilt wird ("19"|"7"|"0")
+        private string _baseGroup;
+        private readonly decimal _start19;
+        private readonly decimal _start7;
+        private readonly decimal _start0;
 
         // Header/Footer
         private Panel headerPanel, footerPanel;
@@ -65,9 +70,25 @@ namespace TaMi_Kassenclient
             BuildContent();
 
             // Vorbelegung
-            nud19.Value = ClampToMoney(vorhand19);
-            nud7.Value  = ClampToMoney(vorhand7);
-            nud0.Value  = ClampToMoney(vorhand0);
+            _start19 = ClampToMoney(vorhand19);
+            _start7  = ClampToMoney(vorhand7);
+            _start0  = ClampToMoney(vorhand0);
+            nud19.Value = _start19;
+            nud7.Value  = _start7;
+            nud0.Value  = _start0;
+
+            // Basisgruppe bestimmen: die mit dem größten |Startwert| (bei 0 -> 19)
+            _baseGroup = "19";
+            try
+            {
+                decimal a19 = Math.Abs(_start19);
+                decimal a7  = Math.Abs(_start7);
+                decimal a0  = Math.Abs(_start0);
+                if (a7 >= a19 && a7 >= a0) _baseGroup = "7";
+                else if (a0 >= a19 && a0 >= a7) _baseGroup = "0";
+                // Falls alle 0 bleiben wir bei 19
+            }
+            catch { _baseGroup = "19"; }
             txt19_Text.Text = standardText ?? string.Empty;
             txt7_Text.Text  = standardText ?? string.Empty;
             txt0_Text.Text  = standardText ?? string.Empty;
@@ -179,22 +200,21 @@ namespace TaMi_Kassenclient
 
             nud19.ValueChanged += async (s, e) =>
             {
-                AdjustOthers("19");
+                AdjustBaseAfterChange("19");
                 await ApplyRulesForGroupAsync("19");
-                // 19% verändert 7% im UI -> auch für 7% neu anwenden, wenn nicht manuell überschrieben
-                await ApplyRulesForGroupAsync("7");
+                await ApplyRulesForGroupAsync(_baseGroup);
             };
             nud7.ValueChanged  += async (s, e) =>
             {
-                AdjustOthers("7");
+                AdjustBaseAfterChange("7");
                 await ApplyRulesForGroupAsync("7");
-                await ApplyRulesForGroupAsync("19");
+                await ApplyRulesForGroupAsync(_baseGroup);
             };
             nud0.ValueChanged  += async (s, e) =>
             {
-                AdjustOthers("0");
+                AdjustBaseAfterChange("0");
                 await ApplyRulesForGroupAsync("0");
-                await ApplyRulesForGroupAsync("7");
+                await ApplyRulesForGroupAsync(_baseGroup);
             };
         }
 
@@ -216,24 +236,32 @@ namespace TaMi_Kassenclient
         private TextBox CreateSmallBox(int left, int top) => new TextBox { Left = left, Top = top, Width = 80 };
         private TextBox CreateTextBox(int left, int top) => new TextBox { Left = left, Top = top, Width = 340 };
 
-        private void AdjustOthers(string changed)
+        // Rechnet IMMER die Basisgruppe aus: Base = OriginalSumme - (Summe der anderen beiden).
+        // Damit wird stets „vom Ursprung abgezogen/aufgeschlagen“, positiv wie negativ.
+        private void AdjustBaseAfterChange(string changed)
         {
             if (_updating) return;
+            _updating = true;
             try
             {
-                _updating = true;
-                decimal v19 = nud19.Value, v7 = nud7.Value, v0 = nud0.Value;
-                if (changed == "19")
+                decimal v19 = nud19.Value;
+                decimal v7  = nud7.Value;
+                decimal v0  = nud0.Value;
+
+                if (_baseGroup == "19")
                 {
-                    nud7.Value = ClampToMoney(_originalSumme - v19 - v0);
+                    var newV = ClampToMoney(_originalSumme - v7 - v0);
+                    if (nud19.Value != newV) nud19.Value = newV;
                 }
-                else if (changed == "7")
+                else if (_baseGroup == "7")
                 {
-                    nud19.Value = ClampToMoney(_originalSumme - v7 - v0);
+                    var newV = ClampToMoney(_originalSumme - v19 - v0);
+                    if (nud7.Value != newV) nud7.Value = newV;
                 }
-                else
+                else // "0"
                 {
-                    nud7.Value = ClampToMoney(_originalSumme - v19 - v0);
+                    var newV = ClampToMoney(_originalSumme - v19 - v7);
+                    if (nud0.Value != newV) nud0.Value = newV;
                 }
             }
             finally
