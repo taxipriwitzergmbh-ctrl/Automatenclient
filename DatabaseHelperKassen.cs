@@ -950,46 +950,7 @@ ORDER BY ErfasstAm ASC, Belegnummer ASC;";
                 _tblAbrechnungsRegeln = await ResolveQualifiedTableAsync("TAbrechnungsBedingungen") ?? "[dbo].[TAbrechnungsBedingungen]";
             if (string.IsNullOrEmpty(_tblAbrechnungsClauses))
                 _tblAbrechnungsClauses = await ResolveQualifiedTableAsync("TAbrechnungsBedingungenClause") ?? "[dbo].[TAbrechnungsBedingungenClause]";
-
-            using (var cmd = _connection.CreateCommand())
-            {
-                cmd.CommandText = $@"
-IF NOT EXISTS (SELECT 1 FROM sys.tables t JOIN sys.schemas s ON s.schema_id=t.schema_id WHERE t.name='TAbrechnungsBedingungen')
-BEGIN
-    CREATE TABLE {_tblAbrechnungsRegeln}
-    (
-        Id              int IDENTITY(1,1) PRIMARY KEY,
-        Name            varchar(200) NOT NULL,
-        JoinKind        varchar(10)  NULL,
-        IsDefault       bit NOT NULL DEFAULT(0),
-        Priority        int NOT NULL DEFAULT(100),
-        ManId           int NULL,
-        FhzIdList       varchar(4000) NULL,
-        PersId          int NULL,
-        ResultKost1     int NULL,
-        ResultKost2     int NULL,
-        ResultKonto     int NULL,
-        IsActive        bit NOT NULL DEFAULT(1),
-        CreatedAt       datetime2(0) NOT NULL DEFAULT(SYSUTCDATETIME()),
-        ModifiedAt      datetime2(0) NULL
-    );
-END
-
-IF NOT EXISTS (SELECT 1 FROM sys.tables t JOIN sys.schemas s ON s.schema_id=t.schema_id WHERE t.name='TAbrechnungsBedingungenClause')
-BEGIN
-    CREATE TABLE {_tblAbrechnungsClauses}
-    (
-        Id       int IDENTITY(1,1) PRIMARY KEY,
-        RuleId   int NOT NULL,
-        GroupId  int NOT NULL DEFAULT(0),
-        Field    nvarchar(128) NOT NULL,
-        Operator nvarchar(16) NOT NULL,
-        Value    nvarchar(4000) NULL
-    );
-    CREATE INDEX IX_Clauses_RuleId ON {_tblAbrechnungsClauses}(RuleId);
-END";
-                await cmd.ExecuteNonQueryAsync();
-            }
+            // Kein automatisches Erstellen/Ändern von Tabellen mehr (keine DDL-Berechtigungen)
         }
 
         public async Task<DataTable> LoadAbrechnungsRegelnAsync()
