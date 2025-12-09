@@ -87,12 +87,12 @@ namespace TaMi_Kassenclient
         private void RefreshList()
         {
             lvRegeln.Items.Clear();
-            foreach(var r in _regeln){ var item = new ListViewItem(r.Name ?? "(ohne Namen)"); item.SubItems.Add(r.GetReadableCondition()); item.SubItems.Add(r.IsDefault?"Ja":"Nein"); var parts=new List<string>(); if(r.ResultKost1.HasValue) parts.Add($"Kost1={r.ResultKost1}"); if(r.ResultKost2.HasValue) parts.Add($"Kost2={r.ResultKost2}"); if(r.ResultKonto.HasValue) parts.Add($"Konto={r.ResultKonto}"); if(!string.IsNullOrWhiteSpace(r.ResultBuchungstext)) parts.Add($"Text=\"{r.ResultBuchungstext}\""); item.SubItems.Add(parts.Count==0?"(kein Ergebnis)":string.Join(", ",parts)); item.Tag=r; lvRegeln.Items.Add(item);} AdjustListColumns(); }
+            foreach(var r in _regeln){ var item = new ListViewItem(r.Name ?? "(ohne Namen)"); item.SubItems.Add(r.GetReadableCondition()); item.SubItems.Add(r.IsDefault?"Ja":"Nein"); var parts=new List<string>(); if(r.ResultKost1.HasValue) parts.Add($"Kost1={r.ResultKost1}"); if(r.ResultKost2.HasValue) parts.Add($"Kost2={r.ResultKost2}"); if(r.ResultKonto.HasValue) parts.Add($"Konto={r.ResultKonto}"); item.SubItems.Add(parts.Count==0?"(kein Ergebnis)":string.Join(", ",parts)); item.Tag=r; lvRegeln.Items.Add(item);} AdjustListColumns(); }
         private void AdjustListColumns(){ try { if(lvRegeln.Columns.Count==0) return; int w = lvRegeln.ClientSize.Width - SystemInformation.VerticalScrollBarWidth; if (w<=0) return; if(lvRegeln.Columns.Count>=4){ int nameW=Math.Max(180,(int)(w*0.22)); int fallbackW=Math.Max(80,(int)(w*0.10)); int ergW=Math.Max(180,(int)(w*0.25)); int bedW=Math.Max(300,w-(nameW+fallbackW+ergW)-8); lvRegeln.Columns[0].Width=nameW; lvRegeln.Columns[1].Width=bedW; lvRegeln.Columns[2].Width=fallbackW; lvRegeln.Columns[3].Width=ergW; } } catch { } }
         private AbrechnungsRegel GetSelectedRule(){ if(lvRegeln.SelectedItems.Count==0) return null; return lvRegeln.SelectedItems[0].Tag as AbrechnungsRegel; }
 
         private async Task NewRuleViaPopupAsync(){ using(var editor=new AbrechnungsBedingungEditorForm()){ if(editor.ShowDialog(this)==DialogResult.OK){ var r=MapFromEditor(editor); r.Name= string.IsNullOrWhiteSpace(editor.RuleName)?$"Regel {DateTime.Now:HHmmss}":editor.RuleName.Trim(); _regeln.Add(r); RefreshList(); await SaveRuleNowAsync(r); } } }
-        private async Task EditSelectedViaPopupAsync(){ var r=GetSelectedRule(); if(r==null) return; using(var editor=new AbrechnungsBedingungEditorForm()){ try{ editor.LoadFromRule(r);}catch{} if(editor.ShowDialog(this)==DialogResult.OK){ var upd=MapFromEditor(editor); upd.Name = string.IsNullOrWhiteSpace(editor.RuleName)? r.Name : editor.RuleName.Trim(); r.Clauses = upd.Clauses; r.ResultKost1=upd.ResultKost1; r.ResultKost2=upd.ResultKost2; r.ResultKonto=upd.ResultKonto; r.ResultBuchungstext=upd.ResultBuchungstext; r.Name=upd.Name; r.IsDefault=upd.IsDefault; r.Priority=upd.Priority; RefreshList(); await SaveRuleNowAsync(r); } } }
+        private async Task EditSelectedViaPopupAsync(){ var r=GetSelectedRule(); if(r==null) return; using(var editor=new AbrechnungsBedingungEditorForm()){ try{ editor.LoadFromRule(r);}catch{} if(editor.ShowDialog(this)==DialogResult.OK){ var upd=MapFromEditor(editor); upd.Name = string.IsNullOrWhiteSpace(editor.RuleName)? r.Name : editor.RuleName.Trim(); r.Clauses = upd.Clauses; r.ResultKost1=upd.ResultKost1; r.ResultKost2=upd.ResultKost2; r.ResultKonto=upd.ResultKonto; r.Name=upd.Name; r.IsDefault=upd.IsDefault; r.Priority=upd.Priority; RefreshList(); await SaveRuleNowAsync(r); } } }
         private async Task DuplicateSelectedViaPopupAsync(){ var r=GetSelectedRule(); if(r==null) return; using(var editor=new AbrechnungsBedingungEditorForm()){ try{editor.LoadFromRule(r);}catch{} if(editor.ShowDialog(this)==DialogResult.OK){ var copy=MapFromEditor(editor); copy.Name= string.IsNullOrWhiteSpace(editor.RuleName)? (r.Name??"Regel")+" (Kopie)" : editor.RuleName.Trim(); copy.Id=0; _regeln.Add(copy); RefreshList(); await SaveRuleNowAsync(copy); } } }
 
         // Speichert eine einzelne Regel sofort in die Datenbank
@@ -104,8 +104,7 @@ namespace TaMi_Kassenclient
                 using (var db = new DatabaseHelperKassen())
                 {
                     // Alte JSON-Felder leeren, DB-Seite generiert strukturierte Persistenz
-                    rule.RawConditionsJson = null;
-                    rule.RawResultsJson = null;
+                    // legacy fields removed
                     rule.Id = await db.SaveAbrechnungsRegelAsync(rule);
                 }
             }
@@ -117,7 +116,7 @@ namespace TaMi_Kassenclient
         private async void DeleteSelected(){ var r=GetSelectedRule(); if(r==null) return; if(MessageBox.Show(this,$"Regel '{r.Name}' löschen?","Bestätigen",MessageBoxButtons.YesNo,MessageBoxIcon.Question)!=DialogResult.Yes) return; try { await SoftDeleteRuleBySqlAsync(r.Id);} catch { } await LoadRulesAsync(); }
         private async Task<int> SoftDeleteRuleBySqlAsync(int ruleId){ if(ruleId<=0) return 0; var cs=DatabaseHelperKassen.GetConnectionString(); using(var conn=new SqlConnection(cs)){ await conn.OpenAsync(); string tblRules= await ResolveQualifiedTableAsync(conn,"TAbrechnungsBedingungen") ?? "[dbo].[TAbrechnungsBedingungen]"; string tblClauses= await ResolveQualifiedTableAsync(conn,"TAbrechnungsBedingungenClause") ?? "[dbo].[TAbrechnungsBedingungenClause]"; using(var tx=conn.BeginTransaction()) using(var cmd=conn.CreateCommand()){ cmd.Transaction=tx; cmd.CommandText=$"UPDATE {tblRules} SET IsActive=0, ModifiedAt=SYSUTCDATETIME() WHERE Id=@Id"; cmd.Parameters.AddWithValue("@Id", ruleId); int affected= await cmd.ExecuteNonQueryAsync(); cmd.Parameters.Clear(); try { cmd.CommandText=$"DELETE FROM {tblClauses} WHERE RuleId=@R"; cmd.Parameters.AddWithValue("@R", ruleId); await cmd.ExecuteNonQueryAsync(); cmd.Parameters.Clear(); } catch { cmd.Parameters.Clear(); } tx.Commit(); return affected; } } }
         private static async Task<string> ResolveQualifiedTableAsync(SqlConnection conn,string tableName){ using(var cmd=conn.CreateCommand()){ cmd.CommandText=@"SELECT '[' + s.name + '].[' + t.name + ']' FROM sys.tables t JOIN sys.schemas s ON s.schema_id=t.schema_id WHERE t.name=@n"; cmd.Parameters.AddWithValue("@n", tableName); var o= await cmd.ExecuteScalarAsync(); return (o==null||o==DBNull.Value)? null : Convert.ToString(o);} }
-        private async void SaveAll(){ try { using(var db=new DatabaseHelperKassen()){ foreach(var r in _regeln){ r.RawConditionsJson=null; r.RawResultsJson=null; r.Id = await db.SaveAbrechnungsRegelAsync(r);} } MessageBox.Show(this,"Regeln gespeichert.","Info",MessageBoxButtons.OK,MessageBoxIcon.Information);} catch(Exception ex){ MessageBox.Show(this,"Fehler beim Speichern: "+ex.Message,"Fehler",MessageBoxButtons.OK,MessageBoxIcon.Error);} }
+        private async void SaveAll(){ try { using(var db=new DatabaseHelperKassen()){ foreach(var r in _regeln){ r.Id = await db.SaveAbrechnungsRegelAsync(r);} } MessageBox.Show(this,"Regeln gespeichert.","Info",MessageBoxButtons.OK,MessageBoxIcon.Information);} catch(Exception ex){ MessageBox.Show(this,"Fehler beim Speichern: "+ex.Message,"Fehler",MessageBoxButtons.OK,MessageBoxIcon.Error);} }
 
         private async Task LoadRulesAsync()
         {
@@ -137,9 +136,7 @@ namespace TaMi_Kassenclient
                     try { r.ResultKost1 = row["ResultKost1"] != DBNull.Value ? (int?)Convert.ToInt32(row["ResultKost1"]) : null; } catch { }
                     try { r.ResultKost2 = row["ResultKost2"] != DBNull.Value ? (int?)Convert.ToInt32(row["ResultKost2"]) : null; } catch { }
                     try { r.ResultKonto = row["ResultKonto"] != DBNull.Value ? (int?)Convert.ToInt32(row["ResultKonto"]) : null; } catch { }
-                    try { r.ResultBuchungstext = row["ResultText"] as string; } catch { }
-                    try { r.RawConditionsJson = row["RawConditions"] as string; } catch { }
-                    try { r.RawResultsJson = row["RawResults"] as string; } catch { }
+                    // legacy fields ResultText/RawConditions/RawResults are ignored
                     try { r.IsActive = row.Table.Columns.Contains("IsActive") && row["IsActive"] != DBNull.Value ? Convert.ToBoolean(row["IsActive"]) : true; } catch { r.IsActive = true; }
                     rules.Add(r);
                 }
@@ -153,7 +150,7 @@ namespace TaMi_Kassenclient
         {
             var rule = new AbrechnungsRegel { JoinKind = editor.Verknuepfung, IsDefault = editor.IsDefault, Priority = editor.Priority, Clauses = new List<AbrechnungsClause>() };
             int group = 0; foreach(var c in editor.Bedingungen){ string fld=(c.Feld??"").Trim(); string op=(c.Operator??"=").Trim(); string val=(c.Wert??"").Trim(); if(string.Equals(fld,"MwSt",StringComparison.OrdinalIgnoreCase)){ if(val=="19") rule.Clauses.Add(new AbrechnungsClause{GroupId=group,Field="Betrag19",Operator=(op=="!="||op=="<>")?"=":">",Value="0"}); else if(val=="7") rule.Clauses.Add(new AbrechnungsClause{GroupId=group,Field="Betrag7",Operator=(op=="!="||op=="<>")?"=":">",Value="0"}); else if(val=="0") rule.Clauses.Add(new AbrechnungsClause{GroupId=group,Field="Betrag0",Operator=(op=="!="||op=="<>")?"=":">",Value="0"}); continue; } if(string.IsNullOrWhiteSpace(fld)) continue; if(string.Equals(op,"!=",StringComparison.OrdinalIgnoreCase)) op="<>"; if(string.Equals(fld,"FhzId",StringComparison.OrdinalIgnoreCase) && string.Equals(op,"IN",StringComparison.OrdinalIgnoreCase)){ var list=string.Join(";",(val??string.Empty).Split(new[]{';',',',' '},StringSplitOptions.RemoveEmptyEntries).Select(s=>s.Trim())); val=list; } rule.Clauses.Add(new AbrechnungsClause{GroupId=group,Field=fld,Operator=op,Value=val}); }
-            foreach(var res in editor.Ergebnisse){ switch((res.Feld??string.Empty).Trim()){ case "Kost1": if(int.TryParse(res.Wert,out var k1)) rule.ResultKost1=k1; break; case "Kost2": if(int.TryParse(res.Wert,out var k2)) rule.ResultKost2=k2; break; case "Konto": if(int.TryParse(res.Wert,out var kt)) rule.ResultKonto=kt; break; case "Buchungstext": rule.ResultBuchungstext = res.Wert; break; } }
+            foreach(var res in editor.Ergebnisse){ switch((res.Feld??string.Empty).Trim()){ case "Kost1": if(int.TryParse(res.Wert,out var k1)) rule.ResultKost1=k1; break; case "Kost2": if(int.TryParse(res.Wert,out var k2)) rule.ResultKost2=k2; break; case "Konto": if(int.TryParse(res.Wert,out var kt)) rule.ResultKonto=kt; break; case "Buchungstext": /* no longer mapped */ break; } }
             return rule;
         }
     }

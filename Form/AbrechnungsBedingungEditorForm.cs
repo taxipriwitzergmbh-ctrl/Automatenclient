@@ -141,7 +141,7 @@ namespace TaMi_Kassenclient
             if (r.ResultKost1.HasValue) AddResult("Kost1", r.ResultKost1.Value.ToString());
             if (r.ResultKost2.HasValue) AddResult("Kost2", r.ResultKost2.Value.ToString());
             if (r.ResultKonto.HasValue) AddResult("Konto", r.ResultKonto.Value.ToString());
-            if (!string.IsNullOrWhiteSpace(r.ResultBuchungstext)) AddResult("Buchungstext", r.ResultBuchungstext);
+            // Buchungstext aus Regeln nicht mehr verwendet
 
             if (pnlErgebnisse.Controls.Count == 0)
             {

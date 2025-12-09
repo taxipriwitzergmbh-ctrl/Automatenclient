@@ -17,16 +17,15 @@ namespace TaMi_Kassenclient
         public int? ManId { get; set; } // no longer persisted / evaluated
         public List<int> FhzIds { get; set; } // no longer persisted / evaluated
         public int? PersId { get; set; } // no longer persisted / evaluated
-        public string AdditionalWhere { get; set; } // no longer persisted (kept only for legacy rows)
+        // Removed: AdditionalWhere (legacy, no longer used)
 
         // Ergebnisse
         public int? ResultKost1 { get; set; }
         public int? ResultKost2 { get; set; }
         public int? ResultKonto { get; set; }
-        public string ResultBuchungstext { get; set; }
+        // Removed: ResultBuchungstext (legacy, no longer used)
 
-        public string RawConditionsJson { get; set; }
-        public string RawResultsJson { get; set; }
+        // Removed: RawConditionsJson / RawResultsJson (legacy, no longer used)
         public bool IsActive { get; set; } = true;
 
         // Authoritative structured clauses
@@ -81,13 +80,11 @@ namespace TaMi_Kassenclient
                 ManId = this.ManId,
                 FhzIds = this.FhzIds != null ? new List<int>(this.FhzIds) : null,
                 PersId = this.PersId,
-                AdditionalWhere = this.AdditionalWhere,
+                // AdditionalWhere removed
                 ResultKost1 = this.ResultKost1,
                 ResultKost2 = this.ResultKost2,
                 ResultKonto = this.ResultKonto,
-                ResultBuchungstext = this.ResultBuchungstext,
-                RawConditionsJson = this.RawConditionsJson,
-                RawResultsJson = this.RawResultsJson,
+                // ResultBuchungstext, RawConditionsJson, RawResultsJson removed
                 IsActive = this.IsActive,
                 Clauses = this.Clauses != null ? new List<AbrechnungsClause>(this.Clauses.Select(c => c.Clone())) : null,
                 PresetName = this.PresetName
