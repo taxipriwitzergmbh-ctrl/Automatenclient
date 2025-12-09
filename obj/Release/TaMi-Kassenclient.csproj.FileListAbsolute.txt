@@ -2,7 +2,6 @@ Z:\2. Abteilungsleitung\IT\Programierung\Kassenclient Version 1.0\Version 1.0\bi
 Z:\2. Abteilungsleitung\IT\Programierung\Kassenclient Version 1.0\Version 1.0\bin\Release\TaMi-Kassenclient.exe
 Z:\2. Abteilungsleitung\IT\Programierung\Kassenclient Version 1.0\Version 1.0\bin\Release\TaMi-Kassenclient.pdb
 Z:\2. Abteilungsleitung\IT\Programierung\Kassenclient Version 1.0\Version 1.0\obj\Release\TaMi-Kassenclient.csproj.AssemblyReference.cache
-Z:\2. Abteilungsleitung\IT\Programierung\Kassenclient Version 1.0\Version 1.0\obj\Release\TaMi-Kassenclient.exe.config
 Z:\2. Abteilungsleitung\IT\Programierung\Kassenclient Version 1.0\Version 1.0\obj\Release\TaMi_Kassenclient.Properties.Resources.resources
 Z:\2. Abteilungsleitung\IT\Programierung\Kassenclient Version 1.0\Version 1.0\obj\Release\TaMi-Kassenclient.csproj.GenerateResource.cache
 Z:\2. Abteilungsleitung\IT\Programierung\Kassenclient Version 1.0\Version 1.0\obj\Release\TaMi-Kassenclient.csproj.CoreCompileInputs.cache

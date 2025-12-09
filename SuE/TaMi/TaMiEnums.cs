@@ -7,10 +7,10 @@ namespace SuE.TaMi
 {
     /*
         PROJEKT           :  Enums
-        VERSION           :  1.02
+        VERSION           :  1.03
         
         ERSTELLUNGS-DATUM :  17.10.2018
-        ÄNDERUNGS-DATUM   :  26.01.2024
+        ÄNDERUNGS-DATUM   :  09.12.2025
         ÄNDERUNG:            siehe Entwicklungsgeschichte
         DURCHGEFUEHRT VON :  SuE-Software  [sue]
 
@@ -27,6 +27,10 @@ namespace SuE.TaMi
         --- Version 1.02 --------------------------------------------------------
 
         26.01.2024  mcs   ShiftEntryFlags und ShiftFlags hinzugefügt
+
+        --- Version 1.03 --------------------------------------------------------
+
+        09.12.2025  mcs   ShiftEntryFlags und ShiftFlags hinzugefügt
 
     */
 
@@ -152,19 +156,24 @@ namespace SuE.TaMi
         DISPOEDITCUSTOMER = 0x0200,
         DISPOCHANGEFILTER = 0x0400,
         DISPODISPATCH = 0x0800,
-
+        DISPOEDITJOBCOMPLETED = 0x1000,
         DISPOVIEWREPEATING = 0x02000,
         DISPOVIEWTOTALS = 0x04000,
         DISPOQUERYJOBS = 0x08000,
 
-
+        KASSENCLIENT = 0x200000,
         DISPOAPP = 0x0400000,
         CHANGESETTINGS = 0x0800000
     }
 
     public enum AppRights2 : int
     {
+        ZEITERFASSUNG_EDIT = 0x400000,
 
+        SCHICHT_EDIT = 0x1000000,
+
+        FAHRERTERMALL = 0x2000000,
+        AUTOMAT_ADMIN = 0x4000000  //Priwitzer Kassenautomat Software (Admin Modus)
     }
 
     //Actions für VEHICLEMANREQ, VEHICLEMANMSG
