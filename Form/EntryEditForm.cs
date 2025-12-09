@@ -51,6 +51,8 @@ namespace TaMi_Kassenclient
             string schichtId = "", string kennzeichen = "", string fahrerName = "",
             int firmenId = 0)
         {
+            this.Icon = Program.AppIcon;
+
             _total = ParseMoney(betragGesamt);
             if (v19 != 0) { Betrag19 = v19; Betrag7 = 0; Betrag0 = 0; }
             else if (v7 != 0) { Betrag19 = 0; Betrag7 = v7; Betrag0 = 0; }

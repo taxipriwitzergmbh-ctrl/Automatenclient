@@ -47,6 +47,12 @@
     <ErrorReport>prompt</ErrorReport>
     <WarningLevel>4</WarningLevel>
   </PropertyGroup>
+  <PropertyGroup>
+    <ApplicationIcon>Resources\Einzahlautomat_Win11.ico</ApplicationIcon>
+  </PropertyGroup>
+  <PropertyGroup>
+    <StartupObject>TaMi_Kassenclient.Program</StartupObject>
+  </PropertyGroup>
   <ItemGroup>
     <Reference Include="System" />
     <Reference Include="System.Core" />
@@ -62,7 +68,6 @@
   </ItemGroup>
   <ItemGroup>
     <Compile Include="AbrechnungsBedingungenForm.cs" />
-    <Compile Include="DayViewForm.cs" />
     <Compile Include="Form\AbrechnungsBedingungEditorForm.cs">
       <SubType>Form</SubType>
     </Compile>
@@ -85,12 +90,14 @@
     <Compile Include="Form\KassenübersichtForm.cs">
       <SubType>Form</SubType>
     </Compile>
-    <Compile Include="LoginForm.cs" />
-    <Compile Include="MainForm.cs" />
+    <Compile Include="Form\LoginForm.cs" />
     <Compile Include="Form\MenueForm.cs">
       <SubType>Form</SubType>
     </Compile>
     <Compile Include="Form\PersonalForm.cs">
+      <SubType>Form</SubType>
+    </Compile>
+    <Compile Include="Form\KassenclientBaseForm.cs">
       <SubType>Form</SubType>
     </Compile>
     <Compile Include="Program.cs" />
@@ -99,6 +106,46 @@
     <Compile Include="Form\ZahlungForm.cs">
       <SubType>Form</SubType>
     </Compile>
+    <Compile Include="SuE\TaMi\Config.cs" />
+    <Compile Include="SuE\TaMi\ConfigItem.cs" />
+    <Compile Include="SuE\TaMi\DispatchState.cs" />
+    <Compile Include="SuE\TaMi\Fahrzeug.cs" />
+    <Compile Include="SuE\TaMi\Fahrzeuge.cs" />
+    <Compile Include="SuE\TaMi\FahrzeugGruppe.cs" />
+    <Compile Include="SuE\TaMi\FahrzeugGruppen.cs" />
+    <Compile Include="SuE\TaMi\FhzState.cs" />
+    <Compile Include="SuE\TaMi\FhzStates.cs" />
+    <Compile Include="SuE\TaMi\Job.cs" />
+    <Compile Include="SuE\TaMi\JobPos.cs" />
+    <Compile Include="SuE\TaMi\Jobs.cs" />
+    <Compile Include="SuE\TaMi\Optionen.cs" />
+    <Compile Include="SuE\TaMi\Personal.cs" />
+    <Compile Include="SuE\TaMi\PersonalMan.cs" />
+    <Compile Include="SuE\TaMi\TaMiClient.cs" />
+    <Compile Include="SuE\TaMi\TaMiEnums.cs" />
+    <Compile Include="SuE\TaMi\TaMiTools.cs" />
+    <Compile Include="SuE\TaMi\Tarif.cs" />
+    <Compile Include="SuE\TaMi\Tarife.cs" />
+    <Compile Include="SuE\TaMi\Zone.cs" />
+    <Compile Include="SuE\TaMi\Zonen.cs" />
+    <Compile Include="SuE\TaMi\ZonePoly.cs" />
+    <Compile Include="SuE\Tools\AddressAnalyser.cs" />
+    <Compile Include="SuE\Tools\AppConfig.cs" />
+    <Compile Include="SuE\Tools\AppConfigItem.cs" />
+    <Compile Include="SuE\Tools\AsyncTcpClient.cs" />
+    <Compile Include="SuE\Tools\AutoClosingMessageBox.cs" />
+    <Compile Include="SuE\Tools\ControlExtensions.cs" />
+    <Compile Include="SuE\Tools\DataGridViewCheckBoxColumnEx.cs" />
+    <Compile Include="SuE\Tools\DataGridViewMultilineTextBoxColumn.cs" />
+    <Compile Include="SuE\Tools\EventExtensions.cs" />
+    <Compile Include="SuE\Tools\ExceptionReporter.cs" />
+    <Compile Include="SuE\Tools\Extensions.cs" />
+    <Compile Include="SuE\Tools\FormExtensions.cs" />
+    <Compile Include="SuE\Tools\InputBox.cs" />
+    <Compile Include="SuE\Tools\MessageClient.cs" />
+    <Compile Include="SuE\Tools\MessagePacket.cs" />
+    <Compile Include="SuE\Tools\TimeSpanNamed.cs" />
+    <Compile Include="SuE\Tools\Utils.cs" />
     <EmbeddedResource Include="Properties\Resources.resx">
       <Generator>ResXFileCodeGenerator</Generator>
       <LastGenOutput>Resources.Designer.cs</LastGenOutput>
@@ -134,7 +181,7 @@
     </BootstrapperPackage>
   </ItemGroup>
   <ItemGroup>
-    <Content Include="Einzahlautomat_Win11.ico" />
+    <Content Include="Resources\Einzahlautomat_Win11.ico" />
   </ItemGroup>
   <Import Project="$(MSBuildToolsPath)\Microsoft.CSharp.targets" />
 </Project>

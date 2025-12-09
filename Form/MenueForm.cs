@@ -1,27 +1,31 @@
+using SuE.TaMi;
 using System;
 using System.Drawing;
+using System.Drawing.Drawing2D;
 using System.Runtime.InteropServices;
 using System.Windows.Forms;
-using System.Drawing.Drawing2D;
 
 namespace TaMi_Kassenclient
 {
-    public partial class MenueForm : Form
+    public partial class MenueForm : KassenclientBaseForm
     {
-        private Panel headerPanel;
-        private Label lblTitle;
-        private Button btnClose;
+        private TaMiClient mTaMiClient;
+
+        //private Panel headerPanel;
+        //private Label lblTitle;
+        //private Button btnClose;
         private Button btnKassenbuch;
         private Button btnRegeln; // neu
         private Button btnPersonal; // neu
         private Button btnZahlungen; // neu
-        private Point _mouseDownLocation;
+        //private Point _mouseDownLocation;
 
         // Farben analog der anderen Forms
         private static readonly Color Accent = Color.FromArgb(33, 150, 243);
         private static readonly Color AccentHover = Color.FromArgb(25, 118, 210);
 
         // Composited zur Reduktion von Flackern
+        /*
         protected override CreateParams CreateParams
         {
             get
@@ -31,22 +35,44 @@ namespace TaMi_Kassenclient
                 return cp;
             }
         }
+        */
 
         public MenueForm()
         {
-            InitializeComponent();
+            mTaMiClient = Program.MainTaMiClient;
+            BuildUI();
         }
 
-        private void InitializeComponent()
+        protected override void OnShown(EventArgs eventArgs)
         {
-            this.headerPanel = new Panel();
-            this.lblTitle = new Label();
-            this.btnClose = new Button();
+            base.OnShown(eventArgs);
+
+            //Nicht verbunden oder angemeldet
+            if (mTaMiClient.State != SuE.Tools.ConnectionState.CONNECTED || mTaMiClient.UserId == -1)
+            {
+                if (LoginForm.ShowLogin(this) == null)
+                    this.Close();
+            }
+
+        }
+
+
+        private void BuildUI()
+        {
+            this.SetupDefaultForm("MenueForm", "Kassenclient", new Size(500, 500));
+            ShowInTaskbar = true;
+
+            //this.headerPanel = new Panel();
+            //this.lblTitle = new Label();
+            //this.btnClose = new Button();
             this.btnKassenbuch = new Button();
             this.btnRegeln = new Button();
             this.btnPersonal = new Button();
             this.btnZahlungen = new Button();
+
             this.SuspendLayout();
+            
+            /*
             // 
             // headerPanel
             // 
@@ -63,10 +89,11 @@ namespace TaMi_Kassenclient
                     Top += e.Y - _mouseDownLocation.Y;
                 }
             };
+
             // 
             // lblTitle
             // 
-            this.lblTitle.Text = "TaMi-Kassenclient – Menü";
+            this.lblTitle.Text = "TaMi-Kassenclient";
             this.lblTitle.Font = new Font("Segoe UI Variable", 18F, FontStyle.Bold);
             this.lblTitle.ForeColor = Color.White;
             this.lblTitle.TextAlign = ContentAlignment.MiddleLeft;
@@ -74,6 +101,7 @@ namespace TaMi_Kassenclient
             this.lblTitle.Size = new Size(360, 60);
             this.lblTitle.BackColor = Color.Transparent;
             this.headerPanel.Controls.Add(this.lblTitle);
+
             // 
             // btnClose
             // 
@@ -90,10 +118,16 @@ namespace TaMi_Kassenclient
             this.btnClose.FlatAppearance.MouseOverBackColor = Color.FromArgb(255, 80, 80);
             this.btnClose.Click += (s, e) => Close();
             this.headerPanel.Controls.Add(this.btnClose);
+            */
+
             // 
             // Buttons – einheitlicher Stil
             // 
-            int w = 320; int h = 56; int x = (500 - w) / 2; int y = 96; int padY = 16;
+            int w = 320; 
+            int h = 56; 
+            int x = (500 - w) / 2; 
+            int y = 96; 
+            int padY = 16;
 
             StylePrimaryButton(this.btnKassenbuch, "Kassenbuch", new Point(x, y), new Size(w, h));
             this.btnKassenbuch.TabIndex = 0;
@@ -114,19 +148,29 @@ namespace TaMi_Kassenclient
             // 
             // MenueForm
             // 
+            /*
+            this.Name = "MenueForm";
+            this.Text = "Kassenclient";
+            this.FormBorderStyle = FormBorderStyle.None;
             this.ClientSize = new Size(500, 500); // erhöht damit alle Buttons sichtbar sind
-            this.Controls.Add(this.headerPanel);
+            this.BackColor = Color.WhiteSmoke;
+            
+            this.MaximizeBox = false;
+            this.StartPosition = FormStartPosition.CenterScreen;
+
+            this.DoubleBuffered = true;
+            */
+
+            //try { Region = Region.FromHrgn(CreateRoundRectRgn(0, 0, Width, Height, 24, 24)); } catch { }
+
+            this.AddHeaderPanel(this.Text, true, true, true);
+
+            //this.Controls.Add(this.headerPanel);
             this.Controls.Add(this.btnKassenbuch);
             this.Controls.Add(this.btnRegeln);
             this.Controls.Add(this.btnPersonal);
             this.Controls.Add(this.btnZahlungen);
-            this.FormBorderStyle = FormBorderStyle.None;
-            this.MaximizeBox = false;
-            this.StartPosition = FormStartPosition.CenterScreen;
-            this.Name = "MenueForm";
-            this.Text = "Menü";
-            this.DoubleBuffered = true;
-            try { Region = Region.FromHrgn(CreateRoundRectRgn(0, 0, Width, Height, 24, 24)); } catch { }
+
             this.ResumeLayout(false);
         }
 
@@ -142,6 +186,7 @@ namespace TaMi_Kassenclient
             b.FlatAppearance.BorderSize = 0;
             b.FlatAppearance.MouseOverBackColor = AccentHover;
             b.TextAlign = ContentAlignment.MiddleCenter;
+
             // Runde Ecken
             b.Resize += (s, e) =>
             {
@@ -160,6 +205,7 @@ namespace TaMi_Kassenclient
                 }
                 catch { }
             };
+
             b.PerformLayout();
         }
 
@@ -169,6 +215,7 @@ namespace TaMi_Kassenclient
             kassenuebersichtForm.ShowDialog();
         }
 
+        /*
         private void HeaderPanel_Paint(object sender, PaintEventArgs e)
         {
             using (var brush = new LinearGradientBrush(headerPanel.ClientRectangle,
@@ -180,5 +227,6 @@ namespace TaMi_Kassenclient
 
         [DllImport("gdi32.dll", SetLastError = true)]
         private static extern IntPtr CreateRoundRectRgn(int nLeftRect, int nTopRect, int nRightRect, int nBottomRect, int nWidthEllipse, int nHeightEllipse);
+        */
     }
 }

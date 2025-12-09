@@ -94,9 +94,11 @@ namespace TaMi_Kassenclient
 
         public PersonalForm()
         {
+            this.Icon = Program.AppIcon;
+
             // Erst unsichtbar, um "unsauberes" Aufbauen zu vermeiden
             try { Opacity = 0; } catch { }
-            InitUi();
+            BuildUI();
         }
 
         private void EnableDoubleBuffer(Control ctl)
@@ -114,13 +116,14 @@ namespace TaMi_Kassenclient
             catch { }
         }
 
-        private void InitUi()
+        private void BuildUI()
         {
             SuspendLayout();
             try
             {
                 FormBorderStyle = FormBorderStyle.None;
                 StartPosition = FormStartPosition.CenterScreen;
+                ShowInTaskbar = false;
                 ClientSize = new Size(1320, 1040);
                 AutoScroll = true;
                 BackColor = Color.White;
@@ -729,8 +732,15 @@ namespace TaMi_Kassenclient
             {
                 var p = await db.GetPersonalInfoAsync(pid);
                 if (p == null) { MessageBox.Show(this, "Personalnummer nicht gefunden.", "Hinweis", MessageBoxButtons.OK, MessageBoxIcon.Information); return; }
-                _currentPid = p.PID; lblName.Text = $"{p.Name}"; lblVorname.Text = $"{p.Vorname}"; txtNfc.Text = p.NFC ?? string.Empty; txtFahrercode.Text = p.Fahrercode ?? string.Empty;
+                
+                _currentPid = p.PID; 
+                lblName.Text = p.Name; 
+                lblVorname.Text = p.Vorname; 
+                txtNfc.Text = p.NFCTagUID ?? string.Empty; 
+                txtFahrercode.Text = p.Fahrercode ?? string.Empty;
+                
                 gvOpenShifts.DataSource = await db.GetOpenShiftsListAsync(_currentPid); ApplyOpenShiftsGridFormatting();
+                
                 await BindOpenPaymentsAsync(db); // neue Ansicht
                 await LoadGuthabenHistoryAsync(); await UpdateSaldoLabelAsync(db); GvOpenPayments_SelectionChanged(null, EventArgs.Empty);
             }

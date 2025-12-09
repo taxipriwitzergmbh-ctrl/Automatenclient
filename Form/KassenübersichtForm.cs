@@ -19,6 +19,7 @@ namespace TaMi_Kassenclient
 
         public KassenübersichtForm()
         {
+            this.Icon = Program.AppIcon;
             InitializeLayout();
         }
 

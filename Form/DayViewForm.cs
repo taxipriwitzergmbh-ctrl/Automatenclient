@@ -58,6 +58,8 @@ namespace TaMi_Kassenclient
 
         public DayViewForm(int firmenId, string kassenName, string automatenName)
         {
+            this.Icon = Program.AppIcon;
+
             _firmenId = firmenId;
             _kassenName = kassenName;
             _automatenName = automatenName;

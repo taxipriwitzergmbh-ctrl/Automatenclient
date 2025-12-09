@@ -42,6 +42,8 @@ namespace TaMi_Kassenclient
                 }
             }
             catch { }
+
+
             AutomatenNamen = new List<string>(new HashSet<string>(result, StringComparer.OrdinalIgnoreCase));
             return AutomatenNamen;
         }

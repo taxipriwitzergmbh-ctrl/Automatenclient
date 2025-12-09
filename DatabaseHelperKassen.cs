@@ -9,29 +9,35 @@ namespace TaMi_Kassenclient
 {
     public sealed class DatabaseHelperKassen : IDisposable
     {
-        private readonly SqlConnection _connection;
-        private string _tblKassenbuch;   // z. B. [dbo].[TKassenbuch]
-        private string _tblMandanten;    // z. B. [dbo].[TMandanten]
-        private bool? _belegIstIdentity; // true, falls Belegnummer Identity ist
-        private string _tblDevices;      // NEU: [dbo].[TKassenbuchDevice]
-        private string _tblVorlagen;     // NEU: [dbo].[TKassenbuchVorlagen]
+        private SqlConnection _connection;
+
+        private string  _tblKassenbuch;     // z. B. [dbo].[TKassenbuch]
+        private string  _tblMandanten;      // z. B. [dbo].[TMandanten]
+        private bool?   _belegIstIdentity;  // true, falls Belegnummer Identity ist
+        private string  _tblDevices;        // NEU: [dbo].[TKassenbuchDevice]
+        private string  _tblVorlagen;       // NEU: [dbo].[TKassenbuchVorlagen]
 
         // Persistenz der Abrechnungsbedingungen
-        private string _tblAbrechnungsRegeln;
-        private string _tblAbrechnungsClauses; // NEU
+        private string  _tblAbrechnungsRegeln;
+        private string  _tblAbrechnungsClauses; // NEU
+
 
         // Weitere Tabellen
         private string _tblPersonal;     // [dbo].[TPersonal]
         private string _tblZahlungen;    // [dbo].[TKassenbuchZahlungen]
         private string _tblFahrzeuge;    // [dbo].[TFahrzeuge] (NEU)
 
+
         public DatabaseHelperKassen()
         {
-            _connection = new SqlConnection(GetConnectionString());
+            //_connection = new SqlConnection(GetConnectionString());
         }
 
         public static string GetConnectionString()
         {
+            return Program.MainTaMiClient.DatabaseConnectionStr;
+
+            /*
             string iniPath = @"C:\\ProgramData\\SuE-Software\\SuE-TaMi Client SQL\\TaMi Client.ini";
             string server = "localhost,1433";
             string dbName = "SuE-TaMi"; // Fallback
@@ -72,12 +78,17 @@ namespace TaMi_Kassenclient
             }
 
             return $"Data Source={server};Initial Catalog={dbName};User ID={user};Password={password};Network Library=DBMSSOCN;";
+            */
         }
 
         private async Task EnsureOpenAsync()
         {
+            if (_connection == null)
+                _connection = Program.MainTaMiClient.OpenTaMiDB(true);
+
             if (_connection.State != ConnectionState.Open)
                 await _connection.OpenAsync();
+
             if (_tblKassenbuch == null)
                 await ResolveObjectNamesAsync();
         }
@@ -116,8 +127,11 @@ SELECT QUOTENAME(s.name) + '.' + QUOTENAME(t.name)
 FROM sys.tables t
 JOIN sys.schemas s ON s.schema_id = t.schema_id
 WHERE t.name = @name";
+
                 cmd.Parameters.AddWithValue("@name", tableName);
+
                 var o = await cmd.ExecuteScalarAsync();
+
                 return (o == null || o == DBNull.Value) ? null : Convert.ToString(o);
             }
         }
@@ -198,7 +212,7 @@ END CATCH";
             await EnsureOpenAsync();
             using (var cmd = _connection.CreateCommand())
             {
-                cmd.CommandText = $@"SELECT PID, Name, Vorname, NFC, Fahrercode FROM {_tblPersonal} WITH (NOLOCK) WHERE PID = @PID";
+                cmd.CommandText = $@"SELECT PID, Name, Vorname, NFCTagUID, Fahrercode FROM {_tblPersonal} WITH (NOLOCK) WHERE PID = @PID";
                 cmd.Parameters.AddWithValue("@PID", pid);
                 using (var rdr = await cmd.ExecuteReaderAsync(CommandBehavior.SingleRow))
                 {
@@ -208,7 +222,7 @@ END CATCH";
                         PID = rdr.GetInt32(rdr.GetOrdinal("PID")),
                         Name = rdr.GetString(rdr.GetOrdinal("Name")),
                         Vorname = rdr.GetString(rdr.GetOrdinal("Vorname")),
-                        NFC = rdr.IsDBNull(rdr.GetOrdinal("NFC")) ? null : rdr["NFC"].ToString(),
+                        NFCTagUID = rdr.IsDBNull(rdr.GetOrdinal("NFCTagUID")) ? null : rdr["NFCTagUID"].ToString(),
                         Fahrercode = rdr.IsDBNull(rdr.GetOrdinal("Fahrercode")) ? null : rdr["Fahrercode"].ToString()
                     };
                 }
@@ -240,8 +254,14 @@ FROM TSchichten s WITH (NOLOCK)
 LEFT JOIN {_tblFahrzeuge} f WITH (NOLOCK) ON f.FID = s.FhzId
 WHERE (s.Flags & 1) = 0 AND (s.Flags & 4) = 0 AND s.PersId = @PersId
 ORDER BY s.StartZeit DESC;";
+
                 cmd.Parameters.AddWithValue("@PersId", persId);
-                using (var rdr = await cmd.ExecuteReaderAsync()) { var dt = new DataTable(); dt.Load(rdr); return dt; }
+                using (var rdr = await cmd.ExecuteReaderAsync()) 
+                { 
+                    var dt = new DataTable(); 
+                    dt.Load(rdr); 
+                    return dt; 
+                }
             }
         }
 
@@ -453,7 +473,7 @@ ORDER BY v.VorlagenName ASC, v.Typ ASC;";
             await EnsureOpenAsync();
             using (var cmd = _connection.CreateCommand())
             {
-                cmd.CommandText = $@"UPDATE {_tblPersonal} SET NFC=@N WHERE PID=@PID";
+                cmd.CommandText = $@"UPDATE {_tblPersonal} SET NFCTagUID=@N WHERE PID=@PID";
                 cmd.Parameters.AddWithValue("@N", (object)nfc ?? DBNull.Value);
                 cmd.Parameters.AddWithValue("@PID", pid);
                 return await cmd.ExecuteNonQueryAsync();
@@ -1100,7 +1120,7 @@ WHERE Id=@Id; SELECT @Id;";
         public int PID { get; set; }
         public string Name { get; set; }
         public string Vorname { get; set; }
-        public string NFC { get; set; }
+        public string NFCTagUID { get; set; }
         public string Fahrercode { get; set; }
     }
 }

@@ -62,6 +62,8 @@ namespace TaMi_Kassenclient
             int? startK1, int? startK2, int? startKto, string standardText,
             int firmenId, string typ, int? fhzId)
         {
+            this.Icon = Program.AppIcon;
+
             _originalSumme = originalSumme;
             _firmenId = firmenId;
             _typ = typ ?? string.Empty;

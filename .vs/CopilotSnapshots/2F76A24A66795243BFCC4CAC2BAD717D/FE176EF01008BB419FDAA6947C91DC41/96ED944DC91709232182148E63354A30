@@ -1,0 +1,195 @@
+﻿using System;
+using System.Collections.Generic;
+using System.Drawing;
+using System.Drawing.Drawing2D;
+using System.Linq;
+using System.Reflection;
+using System.Runtime.CompilerServices;
+using System.Text;
+using System.Threading.Tasks;
+using System.Windows.Forms;
+
+namespace TaMi_Kassenclient
+{
+    internal class UIHelper
+    {
+        public static readonly Color HeaderAccent1 = Color.FromArgb(33, 150, 243),  //Color.FromArgb(33, 150, 243),
+                                     HeaderAccent2 = Color.FromArgb(25, 118, 210); //Color.FromArgb(33, 203, 243);
+
+        public static readonly Color BackcolorNeutral = Color.FromArgb(33, 150, 243);
+
+        public static readonly Font HeaderTextFont = new Font("Segoe UI Variable", 16F, FontStyle.Bold),
+                                    HeaderButtonFont = new Font("Segoe UI Symbol", 18F, FontStyle.Bold),
+
+                                    ButtonFont = new Font("Segoe UI Variable", 12F, FontStyle.Regular);
+
+        public static readonly Color FormBordercolor = Color.FromArgb(13, 71, 161);
+
+
+        public static void SetupDefaultForm(Form form, string Name, string title, Size size)
+        {
+            form.Name = Name;
+            
+            form.Text = title;
+            form.Icon = Program.AppIcon;
+
+            form.FormBorderStyle = FormBorderStyle.None;
+            form.MaximizeBox = false;
+            form.MinimizeBox = false;
+            form.StartPosition = FormStartPosition.CenterScreen;
+            form.ShowInTaskbar = false;
+            form.ClientSize = size;
+            form.AutoScroll = true;
+            form.BackColor = Color.WhiteSmoke;
+            form.KeyPreview = true;
+            
+
+            //form.KeyDown += PersonalForm_KeyDown;
+            //form.KeyPress += PersonalForm_KeyPress;
+
+        }
+
+        public static void AddHeaderPanel(Form form, string title)
+        {
+            AddHeaderPanel(form, title, false);
+        }
+
+        public static void AddHeaderPanel(Form form, string title, bool minimizeButton)
+        {
+            Panel headerPanel = new Panel 
+            { 
+                /*Dock = DockStyle.Top,*/
+                Location = new Point(0, 0),
+                Size = new Size(form.ClientSize.Width, 64),
+                Anchor = AnchorStyles.Top | AnchorStyles.Left | AnchorStyles.Right,
+
+                BackColor = Color.Transparent 
+            };
+            headerPanel.SuspendLayout();
+
+            //Paint-Event für Farbverlauf
+            headerPanel.Paint += (s, e) =>
+            {
+                /*
+                using (var brush = new LinearGradientBrush(headerPanel.ClientRectangle, HeaderAccent1, HeaderAccent2, 0f))
+                {
+                    e.Graphics.FillRectangle(brush, headerPanel.ClientRectangle);
+                }
+                */
+
+                using (var lg = new LinearGradientBrush(headerPanel.ClientRectangle, HeaderAccent1, HeaderAccent2, 0f))
+                    e.Graphics.FillRectangle(lg, headerPanel.ClientRectangle); 
+                
+                using (var pen = new Pen(FormBordercolor)) 
+                    e.Graphics.DrawLine(pen, 0, headerPanel.Height - 1, headerPanel.Width, headerPanel.Height - 1);
+
+            };
+
+            // Dragging-Events
+            Point mouseDownLocation = Point.Empty;
+            bool dragging = false;
+
+            MouseEventHandler dragMouseDown = (s, e) =>
+            {
+                if (e.Button == MouseButtons.Left)
+                {
+                    dragging = true;
+                    mouseDownLocation = e.Location;
+                }
+            };
+            MouseEventHandler dragMouseMove = (s, e) =>
+            {
+                if (dragging)
+                {
+                    // Position relativ zum Form berechnen
+                    var ctrl = s as Control;
+                    var offset = ctrl.PointToScreen(e.Location);
+                    var formOffset = form.PointToScreen(Point.Empty);
+                    form.Left += offset.X - formOffset.X - mouseDownLocation.X;
+                    form.Top += offset.Y - formOffset.Y - mouseDownLocation.Y;
+                }
+            };
+            MouseEventHandler dragMouseUp = (s, e) =>
+            {
+                if (e.Button == MouseButtons.Left)
+                    dragging = false;
+            };
+
+            headerPanel.MouseDown += dragMouseDown;
+            headerPanel.MouseMove += dragMouseMove;
+            headerPanel.MouseUp   += dragMouseUp;
+
+            form.Controls.Add(headerPanel);
+
+            Label lblTitle = new Label 
+            { 
+                Text = title,
+                AutoSize = false,
+                Left = 16,
+                Top = 0,
+                Width = 420,
+                Height = 64,
+                ForeColor = Color.White,
+                Font = HeaderTextFont,
+                TextAlign = ContentAlignment.MiddleLeft,
+                BackColor = Color.Transparent
+            };
+            lblTitle.MouseDown += dragMouseDown;
+            lblTitle.MouseMove += dragMouseMove;
+            lblTitle.MouseUp   += dragMouseUp;
+            headerPanel.Controls.Add(lblTitle);
+
+
+            //btnClose
+            Button btnClose = new Button
+            {
+                Text = "\u2715",
+                Font = HeaderButtonFont,
+                ForeColor = Color.White,
+                BackColor = Color.Transparent,
+                
+                FlatStyle = FlatStyle.Flat,
+                FlatAppearance = {
+                    BorderSize = 0,
+                    MouseOverBackColor = Color.FromArgb(255, 80, 80),
+                    },
+
+                Anchor = AnchorStyles.Top | AnchorStyles.Right,
+                Size = new Size(48, 48),
+                Location = new Point(form.ClientSize.Width -56, 8),
+
+                TabStop = false,
+            };
+
+            btnClose.Click += (s, e) => form.Close();
+            headerPanel.Controls.Add(btnClose);
+
+
+            //btnMinimize
+            Button btnMinimize = new Button
+            {
+                Text = "–",
+                Font = HeaderButtonFont /*new Font("Segoe UI", 16F, FontStyle.Bold)*/,
+                ForeColor = Color.White,
+                BackColor = Color.Transparent,
+                FlatStyle = FlatStyle.Flat,
+                FlatAppearance = {
+                    BorderSize = 0,
+                    MouseOverBackColor = Color.FromArgb(33, 150, 243, 80),
+                    },
+
+                Anchor = AnchorStyles.Top | AnchorStyles.Right,
+                Size = new Size(48, 48),
+                Location = new Point(form.ClientSize.Width - 112, 8),
+
+                TabStop = false,
+            };
+
+            btnMinimize.Click += (s, e) => form.WindowState = FormWindowState.Minimized;
+            headerPanel.Controls.Add(btnMinimize);
+
+            headerPanel.ResumeLayout();
+        }
+
+    }
+}

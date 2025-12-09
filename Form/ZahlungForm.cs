@@ -12,32 +12,65 @@ namespace TaMi_Kassenclient
     public class ZahlungForm : Form
     {
         // UI Felder
-        private Panel headerPanel; private Button btnClose; private Label lblTitle; private Point _mouseDownLocation;
-        private ComboBox cboMitarbeiter; private TextBox txtPid; private ComboBox cboTyp; private ComboBox cboMwst; private ComboBox cboFirma; private TextBox txtText; private TextBox txtK1, txtK2, txtKto; private NumericUpDown nudAmount; private Button btnAnlegen; private Button btnSaveChanges; private Button btnStorno; private Label lblInfo; private Label lblSelName; private DataGridView dgvOpen; private Label lblOpenCaption; private ComboBox cboPreset; private Button btnCreatePreset;
+        private Panel headerPanel; 
+        private Button btnClose; 
+        private Label lblTitle; 
+        private Point _mouseDownLocation;
+        private ComboBox cboMitarbeiter; 
+        private TextBox txtPid; 
+        private ComboBox cboTyp; 
+        private ComboBox cboMwst; 
+        private ComboBox cboFirma; 
+        private TextBox txtText; 
+        private TextBox txtK1, txtK2, txtKto; 
+        private NumericUpDown nudAmount; 
+        private Button btnAnlegen; 
+        private Button btnSaveChanges; 
+        private Button btnStorno; 
+        private Label lblInfo; 
+        private Label lblSelName; 
+        private DataGridView dgvOpen; 
+        private Label lblOpenCaption; 
+        private ComboBox cboPreset; 
+        private Button btnCreatePreset;
 
         // Status
-        private bool _personalLoaded; private bool _presetsLoaded; private bool _mandantenLoaded; private bool _autoLoaded; private bool _suppressPresetEvents; private bool _currentSelectedGesperrt; private int? _editBeleg;
+        private bool _personalLoaded; 
+        private bool _presetsLoaded; 
+        private bool _mandantenLoaded; 
+        private bool _autoLoaded; 
+        private bool _suppressPresetEvents; 
+        private bool _currentSelectedGesperrt; private int? _editBeleg;
 
         // Suche
-        private string _mitarbeiterTypeBuffer = string.Empty; private DateTime _mitarbeiterTypeLastKey = DateTime.MinValue; private const int MitarbeiterTypeTimeoutMs = 1000;
+        private string _mitarbeiterTypeBuffer = string.Empty; 
+        private DateTime _mitarbeiterTypeLastKey = DateTime.MinValue; 
+        private const int MitarbeiterTypeTimeoutMs = 1000;
 
         // Firmen Cache
-        private Dictionary<int,string> _firmenMap; private bool _firmenLoaded;
+        private Dictionary<int,string> _firmenMap; 
+        private bool _firmenLoaded;
 
         private class PresetListItem { public string Text { get; set; } public DataRow Row { get; set; } public override string ToString() => Text; }
 
-        private static readonly Color Accent = Color.FromArgb(33,150,243); private static readonly Color AccentDark = Color.FromArgb(25,118,210);
+        private static readonly Color Accent = Color.FromArgb(33,150,243); 
+        private static readonly Color AccentDark = Color.FromArgb(25,118,210);
 
         public ZahlungForm()
         {
-            // Breite erhöht (vorher 760)
-            FormBorderStyle = FormBorderStyle.None; StartPosition = FormStartPosition.CenterParent; Text = "Neue Zahlung"; ClientSize = new Size(940,700); DoubleBuffered = true; KeyPreview = true; KeyDown += ZahlungForm_KeyDown; BuildUi();
+            this.Icon = Program.AppIcon;
+            BuildUI();
         }
 
         protected override void OnShown(EventArgs e)
         {
             base.OnShown(e);
-            if (_autoLoaded) return; _autoLoaded = true;
+
+            if (_autoLoaded) 
+                return; 
+            
+            _autoLoaded = true;
+
             var t = new Timer { Interval = 120 };
             t.Tick += (s, ev) => { t.Stop(); t.Dispose(); _ = LoadMandantenAsync(); _ = LoadAccountingPresetsAsync(); _ = LoadPersonalAsync(); };
             t.Start();
@@ -53,9 +86,20 @@ namespace TaMi_Kassenclient
             if (e.KeyCode == Keys.Escape) Close();
         }
 
-        private void BuildUi()
+        private void BuildUI()
         {
+            // Breite erhöht (vorher 760)
+            FormBorderStyle = FormBorderStyle.None;
+            StartPosition = FormStartPosition.CenterParent;
+            ShowInTaskbar = false;
+            Text = "Neue Zahlung";
+            ClientSize = new Size(940, 700);
+            DoubleBuffered = true;
+            KeyPreview = true;
+            KeyDown += ZahlungForm_KeyDown;
+
             SuspendLayout();
+
             headerPanel = new Panel { Location = new Point(0,0), Size = new Size(ClientSize.Width,60), Anchor = AnchorStyles.Top|AnchorStyles.Left|AnchorStyles.Right };
             headerPanel.Paint += (s,e)=> { using(var lg=new LinearGradientBrush(headerPanel.ClientRectangle,Accent,AccentDark,0f)) e.Graphics.FillRectangle(lg,headerPanel.ClientRectangle); using(var pen=new Pen(Color.FromArgb(13,71,161))) e.Graphics.DrawLine(pen,0,headerPanel.Height-1,headerPanel.Width,headerPanel.Height-1); };
             headerPanel.MouseDown += (s,e)=> { if(e.Button==MouseButtons.Left) _mouseDownLocation=e.Location; };

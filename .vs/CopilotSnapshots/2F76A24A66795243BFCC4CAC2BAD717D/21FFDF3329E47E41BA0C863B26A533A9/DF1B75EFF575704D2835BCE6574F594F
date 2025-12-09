@@ -1,0 +1,114 @@
+﻿using System;
+using System.Collections.Generic;
+using System.Drawing;
+using System.Drawing.Drawing2D;
+using System.Linq;
+using System.Text;
+using System.Threading.Tasks;
+using System.Windows.Forms;
+
+namespace TaMi_Kassenclient
+{
+    internal class UIHelper
+    {
+        public static readonly Color HeaderAccent1 = Color.FromArgb(33, 150, 243),
+                                     HeaderAccent2 = Color.FromArgb(33, 203, 243);
+
+        public static readonly Color BackcolorNeutral = Color.FromArgb(33, 150, 243);
+
+        public static readonly Font HeaderTextFont = new Font("Segoe UI Variable", 16F, FontStyle.Bold),
+                                    HeaderButtonFont = new Font("Segoe UI Symbol", 18F, FontStyle.Bold),
+
+                                    ButtonFont = new Font("Segoe UI Variable", 12F, FontStyle.Regular);
+
+        public static void AddHeaderPanel(Form form, string title)
+        {
+            Panel headerPanel = new Panel 
+            { 
+                Dock = DockStyle.Top, 
+                Height = 64, 
+                BackColor = Color.Transparent 
+            };
+
+            headerPanel.Paint += (s, e) =>
+            {
+                using (var brush = new LinearGradientBrush(headerPanel.ClientRectangle, HeaderAccent1, HeaderAccent2, 0f))
+                {
+                    e.Graphics.FillRectangle(brush, headerPanel.ClientRectangle);
+                }
+            };
+
+            // Dragging-Events hinzufügen
+            Point mouseDownLocation = Point.Empty;
+            bool dragging = false;
+
+            headerPanel.MouseDown += (s, e) =>
+            {
+                if (e.Button == MouseButtons.Left)
+                {
+                    dragging = true;
+                    mouseDownLocation = e.Location;
+                }
+            };
+            
+            headerPanel.MouseMove += (s, e) =>
+            {
+                if (dragging)
+                {
+                    form.Left += e.X - mouseDownLocation.X;
+                    form.Top += e.Y - mouseDownLocation.Y;
+                }
+            };
+
+            headerPanel.MouseUp += (s, e) =>
+            {
+                if (e.Button == MouseButtons.Left)
+                    dragging = false;
+            };
+
+
+            form.Controls.Add(headerPanel);
+
+
+            Label lblTitle = new Label 
+            { 
+                Text = title,
+                AutoSize = false,
+                Left = 16,
+                Top = 0,
+                Width = 420,
+                Height = 64,
+                ForeColor = Color.White,
+                Font = HeaderTextFont,
+                TextAlign = ContentAlignment.MiddleLeft,
+                BackColor = Color.Transparent
+            };
+            headerPanel.Controls.Add(lblTitle);
+
+            Button btnClose = new Button
+            {
+                Text = "\u2715",
+                Font = HeaderButtonFont,
+                Width = 48,
+                Height = 48,
+                Left = form.ClientSize.Width - 56,
+                Top = 8,
+                Anchor = AnchorStyles.Top | AnchorStyles.Right,
+                FlatStyle = FlatStyle.Flat,
+                FlatAppearance = {
+                    BorderSize = 0,
+                    MouseOverBackColor = Color.FromArgb(255, 80, 80),
+                    },
+
+                ForeColor = Color.White,
+                BackColor = Color.Transparent,
+                TabStop = false
+            };
+
+            btnClose.Click += (s, e) => form.Close();
+            
+            headerPanel.Controls.Add(btnClose);
+        }
+
+    }
+}

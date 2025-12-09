@@ -20,10 +20,33 @@ namespace TaMi_Kassenclient
         private Panel header; private Label lblTitle; private Button btnClose; private Panel content; private SplitContainer split; private ListView lvRegeln; private Button btnNeu, btnBearbeiten, btnDuplizieren, btnLoeschen, btnSpeichernAlle;
         private BindingList<AbrechnungsRegel> _regeln = new BindingList<AbrechnungsRegel>();
 
-        public AbrechnungBedingungenForm() { BuildUi(); }
+        public AbrechnungBedingungenForm() 
+        {
+            this.Icon = Program.AppIcon;
+            BuildUi(); 
+        }
 
-        protected override async void OnShown(EventArgs e) { base.OnShown(e); try { PositionCloseButton(); await LoadRulesAsync(); } catch { } }
-        protected override void OnPaintBackground(PaintEventArgs e) { e.Graphics.Clear(Color.White); var rect = new Rectangle(0,0,ClientSize.Width,HeaderHeight); using(var br=new LinearGradientBrush(rect,Accent,Accent2,0f)) e.Graphics.FillRectangle(br,rect); }
+        protected override async void OnShown(EventArgs e) 
+        { 
+            base.OnShown(e); 
+            try 
+            { 
+                PositionCloseButton(); 
+                await LoadRulesAsync(); 
+            } 
+            catch { } 
+        }
+
+        protected override void OnPaintBackground(PaintEventArgs e) 
+        { 
+            e.Graphics.Clear(Color.White); 
+            var rect = new Rectangle(0,0,ClientSize.Width,HeaderHeight);
+
+            using (var br = new LinearGradientBrush(rect, Accent, Accent2, 0f))
+            {
+                e.Graphics.FillRectangle(br, rect);
+            }
+        }
 
         private void BuildUi()
         {
@@ -47,6 +70,7 @@ namespace TaMi_Kassenclient
             btnSpeichernAlle.Click += (s,e)=> SaveAll();
             pnlBtns.Controls.AddRange(new Control[]{btnNeu, btnBearbeiten, btnDuplizieren, btnLoeschen, btnSpeichernAlle}); split.Panel1.Controls.Add(pnlBtns); AdjustListColumns();
         }
+
         private void PositionCloseButton()
         {
             try
@@ -57,6 +81,7 @@ namespace TaMi_Kassenclient
             }
             catch { }
         }
+
         private Button MakeBtn(string txt, Color c){ var b = new Button{ Text=txt, Width=110, Height=34, BackColor=c, ForeColor=Color.White, FlatStyle=FlatStyle.Flat }; try{ b.FlatAppearance.BorderSize=0; }catch{} return b; }
 
         private void RefreshList()

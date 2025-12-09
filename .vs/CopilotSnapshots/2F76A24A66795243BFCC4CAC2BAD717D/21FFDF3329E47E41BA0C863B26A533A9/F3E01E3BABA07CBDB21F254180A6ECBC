@@ -1,0 +1,120 @@
+﻿using System;
+using System.Collections.Generic;
+using System.Drawing;
+using System.Drawing.Drawing2D;
+using System.Linq;
+using System.Text;
+using System.Threading.Tasks;
+using System.Windows.Forms;
+
+namespace TaMi_Kassenclient
+{
+    internal class UIHelper
+    {
+        public static readonly Color HeaderAccent1 = Color.FromArgb(33, 150, 243),
+                                     HeaderAccent2 = Color.FromArgb(33, 203, 243);
+
+        public static readonly Color BackcolorNeutral = Color.FromArgb(33, 150, 243);
+
+        public static readonly Font HeaderTextFont = new Font("Segoe UI Variable", 16F, FontStyle.Bold),
+                                    HeaderButtonFont = new Font("Segoe UI Symbol", 18F, FontStyle.Bold),
+
+                                    ButtonFont = new Font("Segoe UI Variable", 12F, FontStyle.Regular);
+
+        public static void AddHeaderPanel(Form form, string title)
+        {
+            Panel headerPanel = new Panel 
+            { 
+                Dock = DockStyle.Top, 
+                Height = 64, 
+                BackColor = Color.Transparent 
+            };
+
+            headerPanel.Paint += (s, e) =>
+            {
+                using (var brush = new LinearGradientBrush(headerPanel.ClientRectangle, HeaderAccent1, HeaderAccent2, 0f))
+                {
+                    e.Graphics.FillRectangle(brush, headerPanel.ClientRectangle);
+                }
+            };
+
+            // Dragging-Events
+            Point mouseDownLocation = Point.Empty;
+            bool dragging = false;
+
+            MouseEventHandler dragMouseDown = (s, e) =>
+            {
+                if (e.Button == MouseButtons.Left)
+                {
+                    dragging = true;
+                    mouseDownLocation = e.Location;
+                }
+            };
+            MouseEventHandler dragMouseMove = (s, e) =>
+            {
+                if (dragging)
+                {
+                    // Position relativ zum Form berechnen
+                    var ctrl = s as Control;
+                    var offset = ctrl.PointToScreen(e.Location);
+                    var formOffset = form.PointToScreen(Point.Empty);
+                    form.Left += offset.X - formOffset.X - mouseDownLocation.X;
+                    form.Top += offset.Y - formOffset.Y - mouseDownLocation.Y;
+                }
+            };
+            MouseEventHandler dragMouseUp = (s, e) =>
+            {
+                if (e.Button == MouseButtons.Left)
+                    dragging = false;
+            };
+
+            headerPanel.MouseDown += dragMouseDown;
+            headerPanel.MouseMove += dragMouseMove;
+            headerPanel.MouseUp   += dragMouseUp;
+
+            form.Controls.Add(headerPanel);
+
+            Label lblTitle = new Label 
+            { 
+                Text = title,
+                AutoSize = false,
+                Left = 16,
+                Top = 0,
+                Width = 420,
+                Height = 64,
+                ForeColor = Color.White,
+                Font = HeaderTextFont,
+                TextAlign = ContentAlignment.MiddleLeft,
+                BackColor = Color.Transparent
+            };
+            lblTitle.MouseDown += dragMouseDown;
+            lblTitle.MouseMove += dragMouseMove;
+            lblTitle.MouseUp   += dragMouseUp;
+            headerPanel.Controls.Add(lblTitle);
+
+            Button btnClose = new Button
+            {
+                Text = "\u2715",
+                Font = HeaderButtonFont,
+                Width = 48,
+                Height = 48,
+                Left = form.ClientSize.Width - 56,
+                Top = 8,
+                Anchor = AnchorStyles.Top | AnchorStyles.Right,
+                FlatStyle = FlatStyle.Flat,
+                FlatAppearance = {
+                    BorderSize = 0,
+                    MouseOverBackColor = Color.FromArgb(255, 80, 80),
+                    },
+
+                ForeColor = Color.White,
+                BackColor = Color.Transparent,
+                TabStop = false
+            };
+
+            btnClose.Click += (s, e) => form.Close();
+            headerPanel.Controls.Add(btnClose);
+        }
+
+    }
+}

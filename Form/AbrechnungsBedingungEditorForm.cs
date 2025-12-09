@@ -39,7 +39,11 @@ namespace TaMi_Kassenclient
                 e.Graphics.FillRectangle(br, rect);
         }
 
-        public AbrechnungsBedingungEditorForm() { BuildUi(); }
+        public AbrechnungsBedingungEditorForm() 
+        {
+            this.Icon = Program.AppIcon;
+            BuildUi(); 
+        }
 
         // Lädt eine bestehende Regel in die UI
         public void LoadFromRule(AbrechnungsRegel r)
