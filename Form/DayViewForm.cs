@@ -205,7 +205,7 @@ namespace TaMi_Kassenclient
             btnPickDate = new Button
             {
                 Text = string.Empty,
-                Location = new Point(316, 78),
+                Location = new Point(420, 78),
                 Size = new Size(36, 36),
                 FlatStyle = FlatStyle.Flat,
                 BackColor = Color.FromArgb(33, 150, 243),
@@ -252,8 +252,7 @@ namespace TaMi_Kassenclient
                 Anchor = AnchorStyles.Top | AnchorStyles.Bottom | AnchorStyles.Left | AnchorStyles.Right,
                 Font = new Font("Segoe UI Variable", 12F, FontStyle.Regular)
             };
-            // NEW: Nummer als erste Spalte (kleiner)
-            lvEintraege.Columns.Add("Nr.", 90, HorizontalAlignment.Left);
+            lvEintraege.Columns.Add("Nr.", 100, HorizontalAlignment.Left);
             lvEintraege.Columns.Add("Zeit", 180, HorizontalAlignment.Left);
             lvEintraege.Columns.Add("Typ", 180, HorizontalAlignment.Left);
             lvEintraege.Columns.Add("Buchungstext", 500, HorizontalAlignment.Left);
@@ -522,6 +521,7 @@ namespace TaMi_Kassenclient
                     foreach (DataRow row in dt.Rows)
                     {
                         DateTime ts = row.Field<DateTime>("ErfasstAm");
+                        string kassenNr = dt.Columns.Contains("KassenBelegnummer") && row["KassenBelegnummer"] != DBNull.Value ? Convert.ToString(row["KassenBelegnummer"]) : string.Empty;
                         string typ = MapTypCodeToText(row.Table.Columns.Contains("Typ") ? row["Typ"] : null);
                         string txt = row["Buchungstext"] as string ?? "";
                         decimal betrag = row["Betrag"] == DBNull.Value ? 0m : Convert.ToDecimal(row["Betrag"]);
@@ -529,10 +529,7 @@ namespace TaMi_Kassenclient
                         decimal v19 = dt.Columns.Contains("Betrag19") && row["Betrag19"] != DBNull.Value ? Convert.ToDecimal(row["Betrag19"]) : 0m;
                         decimal v7 = dt.Columns.Contains("Betrag7") && row["Betrag7"] != DBNull.Value ? Convert.ToDecimal(row["Betrag7"]) : 0m;
                         decimal v0 = dt.Columns.Contains("Betrag0") && row["Betrag0"] != DBNull.Value ? Convert.ToDecimal(row["Betrag0"]) : 0m;
-                        // Nur KassenBelegnummer anzeigen (kein Fallback auf Belegnummer)
-                        string beleg = null;
-                        if (dt.Columns.Contains("KassenBelegnummer") && row["KassenBelegnummer"] != DBNull.Value)
-                            beleg = Convert.ToString(row["KassenBelegnummer"]);
+                        string beleg = dt.Columns.Contains("Belegnummer") ? row["Belegnummer"].ToString() : null;
                         bool isOld = dt.Columns.Contains("RevIsOld") && row["RevIsOld"] != DBNull.Value && Convert.ToInt32(row["RevIsOld"]) != 0;
                         bool isFest = dt.Columns.Contains("Festgeschrieben") && row["Festgeschrieben"] != DBNull.Value && Convert.ToInt32(row["Festgeschrieben"]) != 0; // NEW
 
@@ -541,7 +538,7 @@ namespace TaMi_Kassenclient
                         string kost2 = GetColumnValue(row, "Kost2");
                         string konto = GetColumnValue(row, "Konto");
 
-                        var item = new ListViewItem(beleg ?? string.Empty);
+                        var item = new ListViewItem(kassenNr);
                         item.SubItems.Add(ts.ToString("dd.MM.yyyy HH:mm"));
                         item.SubItems.Add(typ);
                         item.SubItems.Add(txt);

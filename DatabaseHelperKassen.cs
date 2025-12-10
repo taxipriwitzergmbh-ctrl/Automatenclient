@@ -745,8 +745,8 @@ ORDER BY ManName ASC, x.DeviceID ASC;";
             {
                 cmd.CommandText = $@"
 SELECT 
-    Belegnummer,
     KassenBelegnummer,
+    Belegnummer,
     SchichtId,
     FhzId,
     ErfasstAm,
