@@ -104,8 +104,7 @@ namespace TaMi_Kassenclient
                 using (var db = new DatabaseHelperKassen())
                 {
                     // Alte JSON-Felder leeren, DB-Seite generiert strukturierte Persistenz
-                    rule.RawConditionsJson = null;
-                    rule.RawResultsJson = null;
+                    // removed legacy raw JSON fields
                     rule.Id = await db.SaveAbrechnungsRegelAsync(rule);
                 }
             }
@@ -117,7 +116,7 @@ namespace TaMi_Kassenclient
         private async void DeleteSelected(){ var r=GetSelectedRule(); if(r==null) return; if(MessageBox.Show(this,$"Regel '{r.Name}' löschen?","Bestätigen",MessageBoxButtons.YesNo,MessageBoxIcon.Question)!=DialogResult.Yes) return; try { await SoftDeleteRuleBySqlAsync(r.Id);} catch { } await LoadRulesAsync(); }
         private async Task<int> SoftDeleteRuleBySqlAsync(int ruleId){ if(ruleId<=0) return 0; var cs=DatabaseHelperKassen.GetConnectionString(); using(var conn=new SqlConnection(cs)){ await conn.OpenAsync(); string tblRules= await ResolveQualifiedTableAsync(conn,"TAbrechnungsBedingungen") ?? "[dbo].[TAbrechnungsBedingungen]"; string tblClauses= await ResolveQualifiedTableAsync(conn,"TAbrechnungsBedingungenClause") ?? "[dbo].[TAbrechnungsBedingungenClause]"; using(var tx=conn.BeginTransaction()) using(var cmd=conn.CreateCommand()){ cmd.Transaction=tx; cmd.CommandText=$"UPDATE {tblRules} SET IsActive=0, ModifiedAt=SYSUTCDATETIME() WHERE Id=@Id"; cmd.Parameters.AddWithValue("@Id", ruleId); int affected= await cmd.ExecuteNonQueryAsync(); cmd.Parameters.Clear(); try { cmd.CommandText=$"DELETE FROM {tblClauses} WHERE RuleId=@R"; cmd.Parameters.AddWithValue("@R", ruleId); await cmd.ExecuteNonQueryAsync(); cmd.Parameters.Clear(); } catch { cmd.Parameters.Clear(); } tx.Commit(); return affected; } } }
         private static async Task<string> ResolveQualifiedTableAsync(SqlConnection conn,string tableName){ using(var cmd=conn.CreateCommand()){ cmd.CommandText=@"SELECT '[' + s.name + '].[' + t.name + ']' FROM sys.tables t JOIN sys.schemas s ON s.schema_id=t.schema_id WHERE t.name=@n"; cmd.Parameters.AddWithValue("@n", tableName); var o= await cmd.ExecuteScalarAsync(); return (o==null||o==DBNull.Value)? null : Convert.ToString(o);} }
-        private async void SaveAll(){ try { using(var db=new DatabaseHelperKassen()){ foreach(var r in _regeln){ r.RawConditionsJson=null; r.RawResultsJson=null; r.Id = await db.SaveAbrechnungsRegelAsync(r);} } MessageBox.Show(this,"Regeln gespeichert.","Info",MessageBoxButtons.OK,MessageBoxIcon.Information);} catch(Exception ex){ MessageBox.Show(this,"Fehler beim Speichern: "+ex.Message,"Fehler",MessageBoxButtons.OK,MessageBoxIcon.Error);} }
+        private async void SaveAll(){ try { using(var db=new DatabaseHelperKassen()){ foreach(var r in _regeln){ r.Id = await db.SaveAbrechnungsRegelAsync(r);} } MessageBox.Show(this,"Regeln gespeichert.","Info",MessageBoxButtons.OK,MessageBoxIcon.Information);} catch(Exception ex){ MessageBox.Show(this,"Fehler beim Speichern: "+ex.Message,"Fehler",MessageBoxButtons.OK,MessageBoxIcon.Error);} }
 
         private async Task LoadRulesAsync()
         {
@@ -138,8 +137,7 @@ namespace TaMi_Kassenclient
                     try { r.ResultKost2 = row["ResultKost2"] != DBNull.Value ? (int?)Convert.ToInt32(row["ResultKost2"]) : null; } catch { }
                     try { r.ResultKonto = row["ResultKonto"] != DBNull.Value ? (int?)Convert.ToInt32(row["ResultKonto"]) : null; } catch { }
                     try { r.ResultBuchungstext = row["ResultText"] as string; } catch { }
-                    try { r.RawConditionsJson = row["RawConditions"] as string; } catch { }
-                    try { r.RawResultsJson = row["RawResults"] as string; } catch { }
+                    // removed raw fields
                     try { r.IsActive = row.Table.Columns.Contains("IsActive") && row["IsActive"] != DBNull.Value ? Convert.ToBoolean(row["IsActive"]) : true; } catch { r.IsActive = true; }
                     rules.Add(r);
                 }

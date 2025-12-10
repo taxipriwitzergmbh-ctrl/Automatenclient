@@ -17,7 +17,7 @@ namespace TaMi_Kassenclient
         public int? ManId { get; set; } // no longer persisted / evaluated
         public List<int> FhzIds { get; set; } // no longer persisted / evaluated
         public int? PersId { get; set; } // no longer persisted / evaluated
-        public string AdditionalWhere { get; set; } // no longer persisted (kept only for legacy rows)
+        // removed: AdditionalWhere
 
         // Ergebnisse
         public int? ResultKost1 { get; set; }
@@ -25,8 +25,7 @@ namespace TaMi_Kassenclient
         public int? ResultKonto { get; set; }
         public string ResultBuchungstext { get; set; }
 
-        public string RawConditionsJson { get; set; }
-        public string RawResultsJson { get; set; }
+        // removed: RawConditionsJson, RawResultsJson
         public bool IsActive { get; set; } = true;
 
         // Authoritative structured clauses
@@ -81,13 +80,12 @@ namespace TaMi_Kassenclient
                 ManId = this.ManId,
                 FhzIds = this.FhzIds != null ? new List<int>(this.FhzIds) : null,
                 PersId = this.PersId,
-                AdditionalWhere = this.AdditionalWhere,
+                // AdditionalWhere removed
                 ResultKost1 = this.ResultKost1,
                 ResultKost2 = this.ResultKost2,
                 ResultKonto = this.ResultKonto,
                 ResultBuchungstext = this.ResultBuchungstext,
-                RawConditionsJson = this.RawConditionsJson,
-                RawResultsJson = this.RawResultsJson,
+                // RawConditionsJson/RawResultsJson removed
                 IsActive = this.IsActive,
                 Clauses = this.Clauses != null ? new List<AbrechnungsClause>(this.Clauses.Select(c => c.Clone())) : null,
                 PresetName = this.PresetName

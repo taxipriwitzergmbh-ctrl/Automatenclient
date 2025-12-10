@@ -213,10 +213,7 @@ namespace TaMi_Kassenclient
                 if (!anyGroupTrue) return false;
             }
             // AdditionalWhere (legacy) last – permissive if null/empty
-            if (!string.IsNullOrWhiteSpace(r.AdditionalWhere))
-            {
-                if (!EvalAdditionalWhere(r.AdditionalWhere, ctx)) return false;
-            }
+            // removed: legacy AdditionalWhere handling
             return true;
         }
 
@@ -260,13 +257,12 @@ namespace TaMi_Kassenclient
                         ManId = null,
                         FhzIds = null,
                         PersId = null,
-                        AdditionalWhere = null, // or keep legacy: r["AdditionalWhere"] as string
+                        // AdditionalWhere removed
                         ResultKost1 = r["ResultKost1"] == DBNull.Value ? (int?)null : Convert.ToInt32(r["ResultKost1"]),
                         ResultKost2 = r["ResultKost2"] == DBNull.Value ? (int?)null : Convert.ToInt32(r["ResultKost2"]),
                         ResultKonto = r["ResultKonto"] == DBNull.Value ? (int?)null : Convert.ToInt32(r["ResultKonto"]),
                         ResultBuchungstext = r["ResultText"] as string,
-                        RawConditionsJson = r["RawConditions"] as string,
-                        RawResultsJson = r["RawResults"] as string,
+                        // RawConditions/RawResults removed
                         IsActive = r.Table.Columns.Contains("IsActive") && r["IsActive"] != DBNull.Value ? Convert.ToBoolean(r["IsActive"]) : true,
                         Clauses = new List<AbrechnungsClause>()
                     };
