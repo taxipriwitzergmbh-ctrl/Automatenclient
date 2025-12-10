@@ -231,7 +231,8 @@ namespace TaMi_Kassenclient
             var pwd = (txtPwd.Text ?? string.Empty).Trim();
             var pwd2 = (txtPwd2.Text ?? string.Empty).Trim();
 
-            if (!int.TryParse(txtPid.Text, out personalId) || personalId <= 0)
+            // Änderung: 0 ist jetzt erlaubt (nur negative IDs werden abgelehnt)
+            if (!int.TryParse(txtPid.Text, out personalId) || personalId < 0)
             {
                 lblError.Text = "Bitte gültige Personalnummer eingeben.";
                 return;
@@ -247,7 +248,6 @@ namespace TaMi_Kassenclient
                 lblError.Text = TaMiTools.GetErrorText(loginResult);
                 return;
             }
-
 
             //Formular schließen und OK zurückgeben
             AppSession.CurrentUser = new PersonalInfo() 
