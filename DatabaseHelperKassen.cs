@@ -966,13 +966,10 @@ BEGIN
         ManId           int NULL,
         FhzIdList       nvarchar(4000) NULL,
         PersId          int NULL,
-        AdditionalWhere nvarchar(4000) NULL,
         ResultKost1     int NULL,
         ResultKost2     int NULL,
         ResultKonto     int NULL,
         ResultText      nvarchar(4000) NULL,
-        RawConditions   nvarchar(4000) NULL,
-        RawResults      nvarchar(4000) NULL,
         IsActive        bit NOT NULL DEFAULT(1),
         CreatedAt       datetime2(0) NOT NULL DEFAULT(SYSUTCDATETIME()),
         ModifiedAt      datetime2(0) NULL
@@ -1030,13 +1027,13 @@ END";
                 if (r.Id == 0)
                 {
                     cmd.CommandText = $@"INSERT INTO {_tblAbrechnungsRegeln}
-(Name, JoinKind, IsDefault, Priority, AdditionalWhere, ResultKost1, ResultKost2, ResultKonto, ResultText, RawConditions, RawResults, IsActive, ModifiedAt)
-VALUES (@Name,@Join,@Def,@Prio,@Where,@K1,@K2,@Kto,@Txt,@RawC,@RawR,1,SYSUTCDATETIME()); SELECT SCOPE_IDENTITY();";
+(Name, JoinKind, IsDefault, Priority, ResultKost1, ResultKost2, ResultKonto, ResultText, IsActive, ModifiedAt)
+VALUES (@Name,@Join,@Def,@Prio,@K1,@K2,@Kto,@Txt,1,SYSUTCDATETIME()); SELECT SCOPE_IDENTITY();";
                 }
                 else
                 {
                     cmd.CommandText = $@"UPDATE {_tblAbrechnungsRegeln}
-SET Name=@Name, JoinKind=@Join, IsDefault=@Def, Priority=@Prio, AdditionalWhere=@Where, ResultKost1=@K1, ResultKost2=@K2, ResultKonto=@Kto, ResultText=@Txt, RawConditions=@RawC, RawResults=@RawR, ModifiedAt=SYSUTCDATETIME()
+SET Name=@Name, JoinKind=@Join, IsDefault=@Def, Priority=@Prio, ResultKost1=@K1, ResultKost2=@K2, ResultKonto=@Kto, ResultText=@Txt, ModifiedAt=SYSUTCDATETIME()
 WHERE Id=@Id; SELECT @Id;";
                     cmd.Parameters.AddWithValue("@Id", r.Id);
                 }
