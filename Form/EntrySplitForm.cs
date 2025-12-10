@@ -293,6 +293,7 @@ namespace TaMi_Kassenclient
         {
             try
             {
+                var ctx = new RulesEngine.RuleContext { FirmenId = _firmenId, Typ = _typ, FhzId = _fhzId };
                 // Betrag je Gruppe bestimmen
                 decimal b19 = 0m, b7 = 0m, b0 = 0m;
                 decimal amtForAcc;
@@ -302,12 +303,11 @@ namespace TaMi_Kassenclient
 
                 int? k1 = null, k2 = null, kto = null; string txt = string.Empty;
 
-                // Regeln anwenden über RulesEngine
+                // Regeln anwenden mit Priorität (höhere Priorität gewinnt)
                 try
                 {
-                    var rules = await RulesEngine.LoadRulesAsync();
-                    var ctx = new RulesEngine.RuleContext { FirmenId = _firmenId, Typ = _typ, FhzId = _fhzId };
-                    RulesEngine.ApplyForEdit(rules, ctx, b19, b7, b0, ref k1, ref k2, ref kto, ref txt);
+            var rules = await RulesEngine.LoadRulesAsync();
+            RulesEngine.ApplyForEdit(rules, ctx, b19, b7, b0, ref k1, ref k2, ref kto, ref txt);
                 }
                 catch { }
 

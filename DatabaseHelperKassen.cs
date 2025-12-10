@@ -961,12 +961,9 @@ BEGIN
     (
         Id              int IDENTITY(1,1) PRIMARY KEY,
         Name            varchar(200) NOT NULL,
-        JoinKind        varchar(10)  NULL,
+        JoinKind        varchar(50)  NULL,
         IsDefault       bit NOT NULL DEFAULT(0),
         Priority        int NOT NULL DEFAULT(100),
-        ManId           int NULL,
-        FhzIdList       varchar(4000) NULL,
-        PersId          int NULL,
         ResultKost1     int NULL,
         ResultKost2     int NULL,
         ResultKonto     int NULL,
@@ -983,9 +980,9 @@ BEGIN
         Id       int IDENTITY(1,1) PRIMARY KEY,
         RuleId   int NOT NULL,
         GroupId  int NOT NULL DEFAULT(0),
-        Field    nvarchar(128) NOT NULL,
-        Operator nvarchar(16) NOT NULL,
-        Value    nvarchar(4000) NULL
+        Field    varchar(128) NOT NULL,
+        Operator varchar(50) NOT NULL,
+        Value    varchar(256) NULL
     );
     CREATE INDEX IX_Clauses_RuleId ON {_tblAbrechnungsClauses}(RuleId);
 END";
