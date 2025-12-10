@@ -745,7 +745,6 @@ ORDER BY ManName ASC, x.DeviceID ASC;";
             {
                 cmd.CommandText = $@"
 SELECT 
-    KassenBelegnummer,
     Belegnummer,
     SchichtId,
     FhzId,
@@ -960,13 +959,20 @@ BEGIN
     CREATE TABLE {_tblAbrechnungsRegeln}
     (
         Id              int IDENTITY(1,1) PRIMARY KEY,
-        Name            varchar(200) NOT NULL,
-        JoinKind        varchar(50)  NULL,
+        Name            nvarchar(200) NOT NULL,
+        JoinKind        nvarchar(10)  NULL,
         IsDefault       bit NOT NULL DEFAULT(0),
         Priority        int NOT NULL DEFAULT(100),
+        ManId           int NULL,
+        FhzIdList       nvarchar(4000) NULL,
+        PersId          int NULL,
+        AdditionalWhere nvarchar(4000) NULL,
         ResultKost1     int NULL,
         ResultKost2     int NULL,
         ResultKonto     int NULL,
+        ResultText      nvarchar(4000) NULL,
+        RawConditions   nvarchar(4000) NULL,
+        RawResults      nvarchar(4000) NULL,
         IsActive        bit NOT NULL DEFAULT(1),
         CreatedAt       datetime2(0) NOT NULL DEFAULT(SYSUTCDATETIME()),
         ModifiedAt      datetime2(0) NULL
@@ -980,9 +986,9 @@ BEGIN
         Id       int IDENTITY(1,1) PRIMARY KEY,
         RuleId   int NOT NULL,
         GroupId  int NOT NULL DEFAULT(0),
-        Field    varchar(128) NOT NULL,
-        Operator varchar(50) NOT NULL,
-        Value    varchar(256) NULL
+        Field    nvarchar(128) NOT NULL,
+        Operator nvarchar(16) NOT NULL,
+        Value    nvarchar(4000) NULL
     );
     CREATE INDEX IX_Clauses_RuleId ON {_tblAbrechnungsClauses}(RuleId);
 END";
@@ -1024,13 +1030,13 @@ END";
                 if (r.Id == 0)
                 {
                     cmd.CommandText = $@"INSERT INTO {_tblAbrechnungsRegeln}
-(Name, JoinKind, IsDefault, Priority, ResultKost1, ResultKost2, ResultKonto, IsActive, ModifiedAt)
-VALUES (@Name,@Join,@Def,@Prio,@K1,@K2,@Kto,1,SYSUTCDATETIME()); SELECT SCOPE_IDENTITY();";
+(Name, JoinKind, IsDefault, Priority, AdditionalWhere, ResultKost1, ResultKost2, ResultKonto, ResultText, RawConditions, RawResults, IsActive, ModifiedAt)
+VALUES (@Name,@Join,@Def,@Prio,@Where,@K1,@K2,@Kto,@Txt,@RawC,@RawR,1,SYSUTCDATETIME()); SELECT SCOPE_IDENTITY();";
                 }
                 else
                 {
                     cmd.CommandText = $@"UPDATE {_tblAbrechnungsRegeln}
-SET Name=@Name, JoinKind=@Join, IsDefault=@Def, Priority=@Prio, ResultKost1=@K1, ResultKost2=@K2, ResultKonto=@Kto, ModifiedAt=SYSUTCDATETIME()
+SET Name=@Name, JoinKind=@Join, IsDefault=@Def, Priority=@Prio, AdditionalWhere=@Where, ResultKost1=@K1, ResultKost2=@K2, ResultKonto=@Kto, ResultText=@Txt, RawConditions=@RawC, RawResults=@RawR, ModifiedAt=SYSUTCDATETIME()
 WHERE Id=@Id; SELECT @Id;";
                     cmd.Parameters.AddWithValue("@Id", r.Id);
                 }
@@ -1038,9 +1044,13 @@ WHERE Id=@Id; SELECT @Id;";
                 cmd.Parameters.AddWithValue("@Join", (object)(r.JoinKind ?? (object)DBNull.Value) ?? DBNull.Value);
                 cmd.Parameters.AddWithValue("@Def", r.IsDefault);
                 cmd.Parameters.AddWithValue("@Prio", r.Priority);
+                cmd.Parameters.AddWithValue("@Where", (object)(r.AdditionalWhere ?? (object)DBNull.Value) ?? DBNull.Value);
                 cmd.Parameters.AddWithValue("@K1", (object)r.ResultKost1 ?? DBNull.Value);
                 cmd.Parameters.AddWithValue("@K2", (object)r.ResultKost2 ?? DBNull.Value);
                 cmd.Parameters.AddWithValue("@Kto", (object)r.ResultKonto ?? DBNull.Value);
+                cmd.Parameters.AddWithValue("@Txt", (object)(r.ResultBuchungstext ?? (object)DBNull.Value) ?? DBNull.Value);
+                cmd.Parameters.AddWithValue("@RawC", (object)(r.RawConditionsJson ?? (object)DBNull.Value) ?? DBNull.Value);
+                cmd.Parameters.AddWithValue("@RawR", (object)(r.RawResultsJson ?? (object)DBNull.Value) ?? DBNull.Value);
                 var o = await cmd.ExecuteScalarAsync();
                 int ruleId = Convert.ToInt32(Convert.ToDecimal(o));
 

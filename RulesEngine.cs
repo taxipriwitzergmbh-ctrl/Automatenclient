@@ -196,7 +196,7 @@ namespace TaMi_Kassenclient
 
         private static bool MatchesRule(AbrechnungsRegel r, RuleContext ctx)
         {
-            // Legacy aggregated fields (ManId, PersId, FhzIds) are ignored now; only Clauses are authoritative.
+            // Legacy aggregated fields (ManId, PersId, FhzIds, AdditionalWhere) are ignored now; only Clauses are authoritative.
             if (r.Clauses != null && r.Clauses.Count > 0)
             {
                 var groups = r.Clauses.GroupBy(c => c.GroupId);
@@ -211,6 +211,11 @@ namespace TaMi_Kassenclient
                     if (allTrue) { anyGroupTrue = true; break; }
                 }
                 if (!anyGroupTrue) return false;
+            }
+            // AdditionalWhere (legacy) last – permissive if null/empty
+            if (!string.IsNullOrWhiteSpace(r.AdditionalWhere))
+            {
+                if (!EvalAdditionalWhere(r.AdditionalWhere, ctx)) return false;
             }
             return true;
         }
@@ -255,11 +260,13 @@ namespace TaMi_Kassenclient
                         ManId = null,
                         FhzIds = null,
                         PersId = null,
-                        // Legacy AdditionalWhere removed
+                        AdditionalWhere = null, // or keep legacy: r["AdditionalWhere"] as string
                         ResultKost1 = r["ResultKost1"] == DBNull.Value ? (int?)null : Convert.ToInt32(r["ResultKost1"]),
                         ResultKost2 = r["ResultKost2"] == DBNull.Value ? (int?)null : Convert.ToInt32(r["ResultKost2"]),
                         ResultKonto = r["ResultKonto"] == DBNull.Value ? (int?)null : Convert.ToInt32(r["ResultKonto"]),
-                        // Legacy ResultText/RawConditions/RawResults removed
+                        ResultBuchungstext = r["ResultText"] as string,
+                        RawConditionsJson = r["RawConditions"] as string,
+                        RawResultsJson = r["RawResults"] as string,
                         IsActive = r.Table.Columns.Contains("IsActive") && r["IsActive"] != DBNull.Value ? Convert.ToBoolean(r["IsActive"]) : true,
                         Clauses = new List<AbrechnungsClause>()
                     };
@@ -323,7 +330,7 @@ namespace TaMi_Kassenclient
                 if (!kost1.HasValue && r.ResultKost1.HasValue) kost1 = r.ResultKost1;
                 if (!kost2.HasValue && r.ResultKost2.HasValue) kost2 = r.ResultKost2;
                 if (!konto.HasValue && r.ResultKonto.HasValue) konto = r.ResultKonto;
-                // Buchungstext wird nicht mehr aus Regeln übernommen
+                if (string.IsNullOrWhiteSpace(buchungstext) && !string.IsNullOrWhiteSpace(r.ResultBuchungstext)) buchungstext = r.ResultBuchungstext;
                 if (kost1.HasValue && kost2.HasValue && konto.HasValue && !string.IsNullOrWhiteSpace(buchungstext)) break;
             }
 
@@ -332,7 +339,7 @@ namespace TaMi_Kassenclient
                 if (!kost1.HasValue && bestDefault.ResultKost1.HasValue) kost1 = bestDefault.ResultKost1;
                 if (!kost2.HasValue && bestDefault.ResultKost2.HasValue) kost2 = bestDefault.ResultKost2;
                 if (!konto.HasValue && bestDefault.ResultKonto.HasValue) konto = bestDefault.ResultKonto;
-                // Buchungstext wird nicht mehr aus Default-Regeln übernommen
+                if (string.IsNullOrWhiteSpace(buchungstext) && !string.IsNullOrWhiteSpace(bestDefault.ResultBuchungstext)) buchungstext = bestDefault.ResultBuchungstext;
             }
         }
     }

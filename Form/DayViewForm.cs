@@ -42,7 +42,6 @@ namespace TaMi_Kassenclient
         private Button btnPrev;
         private Button btnNext;
         private Button btnToday;
-        private Button btnPickDate; // NEW
         private Label lblDatum;
         private Button btnLockDay;
         private bool _dayLocked;
@@ -201,29 +200,6 @@ namespace TaMi_Kassenclient
             btnToday.Click += (s, e) => { dtpTag.Value = DateTime.Today; };
             Controls.Add(btnToday);
 
-            // NEW: Kalender öffnen Button
-            btnPickDate = new Button
-            {
-                Text = string.Empty,
-                Location = new Point(420, 78),
-                Size = new Size(36, 36),
-                FlatStyle = FlatStyle.Flat,
-                BackColor = Color.FromArgb(33, 150, 243),
-                ForeColor = Color.White
-            };
-            btnPickDate.FlatAppearance.BorderSize = 0;
-            // Try to assign a simple icon glyph
-            try
-            {
-                // Use a small shield icon as placeholder if no calendar icon is available
-                var bmp = new Bitmap(SystemIcons.Asterisk.ToBitmap(), new Size(18, 18));
-                btnPickDate.Image = bmp;
-                btnPickDate.ImageAlign = ContentAlignment.MiddleCenter;
-            }
-            catch { }
-            btnPickDate.Click += BtnPickDate_Click;
-            Controls.Add(btnPickDate);
-
             lblAnfang = new Label
             {
                 Text = "Anfangsbestand: 0,00 €",
@@ -252,7 +228,6 @@ namespace TaMi_Kassenclient
                 Anchor = AnchorStyles.Top | AnchorStyles.Bottom | AnchorStyles.Left | AnchorStyles.Right,
                 Font = new Font("Segoe UI Variable", 12F, FontStyle.Regular)
             };
-            lvEintraege.Columns.Add("Nr.", 100, HorizontalAlignment.Left);
             lvEintraege.Columns.Add("Zeit", 180, HorizontalAlignment.Left);
             lvEintraege.Columns.Add("Typ", 180, HorizontalAlignment.Left);
             lvEintraege.Columns.Add("Buchungstext", 500, HorizontalAlignment.Left);
@@ -268,67 +243,6 @@ namespace TaMi_Kassenclient
             InitializeFooter();
 
             Shown += async (s, e) => await RefreshDayAsync();
-        }
-
-        // NEW: Öffnet einen Kalender zur Datumsauswahl
-        private void BtnPickDate_Click(object sender, EventArgs e)
-        {
-            using (var dlg = new Form())
-            {
-                dlg.StartPosition = FormStartPosition.Manual;
-                try
-                {
-                    var p = PointToScreen(new Point(btnPickDate.Left, btnPickDate.Bottom + 4));
-                    dlg.Location = new Point(Math.Max(0, p.X - 10), Math.Max(0, p.Y));
-                }
-                catch { dlg.StartPosition = FormStartPosition.CenterParent; }
-                dlg.FormBorderStyle = FormBorderStyle.FixedToolWindow;
-                dlg.Text = "Datum wählen";
-                dlg.Size = new Size(280, 240);
-                dlg.BackColor = Color.White;
-
-                var cal = new MonthCalendar
-                {
-                    MaxSelectionCount = 1,
-                    ShowToday = true,
-                    ShowTodayCircle = true,
-                    Dock = DockStyle.Top
-                };
-                try { cal.SetDate(dtpTag.Value.Date); } catch { }
-                // Style calendar to look more modern
-                try
-                {
-                    cal.BackColor = Color.White;
-                    cal.ForeColor = Color.FromArgb(33, 37, 41);
-                    cal.TitleBackColor = Color.FromArgb(33, 150, 243);
-                    cal.TitleForeColor = Color.White;
-                    cal.TrailingForeColor = Color.FromArgb(158, 158, 158);
-                }
-                catch { }
-                dlg.Controls.Add(cal);
-
-                var btnOk = new Button { Text = "OK", DialogResult = DialogResult.OK, Dock = DockStyle.Bottom, Height = 36, BackColor = Color.FromArgb(33,150,243), ForeColor = Color.White, FlatStyle = FlatStyle.Flat };
-                try { btnOk.FlatAppearance.BorderSize = 0; } catch { }
-                dlg.Controls.Add(btnOk);
-                dlg.AcceptButton = btnOk;
-
-                // Double-click selects immediately
-                cal.MouseDoubleClick += (s2, e2) =>
-                {
-                    try { dtpTag.Value = cal.SelectionStart.Date; } catch { }
-                    dlg.DialogResult = DialogResult.OK;
-                    dlg.Close();
-                };
-
-                if (dlg.ShowDialog(this) == DialogResult.OK)
-                {
-                    try
-                    {
-                        dtpTag.Value = cal.SelectionStart.Date;
-                    }
-                    catch { }
-                }
-            }
         }
 
         private void InitializeFooter()
@@ -521,7 +435,6 @@ namespace TaMi_Kassenclient
                     foreach (DataRow row in dt.Rows)
                     {
                         DateTime ts = row.Field<DateTime>("ErfasstAm");
-                        string kassenNr = dt.Columns.Contains("KassenBelegnummer") && row["KassenBelegnummer"] != DBNull.Value ? Convert.ToString(row["KassenBelegnummer"]) : string.Empty;
                         string typ = MapTypCodeToText(row.Table.Columns.Contains("Typ") ? row["Typ"] : null);
                         string txt = row["Buchungstext"] as string ?? "";
                         decimal betrag = row["Betrag"] == DBNull.Value ? 0m : Convert.ToDecimal(row["Betrag"]);
@@ -538,8 +451,7 @@ namespace TaMi_Kassenclient
                         string kost2 = GetColumnValue(row, "Kost2");
                         string konto = GetColumnValue(row, "Konto");
 
-                        var item = new ListViewItem(kassenNr);
-                        item.SubItems.Add(ts.ToString("dd.MM.yyyy HH:mm"));
+                        var item = new ListViewItem(ts.ToString("dd.MM.yyyy HH:mm"));
                         item.SubItems.Add(typ);
                         item.SubItems.Add(txt);
                         item.SubItems.Add(betrag.ToString("C2"));
@@ -640,9 +552,7 @@ namespace TaMi_Kassenclient
                         {
                             // Regeln anwenden (nur Standardwerte setzen, falls leer)
                             var rules = await RulesEngine.LoadRulesAsync();
-                            int firmForRules = _firmenId;
-                            try { if (row != null && row.Table.Columns.Contains("FirmenID") && row["FirmenID"] != DBNull.Value) firmForRules = Convert.ToInt32(row["FirmenID"]); } catch { }
-                            var ctx = new RulesEngine.RuleContext { FirmenId = firmForRules, PersId = TryParseIntSafe(persIdObj), Typ = item.SubItems.Count > 1 ? item.SubItems[1].Text : null, FhzId = info.fhzId };
+                            var ctx = new RulesEngine.RuleContext { FirmenId = _firmenId, PersId = TryParseIntSafe(persIdObj), Typ = item.SubItems.Count > 1 ? item.SubItems[1].Text : null, FhzId = info.fhzId };
                             int? k1 = dlg.Kost1, k2 = dlg.Kost2, kto = dlg.Konto; string txt = dlg.Buchungstext;
                             RulesEngine.ApplyForEdit(rules, ctx, dlg.Betrag19, dlg.Betrag7, dlg.Betrag0, ref k1, ref k2, ref kto, ref txt);
 
@@ -670,7 +580,7 @@ namespace TaMi_Kassenclient
             var typ = item.SubItems.Count > 1 ? item.SubItems[1].Text : null;
 
             // SchichtId/PersId laden, um FhzId ermitteln zu können
-            string schichtId = null; object persIdObj = null; int? fhzId = null; int firmForRules = _firmenId;
+            string schichtId = null; object persIdObj = null; int? fhzId = null;
             using (var db = new DatabaseHelperKassen())
             {
                 var row = await db.GetEintragByBelegnummerAsync(meta.Belegnummer);
@@ -678,13 +588,12 @@ namespace TaMi_Kassenclient
                 persIdObj = row?.Table.Columns.Contains("PersId") == true ? row["PersId"] : null;
                 var info = await ResolveFahrerUndKennzeichenAsync(schichtId, persIdObj);
                 fhzId = info.fhzId;
-                try { if (row != null && row.Table.Columns.Contains("FirmenID") && row["FirmenID"] != DBNull.Value) firmForRules = Convert.ToInt32(row["FirmenID"]); } catch { }
             }
 
             using (var split = new EntrySplitForm(gesamt, meta.Betrag19, meta.Betrag7, meta.Betrag0,
                                                   startK1: TryParseInt(meta.Kost1), startK2: TryParseInt(meta.Kost2), startKto: TryParseInt(meta.Konto),
                                                   standardText: item.SubItems[2].Text,
-                                                  firmenId: firmForRules, typ: typ, fhzId: fhzId))
+                                                  firmenId: _firmenId, typ: typ, fhzId: fhzId))
             {
                 if (split.ShowDialog(this) == DialogResult.OK)
                 {
