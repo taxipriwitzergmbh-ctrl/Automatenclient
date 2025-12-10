@@ -640,7 +640,9 @@ namespace TaMi_Kassenclient
                         {
                             // Regeln anwenden (nur Standardwerte setzen, falls leer)
                             var rules = await RulesEngine.LoadRulesAsync();
-                            var ctx = new RulesEngine.RuleContext { FirmenId = _firmenId, PersId = TryParseIntSafe(persIdObj), Typ = item.SubItems.Count > 1 ? item.SubItems[1].Text : null, FhzId = info.fhzId };
+                            int firmForRules = _firmenId;
+                            try { if (row != null && row.Table.Columns.Contains("FirmenID") && row["FirmenID"] != DBNull.Value) firmForRules = Convert.ToInt32(row["FirmenID"]); } catch { }
+                            var ctx = new RulesEngine.RuleContext { FirmenId = firmForRules, PersId = TryParseIntSafe(persIdObj), Typ = item.SubItems.Count > 1 ? item.SubItems[1].Text : null, FhzId = info.fhzId };
                             int? k1 = dlg.Kost1, k2 = dlg.Kost2, kto = dlg.Konto; string txt = dlg.Buchungstext;
                             RulesEngine.ApplyForEdit(rules, ctx, dlg.Betrag19, dlg.Betrag7, dlg.Betrag0, ref k1, ref k2, ref kto, ref txt);
 
@@ -668,7 +670,7 @@ namespace TaMi_Kassenclient
             var typ = item.SubItems.Count > 1 ? item.SubItems[1].Text : null;
 
             // SchichtId/PersId laden, um FhzId ermitteln zu können
-            string schichtId = null; object persIdObj = null; int? fhzId = null;
+            string schichtId = null; object persIdObj = null; int? fhzId = null; int firmForRules = _firmenId;
             using (var db = new DatabaseHelperKassen())
             {
                 var row = await db.GetEintragByBelegnummerAsync(meta.Belegnummer);
@@ -676,12 +678,13 @@ namespace TaMi_Kassenclient
                 persIdObj = row?.Table.Columns.Contains("PersId") == true ? row["PersId"] : null;
                 var info = await ResolveFahrerUndKennzeichenAsync(schichtId, persIdObj);
                 fhzId = info.fhzId;
+                try { if (row != null && row.Table.Columns.Contains("FirmenID") && row["FirmenID"] != DBNull.Value) firmForRules = Convert.ToInt32(row["FirmenID"]); } catch { }
             }
 
             using (var split = new EntrySplitForm(gesamt, meta.Betrag19, meta.Betrag7, meta.Betrag0,
                                                   startK1: TryParseInt(meta.Kost1), startK2: TryParseInt(meta.Kost2), startKto: TryParseInt(meta.Konto),
                                                   standardText: item.SubItems[2].Text,
-                                                  firmenId: _firmenId, typ: typ, fhzId: fhzId))
+                                                  firmenId: firmForRules, typ: typ, fhzId: fhzId))
             {
                 if (split.ShowDialog(this) == DialogResult.OK)
                 {

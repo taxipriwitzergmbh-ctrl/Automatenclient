@@ -293,31 +293,23 @@ namespace TaMi_Kassenclient
         {
             try
             {
-                var rules = await RulesEngine.LoadRulesAsync();
-                var ctx = new RulesEngine.RuleContext { FirmenId = _firmenId, Typ = _typ, FhzId = _fhzId };
+                // Betrag je Gruppe bestimmen
+                decimal b19 = 0m, b7 = 0m, b0 = 0m;
+                decimal amtForAcc;
+                if (group == "19") { amtForAcc = Betrag19; b19 = amtForAcc <= 0m ? 0.01m : amtForAcc; }
+                else if (group == "7") { amtForAcc = Betrag7; b7 = amtForAcc <= 0m ? 0.01m : amtForAcc; }
+                else { amtForAcc = Betrag0; b0 = amtForAcc <= 0m ? 0.01m : amtForAcc; }
 
                 int? k1 = null, k2 = null, kto = null; string txt = string.Empty;
-                decimal b19 = 0m, b7 = 0m, b0 = 0m;
-                if (group == "19")
-                {
-                    var amt = Betrag19;
-                    if (amt <= 0m) amt = 0.01m; // Minimalwert, damit Regeln mit "> 0" matchen (nur für Matching)
-                    b19 = amt;
-                }
-                else if (group == "7")
-                {
-                    var amt = Betrag7;
-                    if (amt <= 0m) amt = 0.01m;
-                    b7 = amt;
-                }
-                else
-                {
-                    var amt = Betrag0;
-                    if (amt <= 0m) amt = 0.01m;
-                    b0 = amt;
-                }
 
-                RulesEngine.ApplyForEdit(rules, ctx, b19, b7, b0, ref k1, ref k2, ref kto, ref txt);
+                // Regeln anwenden über RulesEngine
+                try
+                {
+                    var rules = await RulesEngine.LoadRulesAsync();
+                    var ctx = new RulesEngine.RuleContext { FirmenId = _firmenId, Typ = _typ, FhzId = _fhzId };
+                    RulesEngine.ApplyForEdit(rules, ctx, b19, b7, b0, ref k1, ref k2, ref kto, ref txt);
+                }
+                catch { }
 
                 _applyingRules = true;
                 if (group == "19")

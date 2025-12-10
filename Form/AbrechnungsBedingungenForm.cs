@@ -60,7 +60,14 @@ namespace TaMi_Kassenclient
             header.Controls.Add(lblTitle); header.Controls.Add(btnClose); Controls.Add(header);
             split = new SplitContainer { Dock = DockStyle.Fill, SplitterDistance = 460, Padding = new Padding(0) }; content.Controls.Add(split); try { split.Panel2Collapsed = true; split.IsSplitterFixed = true; split.SplitterWidth = 1; } catch { }
             split.Panel1.Padding = new Padding(0,0,0,12);
-            lvRegeln = new ListView { Dock = DockStyle.Fill, View = View.Details, FullRowSelect = true, GridLines = true, HideSelection = false }; lvRegeln.Columns.Add("Name",220); lvRegeln.Columns.Add("Bedingung",520); lvRegeln.Columns.Add("Fallback",90); lvRegeln.Columns.Add("Ergebnis",300); lvRegeln.Resize += (s,e)=>AdjustListColumns(); split.Panel1.Controls.Add(lvRegeln);
+            lvRegeln = new ListView { Dock = DockStyle.Fill, View = View.Details, FullRowSelect = true, GridLines = true, HideSelection = false };
+            lvRegeln.Columns.Add("Name",220);
+            lvRegeln.Columns.Add("Bedingung",520);
+            lvRegeln.Columns.Add("Fallback",90);
+            lvRegeln.Columns.Add("Priorität",80);
+            lvRegeln.Columns.Add("Ergebnis",300);
+            lvRegeln.Resize += (s,e)=>AdjustListColumns();
+            split.Panel1.Controls.Add(lvRegeln);
             var pnlBtns = new FlowLayoutPanel { Dock = DockStyle.Bottom, Height = 64, FlowDirection = FlowDirection.LeftToRight, Padding = new Padding(8)};
             btnNeu = MakeBtn("Neu", Accent); btnBearbeiten = MakeBtn("Bearbeiten", Color.FromArgb(0,172,193)); btnDuplizieren = MakeBtn("Duplizieren", Color.FromArgb(3,155,229)); btnLoeschen = MakeBtn("Löschen", Color.IndianRed); btnSpeichernAlle = MakeBtn("Speichern", Color.FromArgb(76,175,80));
             btnNeu.Click += async (s,e)=> await NewRuleViaPopupAsync();
@@ -87,8 +94,23 @@ namespace TaMi_Kassenclient
         private void RefreshList()
         {
             lvRegeln.Items.Clear();
-            foreach(var r in _regeln){ var item = new ListViewItem(r.Name ?? "(ohne Namen)"); item.SubItems.Add(r.GetReadableCondition()); item.SubItems.Add(r.IsDefault?"Ja":"Nein"); var parts=new List<string>(); if(r.ResultKost1.HasValue) parts.Add($"Kost1={r.ResultKost1}"); if(r.ResultKost2.HasValue) parts.Add($"Kost2={r.ResultKost2}"); if(r.ResultKonto.HasValue) parts.Add($"Konto={r.ResultKonto}"); item.SubItems.Add(parts.Count==0?"(kein Ergebnis)":string.Join(", ",parts)); item.Tag=r; lvRegeln.Items.Add(item);} AdjustListColumns(); }
-        private void AdjustListColumns(){ try { if(lvRegeln.Columns.Count==0) return; int w = lvRegeln.ClientSize.Width - SystemInformation.VerticalScrollBarWidth; if (w<=0) return; if(lvRegeln.Columns.Count>=4){ int nameW=Math.Max(180,(int)(w*0.22)); int fallbackW=Math.Max(80,(int)(w*0.10)); int ergW=Math.Max(180,(int)(w*0.25)); int bedW=Math.Max(300,w-(nameW+fallbackW+ergW)-8); lvRegeln.Columns[0].Width=nameW; lvRegeln.Columns[1].Width=bedW; lvRegeln.Columns[2].Width=fallbackW; lvRegeln.Columns[3].Width=ergW; } } catch { } }
+            foreach(var r in _regeln)
+            {
+                var item = new ListViewItem(r.Name ?? "(ohne Namen)");
+                item.SubItems.Add(r.GetReadableCondition());
+                item.SubItems.Add(r.IsDefault?"Ja":"Nein");
+                item.SubItems.Add(r.Priority.ToString());
+                var parts=new List<string>();
+                if(r.ResultKost1.HasValue) parts.Add($"Kost1={r.ResultKost1}");
+                if(r.ResultKost2.HasValue) parts.Add($"Kost2={r.ResultKost2}");
+                if(r.ResultKonto.HasValue) parts.Add($"Konto={r.ResultKonto}");
+                item.SubItems.Add(parts.Count==0?"(kein Ergebnis)":string.Join(", ",parts));
+                item.Tag=r;
+                lvRegeln.Items.Add(item);
+            }
+            AdjustListColumns();
+        }
+        private void AdjustListColumns(){ try { if(lvRegeln.Columns.Count==0) return; int w = lvRegeln.ClientSize.Width - SystemInformation.VerticalScrollBarWidth; if (w<=0) return; if(lvRegeln.Columns.Count>=5){ int nameW=Math.Max(180,(int)(w*0.20)); int fallbackW=Math.Max(80,(int)(w*0.10)); int prioW=Math.Max(70,(int)(w*0.08)); int ergW=Math.Max(180,(int)(w*0.22)); int bedW=Math.Max(300,w-(nameW+fallbackW+prioW+ergW)-8); lvRegeln.Columns[0].Width=nameW; lvRegeln.Columns[1].Width=bedW; lvRegeln.Columns[2].Width=fallbackW; lvRegeln.Columns[3].Width=prioW; lvRegeln.Columns[4].Width=ergW; } } catch { } }
         private AbrechnungsRegel GetSelectedRule(){ if(lvRegeln.SelectedItems.Count==0) return null; return lvRegeln.SelectedItems[0].Tag as AbrechnungsRegel; }
 
         private async Task NewRuleViaPopupAsync(){ using(var editor=new AbrechnungsBedingungEditorForm()){ if(editor.ShowDialog(this)==DialogResult.OK){ var r=MapFromEditor(editor); r.Name= string.IsNullOrWhiteSpace(editor.RuleName)?$"Regel {DateTime.Now:HHmmss}":editor.RuleName.Trim(); _regeln.Add(r); RefreshList(); await SaveRuleNowAsync(r); } } }
