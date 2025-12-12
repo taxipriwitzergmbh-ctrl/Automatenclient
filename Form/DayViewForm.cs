@@ -19,6 +19,7 @@ namespace TaMi_Kassenclient
         private class EntryMeta
         {
             public string Belegnummer { get; set; }
+            public string KassenBelegnummer { get; set; }
             public decimal Betrag19 { get; set; }
             public decimal Betrag7 { get; set; }
             public decimal Betrag0 { get; set; }
@@ -445,6 +446,7 @@ namespace TaMi_Kassenclient
                         decimal v7 = dt.Columns.Contains("Betrag7") && row["Betrag7"] != DBNull.Value ? Convert.ToDecimal(row["Betrag7"]) : 0m;
                         decimal v0 = dt.Columns.Contains("Betrag0") && row["Betrag0"] != DBNull.Value ? Convert.ToDecimal(row["Betrag0"]) : 0m;
                         string beleg = dt.Columns.Contains("Belegnummer") ? row["Belegnummer"].ToString() : null;
+                        string kassenBeleg = dt.Columns.Contains("KassenBelegnummer") ? Convert.ToString(row["KassenBelegnummer"]) : null;
                         bool isOld = dt.Columns.Contains("RevIsOld") && row["RevIsOld"] != DBNull.Value && Convert.ToInt32(row["RevIsOld"]) != 0;
                         bool isFest = dt.Columns.Contains("Festgeschrieben") && row["Festgeschrieben"] != DBNull.Value && Convert.ToInt32(row["Festgeschrieben"]) != 0; // NEW
 
@@ -473,6 +475,7 @@ namespace TaMi_Kassenclient
                         item.Tag = new EntryMeta
                         {
                             Belegnummer = beleg,
+                            KassenBelegnummer = kassenBeleg,
                             Betrag19 = v19,
                             Betrag7 = v7,
                             Betrag0 = v0,
@@ -554,7 +557,9 @@ namespace TaMi_Kassenclient
                 using (var dlg = new EntryEditForm(item.SubItems[1].Text, item.SubItems[2].Text, item.SubItems[3].Text, item.SubItems[4].Text,
                     meta.Betrag19, meta.Betrag7, meta.Betrag0,
                     meta.Kost1, meta.Kost2, meta.Konto,
-                    schichtId, info.kennzeichen, info.fahrer, _firmenId))
+                    schichtId, info.kennzeichen, info.fahrer, _firmenId,
+                    meta.Belegnummer,
+                    meta.KassenBelegnummer))
                 {
                     if (dlg.ShowDialog(this) == DialogResult.OK)
                     {
@@ -565,9 +570,12 @@ namespace TaMi_Kassenclient
                             var ctx = new RulesEngine.RuleContext { FirmenId = _firmenId, PersId = TryParseIntSafe(persIdObj), Typ = item.SubItems.Count > 2 ? item.SubItems[2].Text : null, FhzId = info.fhzId };
                             int? k1 = dlg.Kost1, k2 = dlg.Kost2, kto = dlg.Konto; string txt = dlg.Buchungstext;
                             RulesEngine.ApplyForEdit(rules, ctx, dlg.Betrag19, dlg.Betrag7, dlg.Betrag0, ref k1, ref k2, ref kto, ref txt);
-
-                            await db.ReviseSingleAsync(meta.Belegnummer, txt, k1, k2, kto,
-                                dlg.Betrag19, dlg.Betrag7, dlg.Betrag0);
+                            if (!dlg.DirectSaved)
+                            {
+                                // Normales Speichern: Revision anlegen
+                                await db.ReviseSingleAsync(meta.Belegnummer, txt, k1, k2, kto,
+                                    dlg.Betrag19, dlg.Betrag7, dlg.Betrag0);
+                            }
                             await RefreshDayAsync();
                         }
                         catch (System.Exception ex)

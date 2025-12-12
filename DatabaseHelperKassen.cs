@@ -606,6 +606,49 @@ WHERE Belegnummer=@bnr AND (Verbucht=0 OR Verbucht IS NULL)";
             }
         }
 
+        // Hilfsfunktion: Belegnummer über KassenBelegnummer auflösen (neueste, nicht alte Revision)
+        public async Task<string> ResolveBelegnummerByKassenBelegAsync(string kassenBelegnummer)
+        {
+            await EnsureOpenAsync();
+            if (string.IsNullOrWhiteSpace(kassenBelegnummer)) return null;
+            using (var cmd = _connection.CreateCommand())
+            {
+                cmd.CommandText = $@"SELECT TOP 1 Belegnummer FROM {_tblKassenbuch} WITH (NOLOCK) WHERE KassenBelegnummer = @KBNR AND ISNULL(RevIsOld,0)=0 ORDER BY ErfasstAm DESC";
+                cmd.Parameters.AddWithValue("@KBNR", kassenBelegnummer);
+                var o = await cmd.ExecuteScalarAsync();
+                if (o == null || o == DBNull.Value) return null;
+                return Convert.ToString(o);
+            }
+        }
+
+        // Direkte Bearbeitung des aktuellen Eintrags ohne Revision
+        public async Task<int> UpdateEntryDirectAsync(string belegnummer, string kassenBelegnummer,
+            string buchungstext, int? kost1, int? kost2, int? konto,
+            decimal betrag19, decimal betrag7, decimal betrag0)
+        {
+            await EnsureOpenAsync();
+            using (var cmd = _connection.CreateCommand())
+            {
+                cmd.CommandText = $@"UPDATE {_tblKassenbuch}
+SET Buchungstext=@txt, Betrag19=@b19, Betrag7=@b7, Betrag0=@b0,
+    Kost1=@k1, Kost2=@k2, Konto=@kto
+WHERE ISNULL(RevIsOld,0)=0 AND (
+    (@bnr IS NOT NULL AND Belegnummer = @bnr)
+    OR (@kbnr IS NOT NULL AND KassenBelegnummer = @kbnr)
+)";
+                cmd.Parameters.AddWithValue("@txt", (object)(buchungstext ?? (object)DBNull.Value) ?? DBNull.Value);
+                cmd.Parameters.AddWithValue("@b19", betrag19);
+                cmd.Parameters.AddWithValue("@b7", betrag7);
+                cmd.Parameters.AddWithValue("@b0", betrag0);
+                cmd.Parameters.AddWithValue("@k1", (object)kost1 ?? DBNull.Value);
+                cmd.Parameters.AddWithValue("@k2", (object)kost2 ?? DBNull.Value);
+                cmd.Parameters.AddWithValue("@kto", (object)konto ?? DBNull.Value);
+                cmd.Parameters.AddWithValue("@bnr", string.IsNullOrWhiteSpace(belegnummer) ? (object)DBNull.Value : belegnummer);
+                cmd.Parameters.AddWithValue("@kbnr", string.IsNullOrWhiteSpace(kassenBelegnummer) ? (object)DBNull.Value : kassenBelegnummer);
+                return await cmd.ExecuteNonQueryAsync();
+            }
+        }
+
         private async Task InsertCloneWithSameBelegnummerAsync(SqlTransaction tx, DataRow src, IDictionary<string, object> overrides, int newRevNum)
         {
             var writable = await GetWritableColumnsAsync(tx);

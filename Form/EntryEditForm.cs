@@ -18,6 +18,7 @@ namespace TaMi_Kassenclient
         public decimal Betrag19 { get; private set; }
         public decimal Betrag7 { get; private set; }
         public decimal Betrag0 { get; private set; }
+        public bool DirectSaved { get; private set; }
 
         private const int HeaderHeight = 60;
 
@@ -27,6 +28,7 @@ namespace TaMi_Kassenclient
         private Point _mouseDownLocation;
 
         private Label _lblZeit, _lblSchichtId, _lblFahrer, _lblKennzeichen, _lblGesamt;
+        private Label _lblBelegnummer, _lblKassenBelegnummer;
         private TextBox _txtBuchungstext, _txtKost1, _txtKost2, _txtKonto;
         private ComboBox _cboMwst;
 
@@ -36,6 +38,8 @@ namespace TaMi_Kassenclient
         private readonly decimal _total;
         private readonly int _firmenId;
         private readonly string _typ;
+        private readonly string _belegnummer;
+        private readonly string _kassenBelegnummer;
 
         // Zusatz: Schicht/Fahrzeug-Kontext für Rules
         private int? _schichtId;
@@ -49,7 +53,9 @@ namespace TaMi_Kassenclient
             decimal v19, decimal v7, decimal v0,
             string vorhandenKost1 = "", string vorhandenKost2 = "", string vorhandenKonto = "",
             string schichtId = "", string kennzeichen = "", string fahrerName = "",
-            int firmenId = 0)
+            int firmenId = 0,
+            string belegnummer = null,
+            string kassenBelegnummer = null)
         {
             this.Icon = Program.AppIcon;
 
@@ -61,6 +67,8 @@ namespace TaMi_Kassenclient
 
             _firmenId = firmenId;
             _typ = typ ?? string.Empty;
+            _belegnummer = belegnummer ?? string.Empty;
+            _kassenBelegnummer = kassenBelegnummer ?? string.Empty;
             // SchichtId ggf. merken (für FhzId-Auflösung)
             if (int.TryParse((schichtId ?? string.Empty).Trim(), out var sid) && sid > 0) _schichtId = sid; else _schichtId = null;
 
@@ -88,6 +96,37 @@ namespace TaMi_Kassenclient
 
             AcceptButton = _btnSave;
             CancelButton = _btnCancel;
+            KeyPreview = true;
+            this.KeyDown += async (s, e) =>
+            {
+                if (e.Control && e.KeyCode == Keys.A)
+                {
+                    // Direktes Bearbeiten in der Datenbank ausführen
+                    if (TryCommit())
+                    {
+                        try
+                        {
+                            using (var db = new DatabaseHelperKassen())
+                            {
+                                string bn = _belegnummer;
+                                if (string.IsNullOrWhiteSpace(bn))
+                                    bn = await db.ResolveBelegnummerByKassenBelegAsync(_kassenBelegnummer);
+                                // Direkte Aktualisierung ohne Revision; wenn weder bn noch KBNR vorhanden, Fehler
+                                int affected = await db.UpdateEntryDirectAsync(bn, _kassenBelegnummer, Buchungstext, Kost1, Kost2, Konto, Betrag19, Betrag7, Betrag0);
+                                if (affected <= 0)
+                                    throw new InvalidOperationException("Kein Eintrag aktualisiert (Belegnummer/KassenBelegnummer nicht gefunden).");
+                            }
+                            DirectSaved = true;
+                            DialogResult = DialogResult.OK;
+                        }
+                        catch (Exception ex)
+                        {
+                            MessageBox.Show(this, "Fehler beim direkten Speichern: " + ex.Message, "Fehler", MessageBoxButtons.OK, MessageBoxIcon.Error);
+                        }
+                    }
+                    e.Handled = true;
+                }
+            };
 
             // Erste Regelanwendung (auto-fill) mit FhzId-Kontext
             _ = LoadContextAndApplyRulesAsync();
@@ -140,6 +179,15 @@ namespace TaMi_Kassenclient
             Controls.Add(new Label { Text = "Kennzeichen:", Left = left, Top = top, Width = labelW, ForeColor = Color.DimGray });
             _lblKennzeichen = new Label { Text = kennzeichen, Left = left + labelW + 10, Top = top, Width = 580 }; top += gapY;
             Controls.Add(_lblKennzeichen);
+
+            // Belegnummern anzeigen
+            Controls.Add(new Label { Text = "Belegnummer:", Left = left, Top = top, Width = labelW, ForeColor = Color.DimGray });
+            _lblBelegnummer = new Label { Text = _belegnummer, Left = left + labelW + 10, Top = top, Width = 280 }; top += gapY;
+            Controls.Add(_lblBelegnummer);
+
+            Controls.Add(new Label { Text = "KassenBelegnummer:", Left = left, Top = top, Width = labelW, ForeColor = Color.DimGray });
+            _lblKassenBelegnummer = new Label { Text = _kassenBelegnummer, Left = left + labelW + 10, Top = top, Width = 280 }; top += gapY;
+            Controls.Add(_lblKassenBelegnummer);
 
             Controls.Add(new Label { Text = "Gesamtbetrag:", Left = left, Top = top, Width = labelW, ForeColor = Color.DimGray });
             _lblGesamt = new Label { Text = _total.ToString("C2"), Left = left + labelW + 10, Top = top, Width = 200, Font = new Font("Segoe UI Variable", 11F, FontStyle.Bold) }; top += gapY + 8;
