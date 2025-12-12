@@ -228,6 +228,8 @@ namespace TaMi_Kassenclient
                 Anchor = AnchorStyles.Top | AnchorStyles.Bottom | AnchorStyles.Left | AnchorStyles.Right,
                 Font = new Font("Segoe UI Variable", 12F, FontStyle.Regular)
             };
+            // Neue erste Spalte: Nr.
+            lvEintraege.Columns.Add("Nr.", 160, HorizontalAlignment.Left);
             lvEintraege.Columns.Add("Zeit", 180, HorizontalAlignment.Left);
             lvEintraege.Columns.Add("Typ", 180, HorizontalAlignment.Left);
             lvEintraege.Columns.Add("Buchungstext", 500, HorizontalAlignment.Left);
@@ -446,20 +448,28 @@ namespace TaMi_Kassenclient
                         bool isOld = dt.Columns.Contains("RevIsOld") && row["RevIsOld"] != DBNull.Value && Convert.ToInt32(row["RevIsOld"]) != 0;
                         bool isFest = dt.Columns.Contains("Festgeschrieben") && row["Festgeschrieben"] != DBNull.Value && Convert.ToInt32(row["Festgeschrieben"]) != 0; // NEW
 
+                        // KassenBelegnummer/RevNum für Spalte "Nr."
+                        string kassenBelegnummer = dt.Columns.Contains("KassenBelegnummer") && row["KassenBelegnummer"] != DBNull.Value
+                            ? Convert.ToString(row["KassenBelegnummer"]) : (dt.Columns.Contains("Belegnummer") ? Convert.ToString(row["Belegnummer"]) : string.Empty);
+                        int revNum = dt.Columns.Contains("RevNum") && row["RevNum"] != DBNull.Value ? Convert.ToInt32(row["RevNum"]) : 0;
+                        string nrText = string.IsNullOrWhiteSpace(kassenBelegnummer) ? string.Empty : (revNum > 0 ? (kassenBelegnummer + " / " + revNum.ToString()) : kassenBelegnummer);
+
                         string mwst = v19 != 0 ? "19%" : v7 != 0 ? "7%" : v0 != 0 ? "0%" : "-";
                         string kost1 = GetColumnValue(row, "Kost1", "Kost");
                         string kost2 = GetColumnValue(row, "Kost2");
                         string konto = GetColumnValue(row, "Konto");
 
-                        var item = new ListViewItem(ts.ToString("dd.MM.yyyy HH:mm"));
-                        item.SubItems.Add(typ);
-                        item.SubItems.Add(txt);
-                        item.SubItems.Add(betrag.ToString("C2"));
-                        item.SubItems.Add(mwst);
-                        item.SubItems.Add(kost1);
-                        item.SubItems.Add(kost2);
-                        item.SubItems.Add(konto);
-                        item.SubItems.Add(kb.ToString("C2"));
+                        // Erster Eintrag: Nr.
+                        var item = new ListViewItem(nrText);
+                        item.SubItems.Add(ts.ToString("dd.MM.yyyy HH:mm")); // Zeit (Index 1)
+                        item.SubItems.Add(typ);                             // Typ (Index 2)
+                        item.SubItems.Add(txt);                             // Buchungstext (Index 3)
+                        item.SubItems.Add(betrag.ToString("C2"));          // Betrag (Index 4)
+                        item.SubItems.Add(mwst);                           // MwSt (Index 5)
+                        item.SubItems.Add(kost1);                          // Kost1 (Index 6)
+                        item.SubItems.Add(kost2);                          // Kost2 (Index 7)
+                        item.SubItems.Add(konto);                          // Konto (Index 8)
+                        item.SubItems.Add(kb.ToString("C2"));              // Kassenbestand (Index 9)
                         item.Tag = new EntryMeta
                         {
                             Belegnummer = beleg,
@@ -482,7 +492,7 @@ namespace TaMi_Kassenclient
                                 item.Font = new Font(baseFont, FontStyle.Italic | FontStyle.Strikeout);
                             }
                             catch { item.ForeColor = Color.Gray; }
-                            item.SubItems[2].Text = "(Ersetzt durch nächste Buchung) " + (item.SubItems[2].Text ?? "");
+                            item.SubItems[3].Text = "(Ersetzt durch nächste Buchung) " + (item.SubItems[3].Text ?? "");
                         }
                         // Hervorhebung festgeschriebener (gültiger) Einträge: hellgraue Hinterlegung
                         if (isFest)
@@ -494,7 +504,7 @@ namespace TaMi_Kassenclient
 
                     if (dt.Rows.Count == 0)
                     {
-                        var empty = new ListViewItem(new[] { "", "Keine Buchungen am ausgewählten Tag.", "", "", "", "", "", "", "" }) { ForeColor = Color.DimGray };
+                        var empty = new ListViewItem(new[] { "", "", "Keine Buchungen am ausgewählten Tag.", "", "", "", "", "", "", "" }) { ForeColor = Color.DimGray };
                         lvEintraege.Items.Add(empty);
                     }
                 }
@@ -541,7 +551,7 @@ namespace TaMi_Kassenclient
                 object persIdObj = row?.Table.Columns.Contains("PersId") == true ? row["PersId"] : null;
                 var info = await ResolveFahrerUndKennzeichenAsync(schichtId, persIdObj);
 
-                using (var dlg = new EntryEditForm(item.SubItems[0].Text, item.SubItems[1].Text, item.SubItems[2].Text, item.SubItems[3].Text,
+                using (var dlg = new EntryEditForm(item.SubItems[1].Text, item.SubItems[2].Text, item.SubItems[3].Text, item.SubItems[4].Text,
                     meta.Betrag19, meta.Betrag7, meta.Betrag0,
                     meta.Kost1, meta.Kost2, meta.Konto,
                     schichtId, info.kennzeichen, info.fahrer, _firmenId))
@@ -552,7 +562,7 @@ namespace TaMi_Kassenclient
                         {
                             // Regeln anwenden (nur Standardwerte setzen, falls leer)
                             var rules = await RulesEngine.LoadRulesAsync();
-                            var ctx = new RulesEngine.RuleContext { FirmenId = _firmenId, PersId = TryParseIntSafe(persIdObj), Typ = item.SubItems.Count > 1 ? item.SubItems[1].Text : null, FhzId = info.fhzId };
+                            var ctx = new RulesEngine.RuleContext { FirmenId = _firmenId, PersId = TryParseIntSafe(persIdObj), Typ = item.SubItems.Count > 2 ? item.SubItems[2].Text : null, FhzId = info.fhzId };
                             int? k1 = dlg.Kost1, k2 = dlg.Kost2, kto = dlg.Konto; string txt = dlg.Buchungstext;
                             RulesEngine.ApplyForEdit(rules, ctx, dlg.Betrag19, dlg.Betrag7, dlg.Betrag0, ref k1, ref k2, ref kto, ref txt);
 
@@ -576,8 +586,8 @@ namespace TaMi_Kassenclient
             var item = lvEintraege.SelectedItems[0];
             var meta = item.Tag as EntryMeta; if (meta == null || string.IsNullOrEmpty(meta.Belegnummer)) return;
 
-            decimal.TryParse(item.SubItems[3].Text, NumberStyles.Currency, CultureInfo.CurrentCulture, out var gesamt);
-            var typ = item.SubItems.Count > 1 ? item.SubItems[1].Text : null;
+            decimal.TryParse(item.SubItems[4].Text, NumberStyles.Currency, CultureInfo.CurrentCulture, out var gesamt);
+            var typ = item.SubItems.Count > 2 ? item.SubItems[2].Text : null;
 
             // SchichtId/PersId laden, um FhzId ermitteln zu können
             string schichtId = null; object persIdObj = null; int? fhzId = null;
@@ -592,7 +602,7 @@ namespace TaMi_Kassenclient
 
             using (var split = new EntrySplitForm(gesamt, meta.Betrag19, meta.Betrag7, meta.Betrag0,
                                                   startK1: TryParseInt(meta.Kost1), startK2: TryParseInt(meta.Kost2), startKto: TryParseInt(meta.Konto),
-                                                  standardText: item.SubItems[2].Text,
+                                                  standardText: item.SubItems[3].Text,
                                                   firmenId: _firmenId, typ: typ, fhzId: fhzId))
             {
                 if (split.ShowDialog(this) == DialogResult.OK)
@@ -616,7 +626,7 @@ namespace TaMi_Kassenclient
 
                         using (var db = new DatabaseHelperKassen())
                         {
-                            await db.SplitByVatAsync(meta.Belegnummer, item.SubItems[2].Text,
+                            await db.SplitByVatAsync(meta.Belegnummer, item.SubItems[3].Text,
                                 split.Betrag19, k1_19, k2_19, kto_19,
                                 split.Betrag7,  k1_7,  k2_7,  kto_7,
                                 split.Betrag0,  k1_0,  k2_0,  kto_0);
@@ -658,19 +668,19 @@ namespace TaMi_Kassenclient
 
                     foreach (ListViewItem it in lvEintraege.Items)
                     {
-                        if (it.SubItems.Count < 9) continue; // placeholder row
+                        if (it.SubItems.Count < 10) continue; // placeholder row
                         var meta = it.Tag as EntryMeta; if (meta == null) continue; // need metadata
                         if (meta.IsOld) continue; // skip replaced entries
 
                         DateTime belegDatum;
-                        if (!DateTime.TryParseExact(it.SubItems[0].Text, "dd.MM.yyyy HH:mm", de, DateTimeStyles.None, out belegDatum))
+                        if (!DateTime.TryParseExact(it.SubItems[1].Text, "dd.MM.yyyy HH:mm", de, DateTimeStyles.None, out belegDatum))
                             belegDatum = dtpTag.Value.Date;
 
                         decimal betrag;
-                        if (!decimal.TryParse(it.SubItems[3].Text, NumberStyles.Currency, de, out betrag))
+                        if (!decimal.TryParse(it.SubItems[4].Text, NumberStyles.Currency, de, out betrag))
                             betrag = meta.Betrag19 + meta.Betrag7 + meta.Betrag0;
 
-                        string steuersatz = it.SubItems[4].Text ?? string.Empty;
+                        string steuersatz = it.SubItems[5].Text ?? string.Empty;
                         if (steuersatz.EndsWith("%")) steuersatz = steuersatz.TrimEnd('%');
 
                         // RechNr aus TKassenbuch: FhzId-SchichtId falls beide vorhanden, sonst Belegnummer
@@ -698,7 +708,7 @@ namespace TaMi_Kassenclient
                             Belegdatum = belegDatum,
                             Belegnummer = meta.Belegnummer,
                             RechNr = rechNr,
-                            Buchungstext = it.SubItems[2].Text,
+                            Buchungstext = it.SubItems[3].Text,
                             BetragSigned = betrag, // mit Vorzeichen
                             Steuersatz = steuersatz,
                             Gegenkonto = meta.Konto,
