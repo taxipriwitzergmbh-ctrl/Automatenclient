@@ -959,12 +959,12 @@ BEGIN
     CREATE TABLE {_tblAbrechnungsRegeln}
     (
         Id              int IDENTITY(1,1) PRIMARY KEY,
-        Name            nvarchar(200) NOT NULL,
-        JoinKind        nvarchar(10)  NULL,
+        Name            varchar(200) NOT NULL,
+        JoinKind        varchar(10)  NULL,
         IsDefault       bit NOT NULL DEFAULT(0),
         Priority        int NOT NULL DEFAULT(100),
         ManId           int NULL,
-        FhzIdList       nvarchar(4000) NULL,
+        FhzIdList       varchar(4000) NULL,
         PersId          int NULL,
         ResultKost1     int NULL,
         ResultKost2     int NULL,
@@ -998,7 +998,12 @@ END";
             await EnsureRulesTableAsync();
             using (var cmd = _connection.CreateCommand())
             {
-                cmd.CommandText = $@"SELECT * FROM {_tblAbrechnungsRegeln} WITH (NOLOCK) WHERE IsActive=1 ORDER BY Priority ASC, Id ASC";
+                // Explicit column list to avoid binding issues with legacy/removed columns
+                cmd.CommandText = $@"SELECT Id, Name, JoinKind, IsDefault, Priority,
+    ResultKost1, ResultKost2, ResultKonto, ResultText, IsActive
+FROM {_tblAbrechnungsRegeln} WITH (NOLOCK)
+WHERE IsActive=1
+ORDER BY Priority ASC, Id ASC";
                 using (var rdr = await cmd.ExecuteReaderAsync())
                 {
                     var dt = new DataTable(); dt.Load(rdr); return dt;
