@@ -35,50 +35,8 @@ namespace TaMi_Kassenclient
 
         public static string GetConnectionString()
         {
+            // Verbindungszeichenfolge kommt vollständig aus dem externen MainTaMiClient.
             return Program.MainTaMiClient.DatabaseConnectionStr;
-
-            /*
-            string iniPath = @"C:\\ProgramData\\SuE-Software\\SuE-TaMi Client SQL\\TaMi Client.ini";
-            string server = "localhost,1433";
-            string dbName = "SuE-TaMi"; // Fallback
-            string user = "dienstplanuser";
-            string password = "SicheresPasswort123!";
-
-            if (File.Exists(iniPath))
-            {
-                foreach (var raw in File.ReadAllLines(iniPath))
-                {
-                    var line = (raw ?? string.Empty).Trim();
-                    if (line.Length == 0 || line.StartsWith("#")) continue;
-                    var eq = line.IndexOf('=');
-                    if (eq <= 0) continue;
-                    var key = line.Substring(0, eq).Trim().ToLowerInvariant();
-                    var val = line.Substring(eq + 1).Trim();
-                    if (val.Length == 0) continue;
-                    switch (key)
-                    {
-                        case "server":
-                        case "data source":
-                            server = val; break;
-                        case "database":
-                        case "datenbank":
-                        case "initial catalog":
-                        case "catalog":
-                        case "dbname":
-                            dbName = val; break;
-                        case "user":
-                        case "uid":
-                        case "user id":
-                            user = val; break;
-                        case "password":
-                        case "pwd":
-                            password = val; break;
-                    }
-                }
-            }
-
-            return $"Data Source={server};Initial Catalog={dbName};User ID={user};Password={password};Network Library=DBMSSOCN;";
-            */
         }
 
         private async Task EnsureOpenAsync()

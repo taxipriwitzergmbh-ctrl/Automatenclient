@@ -35,6 +35,7 @@ namespace TaMi_Kassenclient
         private Button btnLogin;
         private Button btnExit;
         private Label lblError;
+        private System.Windows.Forms.Timer _diffTimer; // zeigt DIF an, wenn Kassendifferenz besteht
 
         //private static readonly Color Accent = Color.FromArgb(33, 150, 243);
         //private static readonly Color Accent2 = Color.FromArgb(33, 203, 243);
@@ -95,7 +96,14 @@ namespace TaMi_Kassenclient
                 // Login-Antworten hier nicht benötigt
             };
 
-            
+            // DIF-Anzeige zyklisch aktualisieren
+            try
+            {
+                _diffTimer = new System.Windows.Forms.Timer { Interval = 1500 };
+                _diffTimer.Tick += (s2, e2) => UpdateDiffIndicator();
+                _diffTimer.Start();
+            }
+            catch { }
 
         }
 
@@ -220,6 +228,59 @@ namespace TaMi_Kassenclient
                     btnLogin.PerformClick(); 
                 }
             };
+        }
+
+        private void UpdateDiffIndicator()
+        {
+            try
+            {
+                decimal diff = 0m;
+                bool got = TryGetCurrentKassenDiff(out diff);
+                if (got && diff != 0m)
+                {
+                    lblError.Text = $"DIF: {diff:C2}";
+                }
+                else
+                {
+                    // nur löschen, wenn keine andere Fehlermeldung gesetzt ist
+                    if (string.IsNullOrEmpty(lblError.Text) || lblError.Text.StartsWith("DIF:"))
+                        lblError.Text = string.Empty;
+                }
+            }
+            catch { }
+        }
+
+        private bool TryGetCurrentKassenDiff(out decimal diff)
+        {
+            diff = 0m;
+            try
+            {
+                // Versuche bekannte Typ-/Eigenschaftsnamen via Reflection
+                var asmList = AppDomain.CurrentDomain.GetAssemblies();
+                foreach (var asm in asmList)
+                {
+                    Type t = asm.GetType("KassenSummary") ?? asm.GetType("Geldautomat.KassenSummary") ?? asm.GetType("Allgemeine_Klassen.KassenSummary");
+                    if (t == null) continue;
+                    var prop = t.GetProperty("CurrentDiff") ?? t.GetProperty("Diff");
+                    if (prop != null)
+                    {
+                        var val = prop.GetValue(null, null);
+                        if (val is decimal d) { diff = d; return true; }
+                        if (val is double dbl) { diff = Convert.ToDecimal(dbl); return true; }
+                        if (val is float fl) { diff = Convert.ToDecimal(fl); return true; }
+                    }
+                    var get = t.GetMethod("GetCurrentDiff") ?? t.GetMethod("GetDiff");
+                    if (get != null)
+                    {
+                        var val = get.Invoke(null, null);
+                        if (val is decimal d) { diff = d; return true; }
+                        if (val is double dbl) { diff = Convert.ToDecimal(dbl); return true; }
+                        if (val is float fl) { diff = Convert.ToDecimal(fl); return true; }
+                    }
+                }
+            }
+            catch { }
+            return false;
         }
 
         private async Task OnLoginButtonClick()
