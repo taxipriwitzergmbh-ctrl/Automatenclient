@@ -1048,12 +1048,10 @@ WHERE Id=@Id; SELECT @Id;";
                 cmd.Parameters.AddWithValue("@Join", (object)(r.JoinKind ?? (object)DBNull.Value) ?? DBNull.Value);
                 cmd.Parameters.AddWithValue("@Def", r.IsDefault);
                 cmd.Parameters.AddWithValue("@Prio", r.Priority);
-                // removed: AdditionalWhere column
                 cmd.Parameters.AddWithValue("@K1", (object)r.ResultKost1 ?? DBNull.Value);
                 cmd.Parameters.AddWithValue("@K2", (object)r.ResultKost2 ?? DBNull.Value);
                 cmd.Parameters.AddWithValue("@Kto", (object)r.ResultKonto ?? DBNull.Value);
                 cmd.Parameters.AddWithValue("@Txt", (object)(r.ResultBuchungstext ?? (object)DBNull.Value) ?? DBNull.Value);
-                // removed: RawConditions/RawResults columns
                 var o = await cmd.ExecuteScalarAsync();
                 int ruleId = Convert.ToInt32(Convert.ToDecimal(o));
 

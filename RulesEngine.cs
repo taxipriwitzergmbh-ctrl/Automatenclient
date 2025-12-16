@@ -253,16 +253,13 @@ namespace TaMi_Kassenclient
                         JoinKind = r["JoinKind"] as string,
                         IsDefault = r["IsDefault"] != DBNull.Value && Convert.ToBoolean(r["IsDefault"]),
                         Priority = r["Priority"] == DBNull.Value ? 100 : Convert.ToInt32(r["Priority"]),
-                        // Legacy fields intentionally NOT loaded (ManId/FhzIdList/PersId) to enforce clause-only logic
                         ManId = null,
                         FhzIds = null,
                         PersId = null,
-                        // AdditionalWhere removed
                         ResultKost1 = r["ResultKost1"] == DBNull.Value ? (int?)null : Convert.ToInt32(r["ResultKost1"]),
                         ResultKost2 = r["ResultKost2"] == DBNull.Value ? (int?)null : Convert.ToInt32(r["ResultKost2"]),
                         ResultKonto = r["ResultKonto"] == DBNull.Value ? (int?)null : Convert.ToInt32(r["ResultKonto"]),
                         ResultBuchungstext = r["ResultText"] as string,
-                        // RawConditions/RawResults removed
                         IsActive = r.Table.Columns.Contains("IsActive") && r["IsActive"] != DBNull.Value ? Convert.ToBoolean(r["IsActive"]) : true,
                         Clauses = new List<AbrechnungsClause>()
                     };

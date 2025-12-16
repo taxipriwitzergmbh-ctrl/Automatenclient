@@ -25,7 +25,7 @@ namespace TaMi_Kassenclient
         public int? ResultKonto { get; set; }
         public string ResultBuchungstext { get; set; }
 
-        // removed: RawConditionsJson, RawResultsJson
+        
         public bool IsActive { get; set; } = true;
 
         // Authoritative structured clauses
@@ -76,16 +76,13 @@ namespace TaMi_Kassenclient
                 JoinKind = this.JoinKind,
                 IsDefault = this.IsDefault,
                 Priority = this.Priority,
-                // Deprecated fields copied only for backward compatibility (will be null in new rules)
                 ManId = this.ManId,
                 FhzIds = this.FhzIds != null ? new List<int>(this.FhzIds) : null,
                 PersId = this.PersId,
-                // AdditionalWhere removed
                 ResultKost1 = this.ResultKost1,
                 ResultKost2 = this.ResultKost2,
                 ResultKonto = this.ResultKonto,
                 ResultBuchungstext = this.ResultBuchungstext,
-                // RawConditionsJson/RawResultsJson removed
                 IsActive = this.IsActive,
                 Clauses = this.Clauses != null ? new List<AbrechnungsClause>(this.Clauses.Select(c => c.Clone())) : null,
                 PresetName = this.PresetName
