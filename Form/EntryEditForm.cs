@@ -109,12 +109,16 @@ namespace TaMi_Kassenclient
                             using (var db = new DatabaseHelperKassen())
                             {
                                 string bn = _belegnummer;
-                                if (string.IsNullOrWhiteSpace(bn))
+                                if (string.IsNullOrWhiteSpace(bn) && !string.IsNullOrWhiteSpace(_kassenBelegnummer))
                                     bn = await db.ResolveBelegnummerByKassenBelegAsync(_kassenBelegnummer);
-                                // Direkte Aktualisierung ohne Revision; wenn weder bn noch KBNR vorhanden, Fehler
-                                int affected = await db.UpdateEntryDirectAsync(bn, _kassenBelegnummer, Buchungstext, Kost1, Kost2, Konto, Betrag19, Betrag7, Betrag0);
+
+                                if (string.IsNullOrWhiteSpace(bn))
+                                    throw new InvalidOperationException("Belegnummer konnte nicht ermittelt werden.");
+
+                                // Direkte Aktualisierung nur per Belegnummer
+                                int affected = await db.UpdateEntryDirectAsync(bn, null, Buchungstext, Kost1, Kost2, Konto, Betrag19, Betrag7, Betrag0);
                                 if (affected <= 0)
-                                    throw new InvalidOperationException("Kein Eintrag aktualisiert (Belegnummer/KassenBelegnummer nicht gefunden).");
+                                    throw new InvalidOperationException("Kein Eintrag aktualisiert (Belegnummer nicht gefunden).");
                             }
                             DirectSaved = true;
                             DialogResult = DialogResult.OK;

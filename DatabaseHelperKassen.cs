@@ -621,21 +621,22 @@ WHERE Belegnummer=@bnr AND (Verbucht=0 OR Verbucht IS NULL)";
             }
         }
 
-        // Direkte Bearbeitung des aktuellen Eintrags ohne Revision
+        // Direkte Bearbeitung des aktuellen Eintrags ohne Revision – NUR per eindeutiger Belegnummer
         public async Task<int> UpdateEntryDirectAsync(string belegnummer, string kassenBelegnummer,
             string buchungstext, int? kost1, int? kost2, int? konto,
             decimal betrag19, decimal betrag7, decimal betrag0)
         {
             await EnsureOpenAsync();
+
+            if (string.IsNullOrWhiteSpace(belegnummer))
+                throw new ArgumentException("Belegnummer ist erforderlich, um genau einen Eintrag zu aktualisieren.", nameof(belegnummer));
+
             using (var cmd = _connection.CreateCommand())
             {
                 cmd.CommandText = $@"UPDATE {_tblKassenbuch}
 SET Buchungstext=@txt, Betrag19=@b19, Betrag7=@b7, Betrag0=@b0,
     Kost1=@k1, Kost2=@k2, Konto=@kto
-WHERE ISNULL(RevIsOld,0)=0 AND (
-    (@bnr IS NOT NULL AND Belegnummer = @bnr)
-    OR (@kbnr IS NOT NULL AND KassenBelegnummer = @kbnr)
-)";
+WHERE ISNULL(RevIsOld,0)=0 AND Belegnummer = @bnr";
                 cmd.Parameters.AddWithValue("@txt", (object)(buchungstext ?? (object)DBNull.Value) ?? DBNull.Value);
                 cmd.Parameters.AddWithValue("@b19", betrag19);
                 cmd.Parameters.AddWithValue("@b7", betrag7);
@@ -643,8 +644,7 @@ WHERE ISNULL(RevIsOld,0)=0 AND (
                 cmd.Parameters.AddWithValue("@k1", (object)kost1 ?? DBNull.Value);
                 cmd.Parameters.AddWithValue("@k2", (object)kost2 ?? DBNull.Value);
                 cmd.Parameters.AddWithValue("@kto", (object)konto ?? DBNull.Value);
-                cmd.Parameters.AddWithValue("@bnr", string.IsNullOrWhiteSpace(belegnummer) ? (object)DBNull.Value : belegnummer);
-                cmd.Parameters.AddWithValue("@kbnr", string.IsNullOrWhiteSpace(kassenBelegnummer) ? (object)DBNull.Value : kassenBelegnummer);
+                cmd.Parameters.AddWithValue("@bnr", belegnummer);
                 return await cmd.ExecuteNonQueryAsync();
             }
         }
