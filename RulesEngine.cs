@@ -199,7 +199,9 @@ namespace TaMi_Kassenclient
             // Legacy aggregated fields (ManId, PersId, FhzIds, AdditionalWhere) are ignored now; only Clauses are authoritative.
             if (r.Clauses != null && r.Clauses.Count > 0)
             {
-                var groups = r.Clauses.GroupBy(c => c.GroupId);
+                var safeClauses = r.Clauses.Where(c => c != null).ToList();
+                if (safeClauses.Count == 0) return true; // no conditions -> match
+                var groups = safeClauses.GroupBy(c => c.GroupId);
                 bool anyGroupTrue = false;
                 foreach (var g in groups)
                 {
@@ -284,18 +286,19 @@ namespace TaMi_Kassenclient
                 var lookup = rules.ToDictionary(r => r.Id, r => r);
                 foreach (DataRow r in dt.Rows)
                 {
+                    if (r == null) continue;
+                    if (!dt.Columns.Contains("RuleId")) continue;
                     int ruleId = Convert.ToInt32(r["RuleId"]);
                     if (!lookup.TryGetValue(ruleId, out var rule)) continue;
                     if (rule.Clauses == null) rule.Clauses = new List<AbrechnungsClause>();
-                    rule.Clauses.Add(new AbrechnungsClause
-                    {
-                        Id = Convert.ToInt32(r["Id"]),
-                        RuleId = ruleId,
-                        GroupId = r["GroupId"] == DBNull.Value ? 0 : Convert.ToInt32(r["GroupId"]),
-                        Field = r["Field"] as string,
-                        Operator = r["Operator"] as string,
-                        Value = r["Value"] as string
-                    });
+                    var clause = new AbrechnungsClause();
+                    try { if (dt.Columns.Contains("Id") && r["Id"] != DBNull.Value) clause.Id = Convert.ToInt32(r["Id"]); } catch { }
+                    clause.RuleId = ruleId;
+                    try { clause.GroupId = (dt.Columns.Contains("GroupId") && r["GroupId"] != DBNull.Value) ? Convert.ToInt32(r["GroupId"]) : 0; } catch { clause.GroupId = 0; }
+                    try { clause.Field = dt.Columns.Contains("Field") ? (r["Field"] as string) : null; } catch { clause.Field = null; }
+                    try { clause.Operator = dt.Columns.Contains("Operator") ? (r["Operator"] as string) : null; } catch { clause.Operator = null; }
+                    try { clause.Value = dt.Columns.Contains("Value") ? (r["Value"] as string) : null; } catch { clause.Value = null; }
+                    rule.Clauses.Add(clause);
                 }
             }
             catch { }

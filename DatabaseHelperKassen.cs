@@ -30,19 +30,64 @@ namespace TaMi_Kassenclient
 
         public DatabaseHelperKassen()
         {
-            //_connection = new SqlConnection(GetConnectionString());
+            // lazily opened in EnsureOpenAsync; keep ctor lightweight
         }
 
         public static string GetConnectionString()
         {
-            // Verbindungszeichenfolge kommt vollständig aus dem externen MainTaMiClient.
-            return Program.MainTaMiClient.DatabaseConnectionStr;
+            // Primär: aus MainTaMiClient (wenn in TaMi-Kassenclient ausgeführt)
+            try
+            {
+                if (Program.MainTaMiClient != null && !string.IsNullOrWhiteSpace(Program.MainTaMiClient.DatabaseConnectionStr))
+                    return Program.MainTaMiClient.DatabaseConnectionStr;
+            }
+            catch { }
+
+            // Fallback: INI wie im Geldautomat-Client lesen
+            try
+            {
+                string iniPath = @"C:\\ProgramData\\SuE-Software\\SuE-TaMi Client SQL\\TaMi Client.ini";
+                string server = "localhost,1433";
+                if (System.IO.File.Exists(iniPath))
+                {
+                    foreach (var line in System.IO.File.ReadAllLines(iniPath))
+                    {
+                        var trimmed = (line ?? string.Empty).Trim();
+                        if (!trimmed.StartsWith("#") && trimmed.StartsWith("Server=", StringComparison.OrdinalIgnoreCase))
+                        {
+                            server = trimmed.Substring("Server=".Length);
+                            break;
+                        }
+                    }
+                }
+                string user = "TaMiCli";
+                string password = "tami";
+                string dbName = "SuE-TaMi";
+                return $"Data Source={server};Initial Catalog={dbName};User ID={user};Password={password};Network Library=DBMSSOCN;";
+            }
+            catch { }
+
+            // Letzter Rückfall: lokale Standardwerte
+            return "Data Source=localhost,1433;Initial Catalog=SuE-TaMi;User ID=TaMiCli;Password=tami;Network Library=DBMSSOCN;";
         }
 
         private async Task EnsureOpenAsync()
         {
             if (_connection == null)
-                _connection = Program.MainTaMiClient.OpenTaMiDB(true);
+            {
+                try
+                {
+                    if (Program.MainTaMiClient != null)
+                        _connection = Program.MainTaMiClient.OpenTaMiDB(true);
+                }
+                catch { _connection = null; }
+
+                if (_connection == null)
+                {
+                    try { _connection = new SqlConnection(GetConnectionString()); }
+                    catch { }
+                }
+            }
 
             if (_connection.State != ConnectionState.Open)
                 await _connection.OpenAsync();
@@ -1095,8 +1140,8 @@ WHERE Id=@Id; SELECT @Id;";
         {
             if (string.IsNullOrWhiteSpace(t)) return 0;
             t = t.Trim();
-            // Neu: numerische Codes direkt erlauben
-            if (byte.TryParse(t, out var num) && num >= 1 && num <= 5)
+            // Neu: numerische Codes direkt erlauben (1..6)
+            if (byte.TryParse(t, out var num) && num >= 1 && num <= 6)
                 return num;
             switch (t.ToLowerInvariant())
             {
@@ -1105,6 +1150,7 @@ WHERE Id=@Id; SELECT @Id;";
                 case "auszahlung": return 3;
                 case "schichtabrechnung": return 4;
                 case "personalguthaben": return 5;
+                case "trinkgeld": return 6;
                 default: return 0;
             }
         }
