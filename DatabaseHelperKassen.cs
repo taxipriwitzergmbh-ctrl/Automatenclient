@@ -285,6 +285,7 @@ ORDER BY s.StartZeit DESC;";
             await EnsureOpenAsync();
             using (var cmd = _connection.CreateCommand())
             {
+                // UI mappt später Typ-Code zu Text und generiert Betrag/MwSt aus Einzelbeträgen
                 cmd.CommandText = $@"SELECT z.*, (p.Name + ' ' + p.Vorname) AS PersName
 FROM {_tblZahlungen} z WITH (NOLOCK)
 LEFT JOIN {_tblPersonal} p WITH (NOLOCK) ON p.PID = z.PersId

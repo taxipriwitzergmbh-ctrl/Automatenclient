@@ -204,6 +204,7 @@ namespace TaMi_Kassenclient
             gvOpenPayments.AlternatingRowsDefaultCellStyle.SelectionForeColor = Color.White;
             gvOpenPayments.SelectionChanged += GvOpenPayments_SelectionChanged;
             gvOpenPayments.CellDoubleClick += (s, e) => LoadSelectedPaymentIntoFields();
+            gvOpenPayments.CellFormatting += GvOpenPayments_CellFormatting;
             grpOpenPayments.Controls.Add(gvOpenPayments);
             grpOpenPayments.ResumeLayout();
             Controls.Add(grpOpenPayments);
@@ -944,23 +945,33 @@ namespace TaMi_Kassenclient
         private string ResolveFirma(int fid){ if(_firmenMap!=null && _firmenMap.TryGetValue(fid,out var n)) return n; return fid==0?string.Empty:("ID "+fid); }
         private DataTable BuildOpenPaymentsView(DataTable raw)
         {
-            var view=new DataTable(); view.Columns.Add("Belegnummer",typeof(int)); view.Columns.Add("Typ",typeof(string)); view.Columns.Add("BetragGesamt",typeof(decimal)); view.Columns.Add("MwSt",typeof(string)); view.Columns.Add("FirmenName",typeof(string)); view.Columns.Add("Buchungstext",typeof(string)); view.Columns.Add("Kost1",typeof(int)); view.Columns.Add("Kost2",typeof(int)); view.Columns.Add("Konto",typeof(int)); view.Columns.Add("Betrag19",typeof(decimal)); view.Columns.Add("Betrag7",typeof(decimal)); view.Columns.Add("Betrag0",typeof(decimal)); view.Columns.Add("FirmenID",typeof(int));
-            foreach(DataRow r in raw.Rows)
+            var view = new DataTable();
+            view.Columns.Add("Belegnummer", typeof(int));
+            view.Columns.Add("Typ", typeof(string));
+            view.Columns.Add("Betrag", typeof(decimal));
+            view.Columns.Add("MwSt", typeof(string));
+            view.Columns.Add("FirmenName", typeof(string));
+            view.Columns.Add("Buchungstext", typeof(string));
+            view.Columns.Add("Kost1", typeof(int));
+            view.Columns.Add("Kost2", typeof(int));
+            view.Columns.Add("Konto", typeof(int));
+            view.Columns.Add("FirmenID", typeof(int));
+            foreach (DataRow r in raw.Rows)
             {
                 int beleg = SafeInt(r.Table.Columns.Contains("Belegnummer") ? r["Belegnummer"] : null);
-                string typRaw = Convert.ToString(r["Typ"])??string.Empty; string typTxt = MapTypCodeToText(typRaw);
-                decimal b19 = r.Table.Columns.Contains("Betrag19") && r["Betrag19"]!=DBNull.Value? Convert.ToDecimal(r["Betrag19"]):0m;
-                decimal b7  = r.Table.Columns.Contains("Betrag7")  && r["Betrag7"] !=DBNull.Value? Convert.ToDecimal(r["Betrag7"]):0m;
-                decimal b0  = r.Table.Columns.Contains("Betrag0")  && r["Betrag0"] !=DBNull.Value? Convert.ToDecimal(r["Betrag0"]):0m;
-                decimal ges = r.Table.Columns.Contains("BetragGesamt") && r["BetragGesamt"]!=DBNull.Value? Convert.ToDecimal(r["BetragGesamt"]):(b19+b7+b0);
-                string mw = b19>0m?"19": (b7>0m?"7": (b0>0m?"0": string.Empty));
+                string typRaw = Convert.ToString(r["Typ"]) ?? string.Empty; string typTxt = MapTypCodeToText(typRaw);
+                decimal b19 = r.Table.Columns.Contains("Betrag19") && r["Betrag19"] != DBNull.Value ? Convert.ToDecimal(r["Betrag19"]) : 0m;
+                decimal b7 = r.Table.Columns.Contains("Betrag7") && r["Betrag7"] != DBNull.Value ? Convert.ToDecimal(r["Betrag7"]) : 0m;
+                decimal b0 = r.Table.Columns.Contains("Betrag0") && r["Betrag0"] != DBNull.Value ? Convert.ToDecimal(r["Betrag0"]) : 0m;
+                decimal betrag = b19 != 0m ? b19 : (b7 != 0m ? b7 : b0);
+                string mw = b19 != 0m ? "19" : (b7 != 0m ? "7" : (b0 != 0m ? "0" : string.Empty));
                 int fid = SafeInt(r.Table.Columns.Contains("FirmenID") ? r["FirmenID"] : null);
                 string firma = ResolveFirma(fid);
                 int k1 = SafeInt(r.Table.Columns.Contains("Kost1") ? r["Kost1"] : null);
                 int k2 = SafeInt(r.Table.Columns.Contains("Kost2") ? r["Kost2"] : null);
                 int kto = SafeInt(r.Table.Columns.Contains("Konto") ? r["Konto"] : null);
-                string txt = Convert.ToString(r["Buchungstext"])??string.Empty;
-                view.Rows.Add(beleg,typTxt,ges,mw,firma,txt,k1,k2,kto,b19,b7,b0,fid);
+                string txt = Convert.ToString(r["Buchungstext"]) ?? string.Empty;
+                view.Rows.Add(beleg, typTxt, betrag, mw, firma, txt, k1, k2, kto, fid);
             }
             return view;
         }
@@ -992,9 +1003,17 @@ namespace TaMi_Kassenclient
         }
         private void ConfigureOpenPaymentsGrid()
         {
-            if(gvOpenPayments==null) return; gvOpenPayments.AutoGenerateColumns=false; gvOpenPayments.Columns.Clear();
-            DataGridViewTextBoxColumn Add(string name,string header,int width=80,string format=null,bool fill=false){ var col=new DataGridViewTextBoxColumn{ DataPropertyName=name, HeaderText=header, Name=name, AutoSizeMode= fill? DataGridViewAutoSizeColumnMode.Fill: DataGridViewAutoSizeColumnMode.None, Width= fill?200:width}; if(format!=null) col.DefaultCellStyle.Format=format; gvOpenPayments.Columns.Add(col); return col; }
-            Add("Belegnummer","Belegnr.",60); Add("Typ","Typ",70); Add("BetragGesamt","Betrag",70,"0.00"); Add("MwSt","MwSt",50); Add("FirmenName","Firma",160); Add("Buchungstext","Text",0,null,true); Add("Kost1","Kost1",55); Add("Kost2","Kost2",55); Add("Konto","Konto",60);
+            if (gvOpenPayments == null) return; gvOpenPayments.AutoGenerateColumns = false; gvOpenPayments.Columns.Clear();
+            DataGridViewTextBoxColumn Add(string name, string header, int width = 80, string format = null, bool fill = false) { var col = new DataGridViewTextBoxColumn { DataPropertyName = name, HeaderText = header, Name = name, AutoSizeMode = fill ? DataGridViewAutoSizeColumnMode.Fill : DataGridViewAutoSizeColumnMode.None, Width = fill ? 200 : width }; if (format != null) col.DefaultCellStyle.Format = format; gvOpenPayments.Columns.Add(col); return col; }
+            Add("Belegnummer", "Belegnr.", 60);
+            Add("Typ", "Typ", 90);
+            var colBetrag = Add("Betrag", "Betrag", 80, "N2"); colBetrag.DefaultCellStyle.Alignment = DataGridViewContentAlignment.MiddleRight;
+            var colMwst = Add("MwSt", "MwSt", 50); colMwst.DefaultCellStyle.Alignment = DataGridViewContentAlignment.MiddleRight;
+            Add("FirmenName", "Firma", 160);
+            Add("Buchungstext", "Text", 0, null, true);
+            Add("Kost1", "Kost1", 55);
+            Add("Kost2", "Kost2", 55);
+            Add("Konto", "Konto", 60);
         }
         private async Task BindOpenPaymentsAsync(DatabaseHelperKassen db){ var raw= await db.GetOffeneAuszahlungenAsync(_currentPid); await EnsureFirmenMapAsync(db); var view= BuildOpenPaymentsView(raw); ConfigureOpenPaymentsGrid(); gvOpenPayments.DataSource=view; }
         // === ENDE Neu ===
@@ -1167,7 +1186,7 @@ namespace TaMi_Kassenclient
         private static void TrySetHeader(DataGridView gv,string col,string header){ if(gv!=null && gv.Columns.Contains(col)) gv.Columns[col].HeaderText=header; }
         private static void TryFormatAmount(DataGridView gv,string col){ if(gv!=null && gv.Columns.Contains(col)) gv.Columns[col].DefaultCellStyle.Format="N2"; }
         private void ApplyOpenShiftsGridFormatting(){ if(gvOpenShifts==null|| gvOpenShifts.DataSource==null) return; TrySetHeader(gvOpenShifts,"StartZeit","Start"); TrySetHeader(gvOpenShifts,"OffenerBetrag","Offen"); TryFormatAmount(gvOpenShifts,"OffenerBetrag"); }
-        private void ApplyGuthabenGridFormatting(){ if(gvGuthabenHistory==null|| gvGuthabenHistory.DataSource==null) return; TrySetHeader(gvGuthabenHistory,"Saldo","Saldo"); TryFormatAmount(gvGuthabenHistory,"Saldo"); }
+        private void ApplyGuthabenGridFormatting(){ if(gvGuthabenHistory==null|| gvGuthabenHistory.DataSource==null) return; TrySetHeader(gvGuthabenHistory,"Saldo","Saldo"); TryFormatAmount(gvGuthabenHistory,"Saldo"); if(gvGuthabenHistory.Columns.Contains("Saldo")) gvGuthabenHistory.Columns["Saldo"].DefaultCellStyle.Alignment = DataGridViewContentAlignment.MiddleRight; }
 
         private void GvGuthabenHistory_CellFormatting(object sender, DataGridViewCellFormattingEventArgs e)
         {
@@ -1178,6 +1197,18 @@ namespace TaMi_Kassenclient
                 if (e.ColumnIndex < 0 || e.RowIndex < 0) return;
                 var col = grid.Columns[e.ColumnIndex];
                 if (col == null) return;
+                // Betragsspalte: zwei Nachkommastellen und €
+                if (string.Equals(col.DataPropertyName, "Saldo", StringComparison.OrdinalIgnoreCase) || string.Equals(col.Name, "Saldo", StringComparison.OrdinalIgnoreCase))
+                {
+                    decimal v;
+                    if (e.Value == null || e.Value == DBNull.Value) { e.Value = "-"; e.FormattingApplied = true; return; }
+                    if (decimal.TryParse(Convert.ToString(e.Value), out v))
+                    {
+                        e.Value = v.ToString("N2") + " €";
+                        e.FormattingApplied = true;
+                        return;
+                    }
+                }
                 if (string.Equals(col.DataPropertyName, "Typ", StringComparison.OrdinalIgnoreCase) || string.Equals(col.Name, "Typ", StringComparison.OrdinalIgnoreCase))
                 {
                     var v = e.Value;
@@ -1192,6 +1223,30 @@ namespace TaMi_Kassenclient
                         e.Value = mapped;
                         e.FormattingApplied = true;
                     }
+                }
+            }
+            catch { }
+        }
+        private void GvOpenPayments_CellFormatting(object sender, DataGridViewCellFormattingEventArgs e)
+        {
+            try
+            {
+                var grid = sender as DataGridView; if (grid == null) return;
+                if (e.ColumnIndex < 0 || e.RowIndex < 0) return;
+                var col = grid.Columns[e.ColumnIndex]; if (col == null) return;
+                var name = col.DataPropertyName ?? col.Name;
+                if (string.Equals(name, "Betrag", StringComparison.OrdinalIgnoreCase))
+                {
+                    if (e.Value == null || e.Value == DBNull.Value) { e.Value = "-"; e.FormattingApplied = true; return; }
+                    decimal v; if (decimal.TryParse(Convert.ToString(e.Value), out v)) { e.Value = v.ToString("N2") + " €"; e.FormattingApplied = true; return; }
+                }
+                else if (string.Equals(name, "MwSt", StringComparison.OrdinalIgnoreCase))
+                {
+                    var s = Convert.ToString(e.Value) ?? string.Empty; if (s.Length > 0) { e.Value = s + " %"; e.FormattingApplied = true; }
+                }
+                else if (string.Equals(name, "Typ", StringComparison.OrdinalIgnoreCase))
+                {
+                    var s = Convert.ToString(e.Value) ?? string.Empty; if (!string.IsNullOrWhiteSpace(s)) { var mapped = MapTypCodeToText(s); e.Value = mapped; e.FormattingApplied = true; }
                 }
             }
             catch { }
