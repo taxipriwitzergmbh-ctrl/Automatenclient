@@ -94,6 +94,9 @@
     <Compile Include="Form\MenueForm.cs">
       <SubType>Form</SubType>
     </Compile>
+    <Compile Include="Form\OffeneUebersichtForm.cs">
+      <SubType>Form</SubType>
+    </Compile>
     <Compile Include="Form\PersonalForm.cs">
       <SubType>Form</SubType>
     </Compile>

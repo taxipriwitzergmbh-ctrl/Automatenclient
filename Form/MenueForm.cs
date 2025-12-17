@@ -4,6 +4,8 @@ using System.Drawing;
 using System.Drawing.Drawing2D;
 using System.Runtime.InteropServices;
 using System.Windows.Forms;
+using System.Reflection;
+using System.IO;
 
 namespace TaMi_Kassenclient
 {
@@ -18,7 +20,9 @@ namespace TaMi_Kassenclient
         private Button btnRegeln; // neu
         private Button btnPersonal; // neu
         private Button btnZahlungen; // neu
+        private Button btnOffene; // neu
         //private Point _mouseDownLocation;
+        private Label lblBuildInfo; // neu
 
         // Farben analog der anderen Forms
         private static readonly Color Accent = Color.FromArgb(33, 150, 243);
@@ -69,6 +73,8 @@ namespace TaMi_Kassenclient
             this.btnRegeln = new Button();
             this.btnPersonal = new Button();
             this.btnZahlungen = new Button();
+            this.btnOffene = new Button();
+            this.lblBuildInfo = new Label();
 
             this.SuspendLayout();
             
@@ -145,6 +151,11 @@ namespace TaMi_Kassenclient
             this.btnZahlungen.TabIndex = 3;
             this.btnZahlungen.Click += (s, e) => { using (var f = new ZahlungForm()) f.ShowDialog(this); };
 
+            // Neuer Button: Offene Übersicht
+            StylePrimaryButton(this.btnOffene, "Offene Übersicht", new Point(x, y + (h + padY) * 4), new Size(w, h));
+            this.btnOffene.TabIndex = 4;
+            this.btnOffene.Click += (s, e) => { using (var f = new OffeneUebersichtForm()) f.ShowDialog(this); };
+
             // 
             // MenueForm
             // 
@@ -170,8 +181,47 @@ namespace TaMi_Kassenclient
             this.Controls.Add(this.btnRegeln);
             this.Controls.Add(this.btnPersonal);
             this.Controls.Add(this.btnZahlungen);
+            this.Controls.Add(this.btnOffene);
+
+            // Build-Info Label unten dezent
+            try
+            {
+                string version = Application.ProductVersion;
+                string asmPath = Assembly.GetExecutingAssembly().Location;
+                DateTime buildDt;
+                try { buildDt = File.GetLastWriteTime(asmPath); }
+                catch { buildDt = DateTime.Now; }
+                string info = $"Version {version} • Build {buildDt:dd.MM.yyyy HH:mm}";
+
+                lblBuildInfo.AutoSize = true;
+                lblBuildInfo.Text = info;
+                lblBuildInfo.Font = new Font("Segoe UI", 8.5f, FontStyle.Regular);
+                lblBuildInfo.ForeColor = Color.FromArgb(120, 120, 120);
+                lblBuildInfo.BackColor = Color.Transparent;
+                // Unten mittig zentrieren
+                lblBuildInfo.Anchor = AnchorStyles.Bottom; // nur unten verankern, horizontal zentrieren per Resize
+                this.Controls.Add(lblBuildInfo);
+                // Initial positionieren und bei Resize nachziehen
+                this.Resize += (s, e) => PositionBuildInfo();
+                PositionBuildInfo();
+            }
+            catch { }
 
             this.ResumeLayout(false);
+        }
+
+        private void PositionBuildInfo()
+        {
+            try
+            {
+                if (lblBuildInfo == null) return;
+                int x = (this.ClientSize.Width - lblBuildInfo.Width) / 2;
+                int y = this.ClientSize.Height - lblBuildInfo.Height - 8;
+                if (x < 8) x = 8;
+                if (y < 0) y = 0;
+                lblBuildInfo.Location = new Point(x, y);
+            }
+            catch { }
         }
 
         private void StylePrimaryButton(Button b, string text, Point location, Size size)

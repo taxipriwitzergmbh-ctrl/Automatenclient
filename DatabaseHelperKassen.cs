@@ -279,6 +279,21 @@ ORDER BY s.StartZeit DESC;";
             }
         }
 
+        // NEU: Alle offenen Zahlungen für alle Mitarbeiter (mit Namen)
+        public async Task<DataTable> GetAllOffeneAuszahlungenAsync()
+        {
+            await EnsureOpenAsync();
+            using (var cmd = _connection.CreateCommand())
+            {
+                cmd.CommandText = $@"SELECT z.*, (p.Name + ' ' + p.Vorname) AS PersName
+FROM {_tblZahlungen} z WITH (NOLOCK)
+LEFT JOIN {_tblPersonal} p WITH (NOLOCK) ON p.PID = z.PersId
+WHERE (z.Verbucht = 0 OR z.Verbucht IS NULL)
+ORDER BY z.ErfasstAm DESC, z.Belegnummer DESC";
+                using (var rdr = await cmd.ExecuteReaderAsync()) { var dt = new DataTable(); dt.Load(rdr); return dt; }
+            }
+        }
+
         public async Task<int> InsertOffeneZahlungAsync(int persId, string typ, string buchungstext, decimal b19, decimal b7, decimal b0, int? k1 = null, int? k2 = null, int? kto = null, int firmenId = 0)
         {
             await EnsureOpenAsync();
@@ -492,6 +507,64 @@ ORDER BY v.VorlagenName ASC, v.Typ ASC;";
                 cmd.Parameters.AddWithValue("@PersId", persId);
                 var o = await cmd.ExecuteScalarAsync();
                 return (o == null || o == DBNull.Value) ? 0m : Convert.ToDecimal(o);
+            }
+        }
+
+        // NEU: Aktuelle Personalguthaben-Salden (nur != 0) für alle Mitarbeiter
+        public async Task<DataTable> GetAllPersonalGuthabenSaldenAsync()
+        {
+            await EnsureOpenAsync();
+            using (var cmd = _connection.CreateCommand())
+            {
+                cmd.CommandText = $@"
+;WITH x AS (
+    SELECT PersId,
+           SaldoPersonalguthaben AS Saldo,
+           ROW_NUMBER() OVER (PARTITION BY PersId ORDER BY ErfasstAm DESC, Belegnummer DESC) rn
+    FROM {_tblKassenbuch} WITH (NOLOCK)
+    WHERE Typ = '5' AND ISNULL(RevIsOld,0) = 0
+)
+SELECT p.PID,
+       (p.Name + ' ' + p.Vorname) AS PersName,
+       CAST(x.Saldo AS money) AS Saldo
+FROM x
+JOIN {_tblPersonal} p WITH (NOLOCK) ON p.PID = x.PersId
+WHERE x.rn = 1 AND ISNULL(x.Saldo,0) <> 0
+ORDER BY p.Name ASC, p.Vorname ASC;";
+                using (var rdr = await cmd.ExecuteReaderAsync()) { var dt = new DataTable(); dt.Load(rdr); return dt; }
+            }
+        }
+
+        // NEU: Alle offenen Schichten für alle Mitarbeiter
+        public async Task<DataTable> GetAllOpenShiftsAsync()
+        {
+            await EnsureOpenAsync();
+            using (var cmd = _connection.CreateCommand())
+            {
+                cmd.CommandText = $@"
+SELECT 
+    s.SchichtId,
+    s.PersId,
+    s.PersName,
+    s.FhzId,
+    f.Kennzeichen,
+    s.StartZeit,
+    ISNULL(s.EinnahmenBar1,0) - ISNULL(s.EinzahlungFahrer1,0) AS Betrag19,
+    ISNULL(s.EinnahmenBar2,0) - ISNULL(s.EinzahlungFahrer2,0) AS Betrag7,
+    ISNULL(s.EinnahmenBar3,0) - ISNULL(s.EinzahlungFahrer3,0) AS Betrag0,
+    CAST(
+        (ISNULL(s.EinnahmenBar1,0) - ISNULL(s.EinzahlungFahrer1,0)) +
+        (ISNULL(s.EinnahmenBar2,0) - ISNULL(s.EinzahlungFahrer2,0)) +
+        (ISNULL(s.EinnahmenBar3,0) - ISNULL(s.EinzahlungFahrer3,0))
+        AS money) AS OffenerBetrag
+FROM TSchichten s WITH (NOLOCK)
+LEFT JOIN {_tblFahrzeuge} f WITH (NOLOCK) ON f.FID = s.FhzId
+WHERE (s.Flags & 1) = 0 AND (s.Flags & 4) = 0
+ORDER BY s.StartZeit DESC;";
+                using (var rdr = await cmd.ExecuteReaderAsync())
+                {
+                    var dt = new DataTable(); dt.Load(rdr); return dt;
+                }
             }
         }
 
