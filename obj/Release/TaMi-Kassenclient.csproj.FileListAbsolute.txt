@@ -7,4 +7,3 @@ Z:\2. Abteilungsleitung\IT\Programierung\Kassenclient Version 1.0\Version 1.0\ob
 Z:\2. Abteilungsleitung\IT\Programierung\Kassenclient Version 1.0\Version 1.0\obj\Release\TaMi-Kassenclient.csproj.CoreCompileInputs.cache
 Z:\2. Abteilungsleitung\IT\Programierung\Kassenclient Version 1.0\Version 1.0\obj\Release\TaMi-Kassenclient.exe
 Z:\2. Abteilungsleitung\IT\Programierung\Kassenclient Version 1.0\Version 1.0\obj\Release\TaMi-Kassenclient.pdb
-Z:\2. Abteilungsleitung\IT\Programierung\Kassenclient Version 1.0\Version 1.0\obj\Release\TaMi-Kassenclient.exe.config

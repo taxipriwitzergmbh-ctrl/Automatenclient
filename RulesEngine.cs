@@ -242,39 +242,52 @@ namespace TaMi_Kassenclient
 
         public static async Task<List<AbrechnungsRegel>> LoadRulesAsync()
         {
-            using (var db = new DatabaseHelperKassen())
+            try
             {
-                var dt = await db.LoadAbrechnungsRegelnAsync();
-                var list = new List<AbrechnungsRegel>();
-                foreach (DataRow r in dt.Rows)
+                using (var db = new DatabaseHelperKassen())
                 {
-                    var model = new AbrechnungsRegel
+                    var dt = await db.LoadAbrechnungsRegelnAsync();
+                    var list = new List<AbrechnungsRegel>();
+                    if (dt != null)
                     {
-                        Id = Convert.ToInt32(r["Id"]),
-                        Name = r["Name"] as string,
-                        JoinKind = r["JoinKind"] as string,
-                        IsDefault = r["IsDefault"] != DBNull.Value && Convert.ToBoolean(r["IsDefault"]),
-                        Priority = r["Priority"] == DBNull.Value ? 100 : Convert.ToInt32(r["Priority"]),
-                        ManId = null,
-                        FhzIds = null,
-                        PersId = null,
-                        ResultKost1 = r["ResultKost1"] == DBNull.Value ? (int?)null : Convert.ToInt32(r["ResultKost1"]),
-                        ResultKost2 = r["ResultKost2"] == DBNull.Value ? (int?)null : Convert.ToInt32(r["ResultKost2"]),
-                        ResultKonto = r["ResultKonto"] == DBNull.Value ? (int?)null : Convert.ToInt32(r["ResultKonto"]),
-                        ResultBuchungstext = r["ResultText"] as string,
-                        IsActive = r.Table.Columns.Contains("IsActive") && r["IsActive"] != DBNull.Value ? Convert.ToBoolean(r["IsActive"]) : true,
-                        Clauses = new List<AbrechnungsClause>()
-                    };
-                    list.Add(model);
+                        foreach (DataRow r in dt.Rows)
+                        {
+                            if (r == null) continue;
+                            var model = new AbrechnungsRegel
+                            {
+                                Id = Convert.ToInt32(r["Id"]),
+                                Name = r["Name"] as string,
+                                JoinKind = r["JoinKind"] as string,
+                                IsDefault = r["IsDefault"] != DBNull.Value && Convert.ToBoolean(r["IsDefault"]),
+                                Priority = r["Priority"] == DBNull.Value ? 100 : Convert.ToInt32(r["Priority"]),
+                                ManId = null,
+                                FhzIds = null,
+                                PersId = null,
+                                ResultKost1 = r["ResultKost1"] == DBNull.Value ? (int?)null : Convert.ToInt32(r["ResultKost1"]),
+                                ResultKost2 = r["ResultKost2"] == DBNull.Value ? (int?)null : Convert.ToInt32(r["ResultKost2"]),
+                                ResultKonto = r["ResultKonto"] == DBNull.Value ? (int?)null : Convert.ToInt32(r["ResultKonto"]),
+                                ResultBuchungstext = r["ResultText"] as string,
+                                IsActive = r.Table.Columns.Contains("IsActive") && r["IsActive"] != DBNull.Value ? Convert.ToBoolean(r["IsActive"]) : true,
+                                Clauses = new List<AbrechnungsClause>()
+                            };
+                            list.Add(model);
+                        }
+                    }
+
+                    await TryLoadClausesAsync(list, db);
+
+                    return list
+                        .Where(r => r != null)
+                        .OrderBy(r => r.IsDefault ? 1 : 0)
+                        .ThenBy(r => r.Priority)
+                        .ThenBy(r => r.Id)
+                        .ToList();
                 }
-
-                await TryLoadClausesAsync(list, db);
-
-                return list
-                    .OrderBy(r => r.IsDefault ? 1 : 0)
-                    .ThenBy(r => r.Priority)
-                    .ThenBy(r => r.Id)
-                    .ToList();
+            }
+            catch (Exception ex)
+            {
+                try { System.Diagnostics.Trace.WriteLine("[Rules] LoadRulesAsync error: " + ex.Message); } catch { }
+                return new List<AbrechnungsRegel>();
             }
         }
 
@@ -283,6 +296,7 @@ namespace TaMi_Kassenclient
             try
             {
                 var dt = await db.LoadAbrechnungsClausesAsync();
+                if (dt == null) return;
                 var lookup = rules.ToDictionary(r => r.Id, r => r);
                 foreach (DataRow r in dt.Rows)
                 {
