@@ -7,6 +7,7 @@ using System.Drawing.Drawing2D;
 using System.Threading.Tasks;
 using System.Collections.Generic;
 using System.Globalization;
+using System.ComponentModel;
 
 namespace TaMi_Kassenclient
 {
@@ -76,9 +77,14 @@ namespace TaMi_Kassenclient
         // Aktionen für offene Zahlungen
         private Button btnEditPayment;
         private Button btnDeletePayment;
+        private bool _rightBuilt = false;
 
         [DllImport("gdi32.dll", SetLastError = true)]
         private static extern IntPtr CreateRoundRectRgn(int nLeftRect, int nTopRect, int nRightRect, int nBottomRect, int nWidthEllipse, int nHeightEllipse);
+
+        [DllImport("user32.dll")]
+        private static extern IntPtr SendMessage(IntPtr hWnd, int msg, IntPtr wParam, IntPtr lParam);
+        private const int WM_SETREDRAW = 0x000B;
 
         private bool _firstShown = true; // Erstes Anzeigen kontrollieren
 
@@ -87,8 +93,9 @@ namespace TaMi_Kassenclient
             get
             {
                 var cp = base.CreateParams;
-                // WS_EX_COMPOSITED: 0x02000000 -> reduziert Flackern durch Compositing
-                cp.ExStyle |= 0x02000000;
+                // Aktivieren: WS_EX_COMPOSITED (0x02000000) für flackerfreies, nicht schemenhaftes Aufbauen
+                // Hinweis: Kann bei extrem großen Formularen die Renderzeit erhöhen, verbessert aber den Ersteindruck.
+                try { cp.ExStyle |= 0x02000000; } catch { }
                 return cp;
             }
         }
@@ -96,9 +103,8 @@ namespace TaMi_Kassenclient
         public PersonalForm()
         {
             this.Icon = Program.AppIcon;
-
-            // Erst unsichtbar, um "unsauberes" Aufbauen zu vermeiden
-            try { Opacity = 0; } catch { }
+            // Stutter minimieren: DoubleBuffering-Styles direkt aktivieren
+            try { SetStyle(ControlStyles.AllPaintingInWmPaint | ControlStyles.OptimizedDoubleBuffer | ControlStyles.UserPaint | ControlStyles.ResizeRedraw, true); UpdateStyles(); } catch { }
             BuildUI();
         }
 
@@ -159,66 +165,85 @@ namespace TaMi_Kassenclient
                 // Rundung später in OnShown setzen (vermeidet schwarzes Flackern beim Erzeugen)
                 // try { Region = Region.FromHrgn(CreateRoundRectRgn(0, 0, Width, Height, 20, 20)); } catch { }
 
-                // Linke Seite: strukturierte Gruppen
+                // Linke Seite: strukturierte Gruppen (schnell)
                 BuildLeftGroups();
 
-                // Rechte Seite: Gruppen ganz nach oben unter Header
-                int rightTop = headerPanel.Bottom + 12;
-                grpOpenShifts = new GroupBox { Text = "Offene Schichten", Location = new Point(540, rightTop), Size = new Size(ClientSize.Width - 564, 300), Anchor = AnchorStyles.Top | AnchorStyles.Left | AnchorStyles.Right };
-                grpOpenShifts.SuspendLayout();
-                gvOpenShifts = new DataGridView { Location = new Point(10, 24), Size = new Size(grpOpenShifts.Width - 20, grpOpenShifts.Height - 34), ReadOnly = true, AllowUserToAddRows = false, AllowUserToDeleteRows = false, AutoSizeColumnsMode = DataGridViewAutoSizeColumnsMode.Fill, Anchor = AnchorStyles.Top | AnchorStyles.Left | AnchorStyles.Right };
-                StyleGrid(gvOpenShifts); EnableDgvDoubleBuffer(gvOpenShifts);
-                grpOpenShifts.Controls.Add(gvOpenShifts);
-                grpOpenShifts.ResumeLayout();
-                Controls.Add(grpOpenShifts);
+                // Rechte Seite wird in OnShown aufgebaut, wenn der Handle erstellt ist
 
-                grpOpenPayments = new GroupBox { Text = "Offene Zahlungen", Location = new Point(540, grpOpenShifts.Bottom + 12), Size = new Size(ClientSize.Width - 564, 280), Anchor = AnchorStyles.Top | AnchorStyles.Left | AnchorStyles.Right };
-                grpOpenPayments.SuspendLayout();
-                gvOpenPayments = new DataGridView { Location = new Point(10, 24), Size = new Size(grpOpenPayments.Width - 20, grpOpenPayments.Height - 34), ReadOnly = true, AllowUserToAddRows = false, AllowUserToDeleteRows = false, AutoSizeColumnsMode = DataGridViewAutoSizeColumnsMode.Fill, Anchor = AnchorStyles.Top | AnchorStyles.Left | AnchorStyles.Right, SelectionMode = DataGridViewSelectionMode.FullRowSelect, MultiSelect = false, BackgroundColor = Color.White, BorderStyle = BorderStyle.FixedSingle };
-                StyleGrid(gvOpenPayments); EnableDgvDoubleBuffer(gvOpenPayments);
-                // Auswahl wie in ZahlungForm: komplette Zeile in Blau
-                gvOpenPayments.DefaultCellStyle.SelectionBackColor = Color.FromArgb(33,150,243);
-                gvOpenPayments.DefaultCellStyle.SelectionForeColor = Color.White;
-                gvOpenPayments.AlternatingRowsDefaultCellStyle.SelectionBackColor = Color.FromArgb(33,150,243);
-                gvOpenPayments.AlternatingRowsDefaultCellStyle.SelectionForeColor = Color.White;
-                gvOpenPayments.SelectionChanged += GvOpenPayments_SelectionChanged;
-                gvOpenPayments.CellDoubleClick += (s, e) => LoadSelectedPaymentIntoFields();
-                grpOpenPayments.Controls.Add(gvOpenPayments);
-                grpOpenPayments.ResumeLayout();
-                Controls.Add(grpOpenPayments);
-
-                // Edit/Löschen Buttons unter dem Grid für Offene Zahlungen
-                btnEditPayment = new Button { Text = "Auswahl ändern", Location = new Point(540, 0), Size = new Size(140, 28), BackColor = Color.FromArgb(3,155,229), ForeColor = Color.White, FlatStyle = FlatStyle.Flat };
-                btnEditPayment.FlatAppearance.BorderSize = 0; btnEditPayment.Click += async (s, e) => await EditSelectedPaymentAsync();
-                btnDeletePayment = new Button { Text = "Auswahl löschen", Location = new Point(688, 0), Size = new Size(140, 28), BackColor = Color.FromArgb(229,57,53), ForeColor = Color.White, FlatStyle = FlatStyle.Flat };
-                btnDeletePayment.FlatAppearance.BorderSize = 0; btnDeletePayment.Click += async (s, e) => await DeleteSelectedPaymentAsync();
-                btnEditPayment.Enabled = false;
-                btnDeletePayment.Enabled = false;
-                Controls.Add(btnEditPayment);
-                Controls.Add(btnDeletePayment);
-
-                // NEU: Personalguthaben-Verlauf unter den Buttons
-                grpGuthabenHistory = new GroupBox { Text = "Personalguthaben – Verlauf", Location = new Point(540, grpOpenPayments.Bottom + 48), Size = new Size(ClientSize.Width - 564, 280), Anchor = AnchorStyles.Top | AnchorStyles.Left | AnchorStyles.Right };
-                grpGuthabenHistory.SuspendLayout();
-                gvGuthabenHistory = new DataGridView { Location = new Point(10, 24), Size = new Size(grpGuthabenHistory.Width - 20, grpGuthabenHistory.Height - 34), ReadOnly = true, AllowUserToAddRows = false, AllowUserToDeleteRows = false, AutoSizeColumnsMode = DataGridViewAutoSizeColumnsMode.None, Anchor = AnchorStyles.Top | AnchorStyles.Left | AnchorStyles.Right };
-                StyleGrid(gvGuthabenHistory); EnableDgvDoubleBuffer(gvGuthabenHistory);
-                grpGuthabenHistory.Controls.Add(gvGuthabenHistory);
-                grpGuthabenHistory.ResumeLayout();
-                Controls.Add(grpGuthabenHistory);
-
-                // Saldo-Label rechts oben neben dem Verlauf
-                lblSaldoAktuell = new Label { AutoSize = true, Text = "Saldo: 0,00 €", Font = new Font("Segoe UI", 10F, FontStyle.Bold), ForeColor = Color.FromArgb(33,37,41), Location = new Point(grpGuthabenHistory.Left + 200, grpGuthabenHistory.Top - 18), Anchor = AnchorStyles.Top | AnchorStyles.Right };
-                Controls.Add(lblSaldoAktuell);
-
-                // Rekursiv DoubleBuffer aktivieren
-                EnableDoubleBuffer(this);
+                // Nur gezielt DoubleBuffering auf Grids (oben aktiviert) – keine rekursive Aktivierung auf allen Controls,
+                // das beschleunigt das erste Anzeigen.
 
                 // Typen initial laden (parallel)
-                _ = LoadActivePersonalAsync();
+                // Mitarbeiterliste wird erst nach dem Anzeigen geladen (siehe OnShown)
                 _ = LoadAccountingPresetsAsync();
                 _ = LoadMandantenAsync();
             }
             finally { ResumeLayout(true); }
+        }
+
+        private void BuildRightGroups()
+        {
+            // Rechte Seite: Gruppen ganz nach oben unter Header
+            int rightTop = headerPanel.Bottom + 12;
+            grpOpenShifts = new GroupBox { Text = "Offene Schichten", Location = new Point(540, rightTop), Size = new Size(ClientSize.Width - 564, 300), Anchor = AnchorStyles.Top | AnchorStyles.Left | AnchorStyles.Right };
+            grpOpenShifts.SuspendLayout();
+            gvOpenShifts = new DataGridView { Location = new Point(10, 24), Size = new Size(grpOpenShifts.Width - 20, grpOpenShifts.Height - 34), ReadOnly = true, AllowUserToAddRows = false, AllowUserToDeleteRows = false, AutoSizeColumnsMode = DataGridViewAutoSizeColumnsMode.Fill, Anchor = AnchorStyles.Top | AnchorStyles.Left | AnchorStyles.Right };
+            StyleGrid(gvOpenShifts); EnableDgvDoubleBuffer(gvOpenShifts);
+            grpOpenShifts.Controls.Add(gvOpenShifts);
+            grpOpenShifts.ResumeLayout();
+            Controls.Add(grpOpenShifts);
+
+            grpOpenPayments = new GroupBox { Text = "Offene Zahlungen", Location = new Point(540, grpOpenShifts.Bottom + 12), Size = new Size(ClientSize.Width - 564, 280), Anchor = AnchorStyles.Top | AnchorStyles.Left | AnchorStyles.Right };
+            grpOpenPayments.SuspendLayout();
+            gvOpenPayments = new DataGridView { Location = new Point(10, 24), Size = new Size(grpOpenPayments.Width - 20, grpOpenPayments.Height - 34), ReadOnly = true, AllowUserToAddRows = false, AllowUserToDeleteRows = false, AutoSizeColumnsMode = DataGridViewAutoSizeColumnsMode.Fill, Anchor = AnchorStyles.Top | AnchorStyles.Left | AnchorStyles.Right, SelectionMode = DataGridViewSelectionMode.FullRowSelect, MultiSelect = false, BackgroundColor = Color.White, BorderStyle = BorderStyle.FixedSingle };
+            StyleGrid(gvOpenPayments); EnableDgvDoubleBuffer(gvOpenPayments);
+            // Auswahl wie in ZahlungForm: komplette Zeile in Blau
+            gvOpenPayments.DefaultCellStyle.SelectionBackColor = Color.FromArgb(33,150,243);
+            gvOpenPayments.DefaultCellStyle.SelectionForeColor = Color.White;
+            gvOpenPayments.AlternatingRowsDefaultCellStyle.SelectionBackColor = Color.FromArgb(33,150,243);
+            gvOpenPayments.AlternatingRowsDefaultCellStyle.SelectionForeColor = Color.White;
+            gvOpenPayments.SelectionChanged += GvOpenPayments_SelectionChanged;
+            gvOpenPayments.CellDoubleClick += (s, e) => LoadSelectedPaymentIntoFields();
+            grpOpenPayments.Controls.Add(gvOpenPayments);
+            grpOpenPayments.ResumeLayout();
+            Controls.Add(grpOpenPayments);
+
+            // Edit/Löschen Buttons unter dem Grid für Offene Zahlungen
+            btnEditPayment = new Button { Text = "Auswahl ändern", Location = new Point(540, 0), Size = new Size(140, 28), BackColor = Color.FromArgb(3,155,229), ForeColor = Color.White, FlatStyle = FlatStyle.Flat };
+            btnEditPayment.FlatAppearance.BorderSize = 0; btnEditPayment.Click += async (s, e) => await EditSelectedPaymentAsync();
+            btnDeletePayment = new Button { Text = "Auswahl löschen", Location = new Point(688, 0), Size = new Size(140, 28), BackColor = Color.FromArgb(229,57,53), ForeColor = Color.White, FlatStyle = FlatStyle.Flat };
+            btnDeletePayment.FlatAppearance.BorderSize = 0; btnDeletePayment.Click += async (s, e) => await DeleteSelectedPaymentAsync();
+            btnEditPayment.Enabled = false;
+            btnDeletePayment.Enabled = false;
+            Controls.Add(btnEditPayment);
+            Controls.Add(btnDeletePayment);
+
+            // NEU: Personalguthaben-Verlauf unter den Buttons
+            grpGuthabenHistory = new GroupBox { Text = "Personalguthaben – Verlauf", Location = new Point(540, grpOpenPayments.Bottom + 48), Size = new Size(ClientSize.Width - 564, 280), Anchor = AnchorStyles.Top | AnchorStyles.Left | AnchorStyles.Right };
+            grpGuthabenHistory.SuspendLayout();
+            gvGuthabenHistory = new DataGridView { Location = new Point(10, 24), Size = new Size(grpGuthabenHistory.Width - 20, grpGuthabenHistory.Height - 34), ReadOnly = true, AllowUserToAddRows = false, AllowUserToDeleteRows = false, AutoSizeColumnsMode = DataGridViewAutoSizeColumnsMode.None, Anchor = AnchorStyles.Top | AnchorStyles.Left | AnchorStyles.Right };
+            StyleGrid(gvGuthabenHistory); EnableDgvDoubleBuffer(gvGuthabenHistory);
+            grpGuthabenHistory.Controls.Add(gvGuthabenHistory);
+            grpGuthabenHistory.ResumeLayout();
+            Controls.Add(grpGuthabenHistory);
+
+            // Saldo-Label rechts oben neben dem Verlauf
+            lblSaldoAktuell = new Label { AutoSize = true, Text = "Saldo: 0,00 €", Font = new Font("Segoe UI", 10F, FontStyle.Bold), ForeColor = Color.FromArgb(33,37,41), Location = new Point(grpGuthabenHistory.Left + 200, grpGuthabenHistory.Top - 18), Anchor = AnchorStyles.Top | AnchorStyles.Right };
+            Controls.Add(lblSaldoAktuell);
+        }
+
+        // Baut die rechten Gruppen nach dem Anzeigen auf (nicht blockierend)
+        private async void EnsureRightGroupsBuiltAsync()
+        {
+            if (_rightBuilt)
+            {
+                OnShown_InitialLayout(EventArgs.Empty);
+                return;
+            }
+            _rightBuilt = true;
+            try { await System.Threading.Tasks.Task.Yield(); } catch { }
+            try { BuildRightGroups(); } catch { }
+            OnShown_InitialLayout(EventArgs.Empty);
         }
 
         // Inkrementelle Mehrzeichen-Suche für cboPerson
@@ -287,9 +312,8 @@ namespace TaMi_Kassenclient
                 if (_firstShown)
                 {
                     _firstShown = false;
-                    // Jetzt erst die abgerundete Region setzen und Form einblenden
-                    try { Region = Region.FromHrgn(CreateRoundRectRgn(0, 0, Width, Height, 20, 20)); } catch { }
-                    try { Opacity = 1; } catch { }
+                    // Keine runde Region setzen (kostet bei großem Fenster Renderzeit)
+                    // Opacity bleibt unverändert; kein künstliches Aus-/Einblenden mehr
                 }
             }
             catch { }
@@ -311,6 +335,7 @@ namespace TaMi_Kassenclient
                 grpMitarbeiter.Location = new Point(16, headerBottom + 12);
                 grpMitarbeiter.Size = new Size(500, 150);
                 if (!Controls.Contains(grpMitarbeiter)) Controls.Add(grpMitarbeiter);
+                grpMitarbeiter.SuspendLayout();
 
                 startY = 24;
                 var lblPid = new Label { Text = "Personalnummer:", Location = new Point(12, startY + 6), AutoSize = true, Width = labelW };
@@ -327,6 +352,16 @@ namespace TaMi_Kassenclient
                 grpMitarbeiter.Controls.Add(lblDrop);
                 cboPerson = new ComboBox { Location = new Point(fieldX, startY), Width = 280, DropDownStyle = ComboBoxStyle.DropDownList, Font = new Font("Segoe UI", 10.5F) };
                 grpMitarbeiter.Controls.Add(cboPerson);
+                // Platzhalter anzeigen und zunächst deaktivieren
+                try
+                {
+                    cboPerson.DataSource = null;
+                    cboPerson.Items.Clear();
+                    cboPerson.Items.Add("— Mitarbeiter werden geladen … —");
+                    cboPerson.SelectedIndex = 0;
+                    cboPerson.Enabled = false;
+                }
+                catch { }
                 cboPerson.SelectedIndexChanged += async (s, e) =>
                 {
                     if (_suppressEvents) return;
@@ -338,6 +373,8 @@ namespace TaMi_Kassenclient
                 };
                 // NEU: KeyPress Handler für Mehrzeichen-Suche
                 cboPerson.KeyPress += CboPerson_KeyPress;
+                grpMitarbeiter.ResumeLayout(false);
+                grpMitarbeiter.PerformLayout();
 
                 // Gruppe Stammdaten
                 if (grpStammdaten == null)
@@ -345,6 +382,7 @@ namespace TaMi_Kassenclient
                 grpStammdaten.Location = new Point(16, grpMitarbeiter.Bottom + 10);
                 grpStammdaten.Size = new Size(500, 250);
                 if (!Controls.Contains(grpStammdaten)) Controls.Add(grpStammdaten);
+                grpStammdaten.SuspendLayout();
 
                 startY = 24;
                 var lblNameCaption = new Label { Text = "Name:", Location = new Point(12, startY + 6), AutoSize = true, Width = labelW };
@@ -395,16 +433,28 @@ namespace TaMi_Kassenclient
                 btnSave.Click += async (s,e) => await SaveAsync();
                 grpStammdaten.Controls.Add(btnSave);
                 grpStammdaten.Resize += (s,e)=> { if(btnSave!=null) btnSave.Left = (grpStammdaten.ClientSize.Width - btnSave.Width)/2; };
+                grpStammdaten.ResumeLayout(false);
+                grpStammdaten.PerformLayout();
 
                 // Neue Zahlung (schmal, keine Überlappung rechts)
                 grpNewPayment = new GroupBox { Text = "Neue Zahlung", Location = new Point(16, grpStammdaten.Bottom + 12), Size = new Size(500, 250) };
                 Controls.Add(grpNewPayment);
+                grpNewPayment.SuspendLayout();
 
                 int nzY = 26;
                 var lblVorlage = new Label { Text = "Vorlage:", Location = new Point(12, nzY + 3), AutoSize = true };
                 cboPreset = new ComboBox { Location = new Point(120, nzY), Width = 220, DropDownStyle = ComboBoxStyle.DropDownList };
                 grpNewPayment.Controls.Add(lblVorlage); grpNewPayment.Controls.Add(cboPreset);
                 cboPreset.SelectedIndexChanged += (s, e) => ApplyPresetToFields();
+                // Preset-Placeholder
+                try
+                {
+                    cboPreset.Items.Clear();
+                    cboPreset.Items.Add("— Vorlagen werden geladen … —");
+                    cboPreset.SelectedIndex = 0;
+                    cboPreset.Enabled = false;
+                }
+                catch { }
 
                 // Button 'Vorlage anlegen' rechts neben Vorlage-Dropdown platzieren
                 btnCreatePreset = new Button { Text = "Vorlage anlegen", Location = new Point(120 + 220 + 8, nzY - 1), Size = new Size(120, 26), BackColor = Color.FromArgb(3, 155, 229), ForeColor = Color.White, FlatStyle = FlatStyle.Flat };
@@ -416,6 +466,15 @@ namespace TaMi_Kassenclient
                 var lblMandant = new Label { Text = "Kasse:", Location = new Point(12, nzY + 3), AutoSize = true };
                 cboMandant = new ComboBox { Location = new Point(120, nzY), Width = 220, DropDownStyle = ComboBoxStyle.DropDownList };
                 grpNewPayment.Controls.Add(lblMandant); grpNewPayment.Controls.Add(cboMandant);
+                // Mandanten-Placeholder
+                try
+                {
+                    cboMandant.Items.Clear();
+                    cboMandant.Items.Add("— Kassen werden geladen … —");
+                    cboMandant.SelectedIndex = 0;
+                    cboMandant.Enabled = false;
+                }
+                catch { }
 
                 nzY += 30;
                 var lblTyp = new Label { Text = "Typ:", Location = new Point(12, nzY + 3), AutoSize = true };
@@ -461,6 +520,8 @@ namespace TaMi_Kassenclient
                 nudNew19 = new NumericUpDown { Visible = false }; // intern
                 nudNew7 = new NumericUpDown { Visible = false };
                 nudNew0 = new NumericUpDown { Visible = false };
+                grpNewPayment.ResumeLayout(false);
+                grpNewPayment.PerformLayout();
             }
             catch (Exception)
             {
@@ -491,6 +552,7 @@ namespace TaMi_Kassenclient
         {
             try
             {
+                try { SendMessage(this.Handle, WM_SETREDRAW, (IntPtr)0, IntPtr.Zero); } catch { }
                 using (var db = new DatabaseHelperKassen())
                 {
                     var dt = await db.GetMandantenAsync();
@@ -504,16 +566,49 @@ namespace TaMi_Kassenclient
                     cboMandant.DataSource = dt;
                     // Default blank selected
                     if (cboMandant.Items.Count > 0) cboMandant.SelectedIndex = 0;
+                    cboMandant.Enabled = true;
                 }
             }
-            catch { }
-            finally { _suppressEvents = false; }
+            catch
+            {
+                try
+                {
+                    _suppressEvents = true;
+                    cboMandant.DataSource = null;
+                    cboMandant.Items.Clear();
+                    cboMandant.Items.Add("— Laden fehlgeschlagen —");
+                    cboMandant.SelectedIndex = 0;
+                    cboMandant.Enabled = true;
+                }
+                catch { }
+            }
+            finally
+            {
+                _suppressEvents = false;
+                try { SendMessage(this.Handle, WM_SETREDRAW, (IntPtr)1, IntPtr.Zero); this.Invalidate(true); this.Update(); } catch { }
+            }
         }
 
         protected override void OnShown(EventArgs e)
         {
             base.OnShown(e);
-            OnShown_InitialLayout(e);
+            // Rechte Seite in "Scheiben" aufbauen, damit UI sofort reagiert
+            EnsureRightGroupsBuiltAsync();
+
+            // Mitarbeiterliste erst nach dem ersten Render laden
+            try
+            {
+                BeginInvoke(new Action(async () => { try { await LoadActivePersonalAsync(); } catch { } }));
+            }
+            catch { }
+
+            // Presets und Mandanten ebenfalls nach dem Render laden
+            try
+            {
+                BeginInvoke(new Action(async () => { try { await LoadAccountingPresetsAsync(); } catch { } }));
+                BeginInvoke(new Action(async () => { try { await LoadMandantenAsync(); } catch { } }));
+            }
+            catch { }
         }
 
         private async void ShowPresetOverlay()
@@ -731,6 +826,13 @@ namespace TaMi_Kassenclient
             { MessageBox.Show(this, "Bitte gültige Personalnummer eingeben.", "Hinweis", MessageBoxButtons.OK, MessageBoxIcon.Information); return; }
             using (var db = new DatabaseHelperKassen())
             {
+                // Rechte Seite erst jetzt aufbauen (on-demand), damit der Start schneller ist
+                if (!_rightBuilt)
+                {
+                    try { BuildRightGroups(); } catch { }
+                    _rightBuilt = true;
+                    OnShown_InitialLayout(EventArgs.Empty);
+                }
                 var p = await db.GetPersonalInfoAsync(pid);
                 if (p == null) { MessageBox.Show(this, "Personalnummer nicht gefunden.", "Hinweis", MessageBoxButtons.OK, MessageBoxIcon.Information); return; }
                 
@@ -906,9 +1008,77 @@ namespace TaMi_Kassenclient
         { if (e.KeyChar=='\r' || e.KeyChar=='\n') { e.Handled = true; } }
         private class ComboItem { public string Text { get; set; } public DataRow Row { get; set; } public override string ToString()=>Text; }
         private async Task LoadActivePersonalAsync()
-        { try{ using(var db=new DatabaseHelperKassen()){ var dt=await db.GetActivePersonalAsync(); _suppressEvents=true; cboPerson.DisplayMember="Name"; cboPerson.ValueMember="PID"; cboPerson.DataSource=dt; cboPerson.SelectedIndex=-1; } } catch {} finally { _suppressEvents=false; } }
+        {
+            try
+            {
+                // Zeichnen temporär aus, um schemenhaftes Aufbauen zu vermeiden
+                try { SendMessage(this.Handle, WM_SETREDRAW, (IntPtr)0, IntPtr.Zero); } catch { }
+                using (var db = new DatabaseHelperKassen())
+                {
+                    var dt = await db.GetActivePersonalAsync();
+                    _suppressEvents = true;
+                    cboPerson.DisplayMember = "Name";
+                    cboPerson.ValueMember = "PID";
+                    cboPerson.DataSource = dt;
+                    cboPerson.SelectedIndex = -1;
+                    cboPerson.Enabled = true;
+                }
+            }
+            catch
+            {
+                try
+                {
+                    _suppressEvents = true;
+                    cboPerson.DataSource = null;
+                    cboPerson.Items.Clear();
+                    cboPerson.Items.Add("— Laden fehlgeschlagen —");
+                    cboPerson.SelectedIndex = 0;
+                    cboPerson.Enabled = true;
+                }
+                catch { }
+            }
+            finally
+            {
+                _suppressEvents = false;
+                try { SendMessage(this.Handle, WM_SETREDRAW, (IntPtr)1, IntPtr.Zero); this.Invalidate(true); this.Update(); } catch { }
+            }
+        }
         private async Task LoadAccountingPresetsAsync()
-        { try{ using(var db=new DatabaseHelperKassen()){ var dt=await db.LoadZahlungsVorlagenAsync(); cboPreset.Items.Clear(); cboPreset.Items.Add(new ComboItem{Text="Vorlage auswählen",Row=null}); foreach(DataRow r in dt.Rows){ string name=Convert.ToString(r["VorlagenName"]); if(string.IsNullOrWhiteSpace(name)) continue; cboPreset.Items.Add(new ComboItem{Text=name,Row=r}); } if(cboPreset.Items.Count>0) cboPreset.SelectedIndex=0; } } catch {} }
+        {
+            try
+            {
+                try { SendMessage(this.Handle, WM_SETREDRAW, (IntPtr)0, IntPtr.Zero); } catch { }
+                using (var db = new DatabaseHelperKassen())
+                {
+                    var dt = await db.LoadZahlungsVorlagenAsync();
+                    cboPreset.Items.Clear();
+                    cboPreset.Items.Add(new ComboItem { Text = "Vorlage auswählen", Row = null });
+                    foreach (DataRow r in dt.Rows)
+                    {
+                        string name = Convert.ToString(r["VorlagenName"]);
+                        if (string.IsNullOrWhiteSpace(name)) continue;
+                        cboPreset.Items.Add(new ComboItem { Text = name, Row = r });
+                    }
+                    if (cboPreset.Items.Count > 0) cboPreset.SelectedIndex = 0;
+                    cboPreset.Enabled = true;
+                }
+            }
+            catch
+            {
+                try
+                {
+                    cboPreset.Items.Clear();
+                    cboPreset.Items.Add("— Laden fehlgeschlagen —");
+                    cboPreset.SelectedIndex = 0;
+                    cboPreset.Enabled = true;
+                }
+                catch { }
+            }
+            finally
+            {
+                try { SendMessage(this.Handle, WM_SETREDRAW, (IntPtr)1, IntPtr.Zero); this.Invalidate(true); this.Update(); } catch { }
+            }
+        }
         private void ApplyPresetToFields()
         { 
             if(!(cboPreset.SelectedItem is ComboItem ci) || ci.Row==null) return; 
