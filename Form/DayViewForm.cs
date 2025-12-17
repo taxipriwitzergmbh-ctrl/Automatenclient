@@ -229,23 +229,27 @@ namespace TaMi_Kassenclient
                 Anchor = AnchorStyles.Top | AnchorStyles.Bottom | AnchorStyles.Left | AnchorStyles.Right,
                 Font = new Font("Segoe UI Variable", 12F, FontStyle.Regular)
             };
-            // Neue erste Spalte: Nr.
-            lvEintraege.Columns.Add("Nr.", 160, HorizontalAlignment.Left);
-            lvEintraege.Columns.Add("Zeit", 180, HorizontalAlignment.Left);
-            lvEintraege.Columns.Add("Typ", 180, HorizontalAlignment.Left);
-            lvEintraege.Columns.Add("Buchungstext", 500, HorizontalAlignment.Left);
-            lvEintraege.Columns.Add("Betrag", 180, HorizontalAlignment.Right);
-            lvEintraege.Columns.Add("MwSt", 80, HorizontalAlignment.Center);
-            lvEintraege.Columns.Add("Kost1", 100, HorizontalAlignment.Left);
-            lvEintraege.Columns.Add("Kost2", 100, HorizontalAlignment.Left);
-            lvEintraege.Columns.Add("Konto", 120, HorizontalAlignment.Left);
+            // Neue erste Spalte: Nr. (Standardbreiten angepasst)
+            lvEintraege.Columns.Add("Nr.", 76, HorizontalAlignment.Left);
+            lvEintraege.Columns.Add("Zeit", 144, HorizontalAlignment.Left);
+            lvEintraege.Columns.Add("Typ", 171, HorizontalAlignment.Left);
+            lvEintraege.Columns.Add("Buchungstext", 708, HorizontalAlignment.Left);
+            lvEintraege.Columns.Add("Betrag", 94, HorizontalAlignment.Right);
+            lvEintraege.Columns.Add("MwSt", 74, HorizontalAlignment.Center);
+            lvEintraege.Columns.Add("Kost1", 57, HorizontalAlignment.Left);
+            lvEintraege.Columns.Add("Kost2", 61, HorizontalAlignment.Left);
+            lvEintraege.Columns.Add("Konto", 82, HorizontalAlignment.Left);
             lvEintraege.Columns.Add("Kassenbestand", 180, HorizontalAlignment.Right);
             lvEintraege.DoubleClick += LvEintraege_DoubleClick;
+            // Spaltenbreiten aus INI laden
+            TryLoadColumnWidths();
             Controls.Add(lvEintraege);
 
             InitializeFooter();
 
             Shown += async (s, e) => await RefreshDayAsync();
+            // Beim Schließen speichern
+            FormClosing += (s, e) => TrySaveColumnWidths();
         }
 
         private void InitializeFooter()
@@ -517,6 +521,98 @@ namespace TaMi_Kassenclient
                 MessageBox.Show(this, $"Fehler beim Laden der Bestände/Buchungen:\r\n{ex.Message}", "Fehler",
                     MessageBoxButtons.OK, MessageBoxIcon.Error);
             }
+            // nach dem Laden sicherstellen, dass benutzerdefinierte Breiten nicht überschrieben werden
+            TryApplyColumnWidths();
+        }
+
+        // === INI Persistenz für Spaltenbreiten ===
+        private string GetIniPath()
+        {
+            try
+            {
+                // bevorzugt gemeinsame INI des Systems
+                var path = AppSettings.IniPath;
+                if (!string.IsNullOrWhiteSpace(path) && File.Exists(path)) return path;
+            }
+            catch { }
+            // Fallback: lokale INI neben EXE
+            try
+            {
+                var exe = Application.ExecutablePath;
+                var dir = Path.GetDirectoryName(exe);
+                var ini = Path.Combine(dir ?? ".", "TaMi-Kassenclient.ini");
+                return ini;
+            }
+            catch { return "TaMi-Kassenclient.ini"; }
+        }
+
+        private string GetIniSectionKey()
+        {
+            // Schlüssel pro Kasse und TagView
+            return $"DayViewForm.Columns.{_firmenId}.{_automatenName}";
+        }
+
+        private void TryLoadColumnWidths()
+        {
+            try
+            {
+                var ini = GetIniPath();
+                if (!File.Exists(ini)) return;
+                var key = GetIniSectionKey();
+                var lines = File.ReadAllLines(ini);
+                foreach (var line in lines)
+                {
+                    if (string.IsNullOrWhiteSpace(line) || line.TrimStart().StartsWith("#")) continue;
+                    var parts = line.Split(new[] { '=' }, 2);
+                    if (parts.Length != 2) continue;
+                    if (!string.Equals(parts[0].Trim(), key, StringComparison.OrdinalIgnoreCase)) continue;
+                    var widthsStr = parts[1].Trim();
+                    var wparts = widthsStr.Split(new[] { ',' }, StringSplitOptions.RemoveEmptyEntries);
+                    _pendingWidths = new List<int>();
+                    foreach (var wp in wparts)
+                    {
+                        if (int.TryParse(wp.Trim(), out var w)) _pendingWidths.Add(Math.Max(30, w));
+                    }
+                    break;
+                }
+            }
+            catch { _pendingWidths = null; }
+        }
+
+        private List<int> _pendingWidths;
+
+        private void TryApplyColumnWidths()
+        {
+            try
+            {
+                if (_pendingWidths == null || lvEintraege == null || lvEintraege.Columns == null) return;
+                for (int i = 0; i < lvEintraege.Columns.Count && i < _pendingWidths.Count; i++)
+                    lvEintraege.Columns[i].Width = _pendingWidths[i];
+            }
+            catch { }
+        }
+
+        private void TrySaveColumnWidths()
+        {
+            try
+            {
+                if (lvEintraege == null || lvEintraege.Columns == null) return;
+                var widths = new List<string>();
+                foreach (ColumnHeader ch in lvEintraege.Columns) widths.Add(ch.Width.ToString());
+                var line = GetIniSectionKey() + "=" + string.Join(",", widths);
+                var ini = GetIniPath();
+                var lines = new List<string>();
+                if (File.Exists(ini)) lines.AddRange(File.ReadAllLines(ini));
+                bool replaced = false;
+                for (int i = 0; i < lines.Count; i++)
+                {
+                    if (lines[i].StartsWith(GetIniSectionKey() + "=", StringComparison.OrdinalIgnoreCase))
+                    { lines[i] = line; replaced = true; break; }
+                }
+                if (!replaced) lines.Add(line);
+                File.WriteAllLines(ini, lines);
+            }
+            catch { }
         }
 
         private void HeaderPanel_Paint(object sender, PaintEventArgs e)
