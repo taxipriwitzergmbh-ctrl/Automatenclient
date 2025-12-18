@@ -694,20 +694,38 @@ namespace TaMi_Kassenclient
             var typ = item.SubItems.Count > 2 ? item.SubItems[2].Text : null;
 
             // SchichtId/PersId laden, um FhzId ermitteln zu können
-            string schichtId = null; object persIdObj = null; int? fhzId = null;
+            string schichtId = null; object persIdObj = null; int? fhzId = null; string fahrerName = string.Empty; string kennzeichen = string.Empty;
             using (var db = new DatabaseHelperKassen())
             {
                 var row = await db.GetEintragByBelegnummerAsync(meta.Belegnummer);
                 schichtId = row?.Table.Columns.Contains("SchichtId") == true ? Convert.ToString(row["SchichtId"]) : string.Empty;
                 persIdObj = row?.Table.Columns.Contains("PersId") == true ? row["PersId"] : null;
                 var info = await ResolveFahrerUndKennzeichenAsync(schichtId, persIdObj);
-                fhzId = info.fhzId;
+                fhzId = info.fhzId; fahrerName = info.fahrer; kennzeichen = info.kennzeichen;
             }
 
-            using (var split = new EntrySplitForm(gesamt, meta.Betrag19, meta.Betrag7, meta.Betrag0,
-                                                  startK1: TryParseInt(meta.Kost1), startK2: TryParseInt(meta.Kost2), startKto: TryParseInt(meta.Konto),
-                                                  standardText: item.SubItems[3].Text,
-                                                  firmenId: _firmenId, typ: typ, fhzId: fhzId))
+            using (var split = new EntrySplitForm(
+                                                  // Kontextanzeige analog EntryEditForm
+                                                  zeit: item.SubItems[1].Text,
+                                                  typ: typ,
+                                                  buchungstext: item.SubItems[3].Text,
+                                                  betragGesamt: item.SubItems[4].Text,
+                                                  // Vorhandene Teilbeträge
+                                                  v19: meta.Betrag19,
+                                                  v7:  meta.Betrag7,
+                                                  v0:  meta.Betrag0,
+                                                  // vorhandene Kontierungswerte
+                                                  vorhandenKost1: meta.Kost1,
+                                                  vorhandenKost2: meta.Kost2,
+                                                  vorhandenKonto: meta.Konto,
+                                                  // Schicht/Fahrer/Kennzeichen
+                                                  schichtId: schichtId,
+                                                  kennzeichen: kennzeichen,
+                                                  fahrerName: fahrerName,
+                                                  // Firmenkontext und Belegnummern
+                                                  firmenId: _firmenId,
+                                                  belegnummer: meta.Belegnummer,
+                                                  kassenBelegnummer: meta.KassenBelegnummer))
             {
                 if (split.ShowDialog(this) == DialogResult.OK)
                 {

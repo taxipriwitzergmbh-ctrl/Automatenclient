@@ -52,15 +52,81 @@ namespace TaMi_Kassenclient
         private TextBox txt7_K1, txt7_K2, txt7_Kto, txt7_Text;
         private TextBox txt0_K1, txt0_K2, txt0_Kto, txt0_Text;
 
+        // Kontextanzeige (optional) analog EntryEditForm
+        private string _zeit, _schichtIdStr, _fahrerName, _kennzeichen, _belegnummer, _kassenBelegnummer;
+        private Label _lblZeit, _lblSchichtId, _lblFahrer, _lblKennzeichen, _lblBelegnummer, _lblKassenBelegnummer;
+        private int _contextInfoHeight; // zusätzliche Höhe oberhalb der Eingabefelder
+
         // Dirty-Flags pro MwSt-Teil, damit Benutzerwerte nicht überschrieben werden
         private bool _applyingRules;
         private bool _d19K1, _d19K2, _d19Kto, _d19Txt;
         private bool _d7K1, _d7K2, _d7Kto, _d7Txt;
         private bool _d0K1, _d0K2, _d0Kto, _d0Txt;
 
+        // Bestehender Konstruktor bleibt erhalten (ruft erweiterten Konstruktor mit leerem Kontext)
         public EntrySplitForm(decimal originalSumme, decimal vorhand19, decimal vorhand7, decimal vorhand0,
             int? startK1, int? startK2, int? startKto, string standardText,
             int firmenId, string typ, int? fhzId)
+            : this(originalSumme, vorhand19, vorhand7, vorhand0, startK1, startK2, startKto, standardText, firmenId, typ, fhzId,
+                   null, null, null, null, null, null)
+        {
+        }
+
+        // Zusätzlicher Komfort-Konstruktor: Signatur analog EntryEditForm
+        // Dadurch können bestehende Aufrufer dieselben Parameter verwenden und die Kontextwerte erscheinen direkt.
+        public EntrySplitForm(string zeit, string typ, string buchungstext, string betragGesamt,
+            decimal v19, decimal v7, decimal v0,
+            string vorhandenKost1 = "", string vorhandenKost2 = "", string vorhandenKonto = "",
+            string schichtId = "", string kennzeichen = "", string fahrerName = "",
+            int firmenId = 0,
+            string belegnummer = null,
+            string kassenBelegnummer = null)
+            : this(
+                // originalSumme
+                ParseMoneySafe(betragGesamt),
+                // vorhandene Beträge zuweisen: wenn keiner gesetzt ist, default auf Gesamt in 19%
+                v19 != 0m ? v19 : 0m,
+                v7  != 0m ? v7  : 0m,
+                v0  != 0m ? v0  : 0m,
+                // Start-Kontierungen aus Strings parsen
+                TryParseInt((vorhandenKost1 ?? string.Empty).Trim()),
+                TryParseInt((vorhandenKost2 ?? string.Empty).Trim()),
+                TryParseInt((vorhandenKonto  ?? string.Empty).Trim()),
+                // Standardtext
+                buchungstext ?? string.Empty,
+                // Firmenkontext
+                firmenId,
+                typ ?? string.Empty,
+                // FHZ unbekannt im Split-Dialog
+                null,
+                // Kontextlabels
+                zeit,
+                schichtId,
+                fahrerName,
+                kennzeichen,
+                belegnummer,
+                kassenBelegnummer)
+        {
+            // Falls keine Einzelbeträge übergeben wurden, alle 0: setze 19% auf Gesamt
+            if (v19 == 0m && v7 == 0m && v0 == 0m)
+            {
+                try
+                {
+                    var total = ParseMoneySafe(betragGesamt);
+                    nud19.Value = ClampToMoney(total);
+                    nud7.Value = 0m;
+                    nud0.Value = 0m;
+                }
+                catch { }
+            }
+        }
+
+        // Neuer überladener Konstruktor mit Kontextfeldern analog EntryEditForm
+        public EntrySplitForm(decimal originalSumme, decimal vorhand19, decimal vorhand7, decimal vorhand0,
+            int? startK1, int? startK2, int? startKto, string standardText,
+            int firmenId, string typ, int? fhzId,
+            string zeit, string schichtId, string fahrerName, string kennzeichen,
+            string belegnummer, string kassenBelegnummer)
         {
             this.Icon = Program.AppIcon;
 
@@ -68,7 +134,17 @@ namespace TaMi_Kassenclient
             _firmenId = firmenId;
             _typ = typ ?? string.Empty;
             _fhzId = fhzId;
+
+            // Kontext speichern
+            _zeit = zeit ?? string.Empty;
+            _schichtIdStr = schichtId ?? string.Empty;
+            _fahrerName = fahrerName ?? string.Empty;
+            _kennzeichen = kennzeichen ?? string.Empty;
+            _belegnummer = belegnummer ?? string.Empty;
+            _kassenBelegnummer = kassenBelegnummer ?? string.Empty;
+
             BuildChrome();
+            BuildContextInfo(); // optionaler Kontextblock
             BuildContent();
 
             // Vorbelegung
@@ -152,7 +228,9 @@ namespace TaMi_Kassenclient
 
         private void BuildContent()
         {
-            int leftLbl = 24, leftAmt = 90, leftK1 = 220, leftK2 = 320, leftKto = 420, leftText = 520, top = HeaderHeight + 24, gap = 36;
+            int leftLbl = 24, leftAmt = 90, leftK1 = 220, leftK2 = 320, leftKto = 420, leftText = 520;
+            int top = HeaderHeight + 24 + _contextInfoHeight; // unterhalb des optionalen Kontextblocks starten
+            int gap = 36;
 
             Controls.Add(new Label { Text = "%", Left = leftLbl, Top = top - 28, Width = 40, ForeColor = Color.DimGray });
             Controls.Add(new Label { Text = "Betrag", Left = leftAmt, Top = top - 28, Width = 120, ForeColor = Color.DimGray });
@@ -218,6 +296,59 @@ namespace TaMi_Kassenclient
                 await ApplyRulesForGroupAsync("0");
                 await ApplyRulesForGroupAsync(_baseGroup);
             };
+        }
+
+        // Baut optionale Kontextinformation analog EntryEditForm über dem Inhalt
+        private void BuildContextInfo()
+        {
+            _contextInfoHeight = 0;
+            int left = 24; int labelW = 160; int top = HeaderHeight + 8; int gapY = 26;
+            Controls.Add(new Label { Text = "Datum:", Left = left, Top = top, Width = labelW, ForeColor = Color.DimGray });
+            _lblZeit = new Label { Text = _zeit ?? string.Empty, Left = left + labelW + 10, Top = top, Width = 600 }; top += gapY;
+            Controls.Add(_lblZeit);
+
+            Controls.Add(new Label { Text = "Schicht:", Left = left, Top = top, Width = labelW, ForeColor = Color.DimGray });
+            _lblSchichtId = new Label { Text = _schichtIdStr ?? string.Empty, Left = left + labelW + 10, Top = top, Width = 600 }; top += gapY;
+            Controls.Add(_lblSchichtId);
+
+            Controls.Add(new Label { Text = "Fahrer:", Left = left, Top = top, Width = labelW, ForeColor = Color.DimGray });
+            _lblFahrer = new Label { Text = _fahrerName ?? string.Empty, Left = left + labelW + 10, Top = top, Width = 600 }; top += gapY;
+            Controls.Add(_lblFahrer);
+
+            Controls.Add(new Label { Text = "Kennzeichen:", Left = left, Top = top, Width = labelW, ForeColor = Color.DimGray });
+            _lblKennzeichen = new Label { Text = _kennzeichen ?? string.Empty, Left = left + labelW + 10, Top = top, Width = 600 }; top += gapY;
+            Controls.Add(_lblKennzeichen);
+
+            Controls.Add(new Label { Text = "Belegnummer:", Left = left, Top = top, Width = labelW, ForeColor = Color.DimGray });
+            _lblBelegnummer = new Label { Text = _belegnummer ?? string.Empty, Left = left + labelW + 10, Top = top, Width = 280 }; top += gapY;
+            Controls.Add(_lblBelegnummer);
+
+            Controls.Add(new Label { Text = "KassenBelegnummer:", Left = left, Top = top, Width = labelW, ForeColor = Color.DimGray });
+            _lblKassenBelegnummer = new Label { Text = _kassenBelegnummer ?? string.Empty, Left = left + labelW + 10, Top = top, Width = 280 }; top += gapY;
+            Controls.Add(_lblKassenBelegnummer);
+
+            _contextInfoHeight = (top - (HeaderHeight + 8)) + 10; // Höhe des Blocks merken
+        }
+
+        // Öffentliche Methode zum Setzen/Aktualisieren des Kontextes nach der Instanziierung
+        public void SetContext(string zeit, string schichtId, string fahrerName, string kennzeichen, string belegnummer, string kassenBelegnummer)
+        {
+            _zeit = zeit ?? string.Empty;
+            _schichtIdStr = schichtId ?? string.Empty;
+            _fahrerName = fahrerName ?? string.Empty;
+            _kennzeichen = kennzeichen ?? string.Empty;
+            _belegnummer = belegnummer ?? string.Empty;
+            _kassenBelegnummer = kassenBelegnummer ?? string.Empty;
+            try
+            {
+                if (_lblZeit != null) _lblZeit.Text = _zeit;
+                if (_lblSchichtId != null) _lblSchichtId.Text = _schichtIdStr;
+                if (_lblFahrer != null) _lblFahrer.Text = _fahrerName;
+                if (_lblKennzeichen != null) _lblKennzeichen.Text = _kennzeichen;
+                if (_lblBelegnummer != null) _lblBelegnummer.Text = _belegnummer;
+                if (_lblKassenBelegnummer != null) _lblKassenBelegnummer.Text = _kassenBelegnummer;
+            }
+            catch { }
         }
 
         private NumericUpDown CreateMoneyUpDown(int left, int top)
@@ -352,6 +483,14 @@ namespace TaMi_Kassenclient
         private static int? TryParseInt(string s)
         {
             return int.TryParse((s ?? string.Empty).Trim(), NumberStyles.Integer, CultureInfo.CurrentCulture, out var v) ? (int?)v : null;
+        }
+
+        private static decimal ParseMoneySafe(string s)
+        {
+            if (string.IsNullOrWhiteSpace(s)) return 0m;
+            if (decimal.TryParse(s, NumberStyles.Any, CultureInfo.CurrentCulture, out var v)) return v;
+            if (decimal.TryParse(s, NumberStyles.Any, CultureInfo.InvariantCulture, out v)) return v;
+            return 0m;
         }
 
         private static decimal ClampToMoney(decimal v)
