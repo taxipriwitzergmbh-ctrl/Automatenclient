@@ -27,7 +27,7 @@ namespace TaMi_Kassenclient
         {
             FormBorderStyle = FormBorderStyle.None;
             StartPosition = FormStartPosition.CenterScreen;
-            ClientSize = new Size(1000, 680);
+            ClientSize = new Size(1180, 720);
             BackColor = Color.White;
             DoubleBuffered = true;
 
@@ -84,7 +84,7 @@ namespace TaMi_Kassenclient
             pnlKassen = new FlowLayoutPanel
             {
                 Location = new Point(20, 80),
-                Size = new Size(960, 580),
+                Size = new Size(1120, 600),
                 Anchor = AnchorStyles.Top | AnchorStyles.Bottom | AnchorStyles.Left | AnchorStyles.Right,
                 AutoScroll = true,
                 WrapContents = true,

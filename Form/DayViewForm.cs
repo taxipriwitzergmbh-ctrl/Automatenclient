@@ -725,7 +725,8 @@ namespace TaMi_Kassenclient
                                                   // Firmenkontext und Belegnummern
                                                   firmenId: _firmenId,
                                                   belegnummer: meta.Belegnummer,
-                                                  kassenBelegnummer: meta.KassenBelegnummer))
+                                                  kassenBelegnummer: meta.KassenBelegnummer,
+                                                  fhzId: fhzId))
             {
                 if (split.ShowDialog(this) == DialogResult.OK)
                 {

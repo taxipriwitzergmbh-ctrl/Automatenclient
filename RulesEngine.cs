@@ -97,6 +97,17 @@ namespace TaMi_Kassenclient
             var leftInt = getInt();
             if (leftInt.HasValue)
             {
+                // Support list semantics for '=' and '!=' like "21;29;55"
+                if (op == "=" || op == "!=")
+                {
+                    var parts = (val ?? string.Empty).Split(new[] { ';', ',', ' ' }, StringSplitOptions.RemoveEmptyEntries).Select(s => s.Trim()).ToList();
+                    var ints = new HashSet<int>(); foreach (var s in parts) { if (TryParseInt(s, out var iv)) ints.Add(iv); }
+                    if (ints.Count > 0)
+                    {
+                        bool contains = ints.Contains(leftInt.Value);
+                        return op == "=" ? contains : !contains;
+                    }
+                }
                 if (!TryParseInt(val, out var rightInt)) rightInt = 0;
                 switch (op)
                 {
@@ -127,6 +138,15 @@ namespace TaMi_Kassenclient
             var leftStr = getStr();
             if (leftStr != null)
             {
+                if (op == "=" || op == "!=")
+                {
+                    var parts = (val ?? string.Empty).Split(new[] { ';', ',', ' ' }, StringSplitOptions.RemoveEmptyEntries);
+                    if (parts.Length > 1)
+                    {
+                        bool contains = parts.Any(p => string.Equals(leftStr, p, StringComparison.OrdinalIgnoreCase));
+                        return op == "=" ? contains : !contains;
+                    }
+                }
                 switch (op)
                 {
                     case "=": return string.Equals(leftStr, val, StringComparison.OrdinalIgnoreCase);
@@ -258,7 +278,7 @@ namespace TaMi_Kassenclient
                                 Id = Convert.ToInt32(r["Id"]),
                                 Name = r["Name"] as string,
                                 JoinKind = r["JoinKind"] as string,
-                                IsDefault = r["IsDefault"] != DBNull.Value && Convert.ToBoolean(r["IsDefault"]),
+                                IsDefault = r.Table.Columns.Contains("IsDefault") && r["IsDefault"] != DBNull.Value && Convert.ToBoolean(r["IsDefault"]),
                                 Priority = r["Priority"] == DBNull.Value ? 100 : Convert.ToInt32(r["Priority"]),
                                 ManId = null,
                                 FhzIds = null,
@@ -270,6 +290,27 @@ namespace TaMi_Kassenclient
                                 IsActive = r.Table.Columns.Contains("IsActive") && r["IsActive"] != DBNull.Value ? Convert.ToBoolean(r["IsActive"]) : true,
                                 Clauses = new List<AbrechnungsClause>()
                             };
+                            // Legacy mapping: some datasets use column 'Fallback' instead of 'IsDefault'.
+                            if (!model.IsDefault && r.Table.Columns.Contains("Fallback") && r["Fallback"] != DBNull.Value)
+                            {
+                                try
+                                {
+                                    if (r["Fallback"] is bool fbBool)
+                                        model.IsDefault = fbBool;
+                                    else
+                                    {
+                                        var s = Convert.ToString(r["Fallback"])?.Trim();
+                                        if (!string.IsNullOrEmpty(s))
+                                        {
+                                            model.IsDefault = s.Equals("ja", StringComparison.OrdinalIgnoreCase)
+                                                             || s.Equals("yes", StringComparison.OrdinalIgnoreCase)
+                                                             || s.Equals("true", StringComparison.OrdinalIgnoreCase)
+                                                             || s.Equals("1");
+                                        }
+                                    }
+                                }
+                                catch { }
+                            }
                             list.Add(model);
                         }
                     }
@@ -330,27 +371,34 @@ namespace TaMi_Kassenclient
             ref int? kost1, ref int? kost2, ref int? konto, ref string buchungstext)
         {
             if (rules == null) return;
-            AbrechnungsRegel bestDefault = null;
+            int? specK1 = null, specK2 = null, specKto = null; string specTxt = null;
+            int? defK1 = null, defK2 = null, defKto = null; string defTxt = null;
 
             foreach (var r in rules)
             {
-                if (!r.IsActive) continue;
-                if (r.IsDefault && bestDefault == null) bestDefault = r; // first active default
+                if (r == null || !r.IsActive) continue;
                 if (!MatchesRule(r, ctx)) continue;
-                if (!kost1.HasValue && r.ResultKost1.HasValue) kost1 = r.ResultKost1;
-                if (!kost2.HasValue && r.ResultKost2.HasValue) kost2 = r.ResultKost2;
-                if (!konto.HasValue && r.ResultKonto.HasValue) konto = r.ResultKonto;
-                if (string.IsNullOrWhiteSpace(buchungstext) && !string.IsNullOrWhiteSpace(r.ResultBuchungstext)) buchungstext = r.ResultBuchungstext;
-                if (kost1.HasValue && kost2.HasValue && konto.HasValue && !string.IsNullOrWhiteSpace(buchungstext)) break;
+
+                if (r.IsDefault)
+                {
+                    if (!defK1.HasValue && r.ResultKost1.HasValue) defK1 = r.ResultKost1;
+                    if (!defK2.HasValue && r.ResultKost2.HasValue) defK2 = r.ResultKost2;
+                    if (!defKto.HasValue && r.ResultKonto.HasValue) defKto = r.ResultKonto;
+                    if (string.IsNullOrWhiteSpace(defTxt) && !string.IsNullOrWhiteSpace(r.ResultBuchungstext)) defTxt = r.ResultBuchungstext;
+                }
+                else
+                {
+                    if (r.ResultKost1.HasValue) specK1 = r.ResultKost1; // last specific (by priority) wins
+                    if (r.ResultKost2.HasValue) specK2 = r.ResultKost2;
+                    if (r.ResultKonto.HasValue) specKto = r.ResultKonto;
+                    if (string.IsNullOrWhiteSpace(specTxt) && !string.IsNullOrWhiteSpace(r.ResultBuchungstext)) specTxt = r.ResultBuchungstext;
+                }
             }
 
-            if ((!kost1.HasValue && !kost2.HasValue && !konto.HasValue) && bestDefault != null)
-            {
-                if (!kost1.HasValue && bestDefault.ResultKost1.HasValue) kost1 = bestDefault.ResultKost1;
-                if (!kost2.HasValue && bestDefault.ResultKost2.HasValue) kost2 = bestDefault.ResultKost2;
-                if (!konto.HasValue && bestDefault.ResultKonto.HasValue) konto = bestDefault.ResultKonto;
-                if (string.IsNullOrWhiteSpace(buchungstext) && !string.IsNullOrWhiteSpace(bestDefault.ResultBuchungstext)) buchungstext = bestDefault.ResultBuchungstext;
-            }
+            if (!kost1.HasValue) kost1 = specK1.HasValue ? specK1 : defK1;
+            if (!kost2.HasValue) kost2 = specK2.HasValue ? specK2 : defK2;
+            if (!konto.HasValue) konto = specKto.HasValue ? specKto : defKto;
+            if (string.IsNullOrWhiteSpace(buchungstext)) buchungstext = !string.IsNullOrWhiteSpace(specTxt) ? specTxt : defTxt;
         }
     }
 }

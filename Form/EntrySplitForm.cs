@@ -74,13 +74,15 @@ namespace TaMi_Kassenclient
 
         // Zusätzlicher Komfort-Konstruktor: Signatur analog EntryEditForm
         // Dadurch können bestehende Aufrufer dieselben Parameter verwenden und die Kontextwerte erscheinen direkt.
+        // NEU: optionale fhzId aufnehmen, damit fahrzeugbezogene Regeln greifen
         public EntrySplitForm(string zeit, string typ, string buchungstext, string betragGesamt,
             decimal v19, decimal v7, decimal v0,
             string vorhandenKost1 = "", string vorhandenKost2 = "", string vorhandenKonto = "",
             string schichtId = "", string kennzeichen = "", string fahrerName = "",
             int firmenId = 0,
             string belegnummer = null,
-            string kassenBelegnummer = null)
+            string kassenBelegnummer = null,
+            int? fhzId = null)
             : this(
                 // originalSumme
                 ParseMoneySafe(betragGesamt),
@@ -97,8 +99,8 @@ namespace TaMi_Kassenclient
                 // Firmenkontext
                 firmenId,
                 typ ?? string.Empty,
-                // FHZ unbekannt im Split-Dialog
-                null,
+                // FHZ aus Aufrufer (ermöglicht fahrzeugbezogene Regeln)
+                fhzId,
                 // Kontextlabels
                 zeit,
                 schichtId,
