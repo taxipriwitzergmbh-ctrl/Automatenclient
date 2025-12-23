@@ -273,7 +273,7 @@ ORDER BY s.StartZeit DESC;";
             await EnsureOpenAsync();
             using (var cmd = _connection.CreateCommand())
             {
-                cmd.CommandText = $@"SELECT * FROM {_tblZahlungen} WHERE PersId = @pid AND (Verbucht = 0 OR Verbucht IS NULL)";
+                cmd.CommandText = $@"SELECT z.*, z.ManID AS FirmenID FROM {_tblZahlungen} z WHERE z.PersId = @pid AND (z.Verbucht = 0 OR z.Verbucht IS NULL)";
                 cmd.Parameters.AddWithValue("@pid", persId);
                 using (var rdr = await cmd.ExecuteReaderAsync()) { var dt = new DataTable(); dt.Load(rdr); return dt; }
             }
@@ -330,14 +330,14 @@ ORDER BY z.ErfasstAm DESC, z.Belegnummer DESC";
                 if (hasUserAnlage)
                 {
                     cmd.CommandText = $@"INSERT INTO {_tblZahlungen}
-(PersId, Typ, Buchungstext, Betrag19, Betrag7, Betrag0, BetragGesamt, Kost1, Kost2, Konto, FirmenID, DeviceID, Verbucht, ErfasstAm, UserAnlage)
+(PersId, Typ, Buchungstext, Betrag19, Betrag7, Betrag0, BetragGesamt, Kost1, Kost2, Konto, ManID, DeviceID, Verbucht, ErfasstAm, UserAnlage)
 OUTPUT INSERTED.Belegnummer
 VALUES(@pid,@typ,@txt,@b19,@b7,@b0,@bg,@k1,@k2,@kto,@fid,0,0,SYSDATETIME(),@ua);";
                 }
                 else
                 {
                     cmd.CommandText = $@"INSERT INTO {_tblZahlungen}
-(PersId, Typ, Buchungstext, Betrag19, Betrag7, Betrag0, BetragGesamt, Kost1, Kost2, Konto, FirmenID, DeviceID, Verbucht, ErfasstAm)
+(PersId, Typ, Buchungstext, Betrag19, Betrag7, Betrag0, BetragGesamt, Kost1, Kost2, Konto, ManID, DeviceID, Verbucht, ErfasstAm)
 OUTPUT INSERTED.Belegnummer
 VALUES(@pid,@typ,@txt,@b19,@b7,@b0,@bg,@k1,@k2,@kto,@fid,0,0,SYSDATETIME());";
                 }
@@ -391,7 +391,7 @@ VALUES(@pid,@typ,@txt,@b19,@b7,@b0,@bg,@k1,@k2,@kto,@fid,0,0,SYSDATETIME());";
             using (var cmd = _connection.CreateCommand())
             {
                 cmd.CommandText = $@"INSERT INTO {_tblVorlagen}
-(Typ,VorlagenName,Buchungstext,Betrag19,Betrag7,Betrag0,FirmenID,Kost1,Kost2,Konto)
+(Typ,VorlagenName,Buchungstext,Betrag19,Betrag7,Betrag0,ManID,Kost1,Kost2,Konto)
 OUTPUT INSERTED.ID
 VALUES(@Typ,@VName,@BText,@B19,@B7,@B0,@FID,@K1,@K2,@Kto);";
                 cmd.Parameters.AddWithValue("@Typ", typCode);
@@ -432,7 +432,7 @@ VALUES(@Typ,@VName,@BText,@B19,@B7,@B0,@FID,@K1,@K2,@Kto);";
             {
                 cmd.CommandText = $@"UPDATE {_tblVorlagen}
 SET Typ=@Typ, VorlagenName=@VName, Buchungstext=@BText, Betrag19=@B19, Betrag7=@B7, Betrag0=@B0,
-    FirmenID=@FID, Kost1=@K1, Kost2=@K2, Konto=@Kto
+    ManID=@FID, Kost1=@K1, Kost2=@K2, Konto=@Kto
 WHERE ID=@ID";
                 cmd.Parameters.AddWithValue("@Typ", typCode);
                 cmd.Parameters.AddWithValue("@VName", vName);
@@ -465,7 +465,7 @@ WHERE ID=@ID";
     v.Betrag19,
     v.Betrag7,
     v.Betrag0,
-    v.FirmenID
+    v.ManID AS FirmenID
 FROM {_tblVorlagen} v WITH (NOLOCK)
 ORDER BY v.VorlagenName ASC, v.Typ ASC;";
                 using (var rdr = await cmd.ExecuteReaderAsync())
@@ -782,11 +782,7 @@ WHERE ISNULL(RevIsOld,0)=0 AND Belegnummer = @bnr";
                 cmd.CommandText = $@"
 ;WITH raw AS (
     SELECT 
-        CASE 
-            WHEN LTRIM(RTRIM(k.FirmenId)) = '-1' THEN -1
-            WHEN TRY_CONVERT(int, LTRIM(RTRIM(k.FirmenId))) IS NULL THEN NULL
-            ELSE TRY_CONVERT(int, LTRIM(RTRIM(k.FirmenId)))
-        END AS FirmenId,
+        k.ManID AS FirmenId,
         k.DeviceID,
         k.Kassenbestand,
         k.ErfasstAm
@@ -832,7 +828,7 @@ ORDER BY ManName ASC, x.DeviceID ASC;";
             var dayStart = new DateTime(tag.Year, tag.Month, tag.Day, 0, 0, 0);
             using (var cmd = _connection.CreateCommand())
             {
-                cmd.CommandText = $"SELECT TOP 1 Kassenbestand FROM {_tblKassenbuch} WITH (NOLOCK) WHERE FirmenId = @FID AND DeviceID = @Dev AND ErfasstAm < @DayStart ORDER BY ErfasstAm DESC;";
+                cmd.CommandText = $"SELECT TOP 1 Kassenbestand FROM {_tblKassenbuch} WITH (NOLOCK) WHERE ManID = @FID AND DeviceID = @Dev AND ErfasstAm < @DayStart ORDER BY ErfasstAm DESC;";
                 cmd.Parameters.AddWithValue("@FID", firmenId);
                 cmd.Parameters.AddWithValue("@Dev", deviceId);
                 cmd.Parameters.AddWithValue("@DayStart", dayStart);
@@ -847,7 +843,7 @@ ORDER BY ManName ASC, x.DeviceID ASC;";
             var dayEnd = new DateTime(tag.Year, tag.Month, tag.Day, 23, 59, 59);
             using (var cmd = _connection.CreateCommand())
             {
-                cmd.CommandText = $"SELECT TOP 1 Kassenbestand FROM {_tblKassenbuch} WITH (NOLOCK) WHERE FirmenId = @FID AND DeviceID = @Dev AND ErfasstAm <= @DayEnd ORDER BY ErfasstAm DESC;";
+                cmd.CommandText = $"SELECT TOP 1 Kassenbestand FROM {_tblKassenbuch} WITH (NOLOCK) WHERE ManID = @FID AND DeviceID = @Dev AND ErfasstAm <= @DayEnd ORDER BY ErfasstAm DESC;";
                 cmd.Parameters.AddWithValue("@FID", firmenId);
                 cmd.Parameters.AddWithValue("@Dev", deviceId);
                 cmd.Parameters.AddWithValue("@DayEnd", dayEnd);
@@ -884,7 +880,7 @@ SELECT
     ISNULL(RevIsOld, 0) AS RevIsOld,
     ISNULL(Festgeschrieben, 0) AS Festgeschrieben
 FROM {_tblKassenbuch} WITH (NOLOCK)
-WHERE FirmenId = @FID AND DeviceID = @Dev AND ErfasstAm >= @From AND ErfasstAm <= @To
+WHERE ManID = @FID AND DeviceID = @Dev AND ErfasstAm >= @From AND ErfasstAm <= @To
 ORDER BY ErfasstAm ASC, Belegnummer ASC;";
                 cmd.Parameters.AddWithValue("@FID", firmenId);
                 cmd.Parameters.AddWithValue("@Dev", deviceId);
@@ -901,7 +897,7 @@ ORDER BY ErfasstAm ASC, Belegnummer ASC;";
             using (var cmd = _connection.CreateCommand())
             {
                 var dayEnd = new DateTime(tag.Year, tag.Month, tag.Day, 23, 59, 59);
-                cmd.CommandText = $"UPDATE {_tblKassenbuch} SET Festgeschrieben = 1 WHERE FirmenId = @FID AND DeviceID = @Dev AND ErfasstAm <= @DayEnd AND ISNULL(Festgeschrieben,0) = 0";
+                cmd.CommandText = $"UPDATE {_tblKassenbuch} SET Festgeschrieben = 1 WHERE ManID = @FID AND DeviceID = @Dev AND ErfasstAm <= @DayEnd AND ISNULL(Festgeschrieben,0) = 0";
                 cmd.Parameters.AddWithValue("@FID", firmenId);
                 cmd.Parameters.AddWithValue("@Dev", deviceId);
                 cmd.Parameters.AddWithValue("@DayEnd", dayEnd);
@@ -916,7 +912,7 @@ ORDER BY ErfasstAm ASC, Belegnummer ASC;";
             using (var cmd = _connection.CreateCommand())
             {
                 var dayEnd = new DateTime(tag.Year, tag.Month, tag.Day, 23, 59, 59);
-                cmd.CommandText = $"SELECT COUNT(1) FROM {_tblKassenbuch} WHERE FirmenId = @FID AND DeviceID = @Dev AND ErfasstAm <= @DayEnd AND ISNULL(Festgeschrieben,0) = 0";
+                cmd.CommandText = $"SELECT COUNT(1) FROM {_tblKassenbuch} WHERE ManID = @FID AND DeviceID = @Dev AND ErfasstAm <= @DayEnd AND ISNULL(Festgeschrieben,0) = 0";
                 cmd.Parameters.AddWithValue("@FID", firmenId);
                 cmd.Parameters.AddWithValue("@Dev", deviceId);
                 cmd.Parameters.AddWithValue("@DayEnd", dayEnd);
