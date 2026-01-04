@@ -66,14 +66,6 @@ namespace TaMi_Kassenclient
         private Button btnCreatePayment;
         private Button btnCreatePreset; // NEU
 
-        // Overlay für neue Vorlage
-        private Panel overlay;
-        private ComboBox ovType;     // NEU: Typ in Vorlage
-        private TextBox ovName;      // NEU: Vorlagenname
-        private TextBox ovTxt, ovK1, ovK2, ovKto;
-        private ComboBox ovMwst;     // NEU MwSt für Vorlage
-        private Button ovSave, ovCancel;
-
         // Aktionen für offene Zahlungen
         private Button btnEditPayment;
         private Button btnDeletePayment;

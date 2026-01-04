@@ -1,4 +1,4 @@
-using System;
+ï»¿using System;
 using System.Drawing;
 using System.Threading.Tasks;
 using System.Windows.Forms;
@@ -7,7 +7,7 @@ using SuE.TaMi;
 namespace TaMi_Kassenclient
 {
 
-    // Einfache Session-Verwaltung für das Kassen-Client-Projekt
+    // Einfache Session-Verwaltung fï¿½r das Kassen-Client-Projekt
     public static class AppSession
     {
         public static PersonalInfo CurrentUser { get; internal set; }
@@ -15,13 +15,9 @@ namespace TaMi_Kassenclient
 
 
 
-    // Leichtgewichtiges Anmeldefenster für TaMi-Kassenclient (ohne Geräte-Anbindung)
+    // Leichtgewichtiges Anmeldefenster fï¿½r TaMi-Kassenclient (ohne Gerï¿½te-Anbindung)
     public class LoginForm : KassenclientBaseForm
     {
-        private int         _pendingPid = 0;
-        private string      _expectedCode = null;
-        private bool        _createMode = false; // wenn kein Fahrercode existiert, doppelte Eingabe aktivieren
-
         //private Panel header;
         //private Label lblTitle;
         //private Button btnClose;
@@ -93,7 +89,7 @@ namespace TaMi_Kassenclient
 
             mTaMiClient.LoginMessage += (s, e) =>
             {
-                // Login-Antworten hier nicht benötigt
+                // Login-Antworten hier nicht benï¿½tigt
             };
 
             // DIF-Anzeige zyklisch aktualisieren
@@ -132,7 +128,7 @@ namespace TaMi_Kassenclient
             };
             Controls.Add(header);
 
-            lblTitle = new Label { Text = "TaMi-Kassenclient – Anmeldung", AutoSize = false, Left = 16, Top = 0, Width = 420, Height = 64, ForeColor = Color.White, Font = new Font("Segoe UI Variable", 16F, FontStyle.Bold), TextAlign = ContentAlignment.MiddleLeft, BackColor = Color.Transparent };
+            lblTitle = new Label { Text = "TaMi-Kassenclient ï¿½ Anmeldung", AutoSize = false, Left = 16, Top = 0, Width = 420, Height = 64, ForeColor = Color.White, Font = new Font("Segoe UI Variable", 16F, FontStyle.Bold), TextAlign = ContentAlignment.MiddleLeft, BackColor = Color.Transparent };
             header.Controls.Add(lblTitle);
 
             btnClose = new Button 
@@ -242,7 +238,7 @@ namespace TaMi_Kassenclient
                 }
                 else
                 {
-                    // nur löschen, wenn keine andere Fehlermeldung gesetzt ist
+                    // nur lï¿½schen, wenn keine andere Fehlermeldung gesetzt ist
                     if (string.IsNullOrEmpty(lblError.Text) || lblError.Text.StartsWith("DIF:"))
                         lblError.Text = string.Empty;
                 }
@@ -294,7 +290,7 @@ namespace TaMi_Kassenclient
 
             if (!int.TryParse(txtPid.Text, out personalId) || personalId <= 0)
             {
-                lblError.Text = "Bitte gültige Personalnummer eingeben.";
+                lblError.Text = "Bitte gï¿½ltige Personalnummer eingeben.";
                 return;
             }
 
@@ -310,7 +306,7 @@ namespace TaMi_Kassenclient
             }
 
 
-            //Formular schließen und OK zurückgeben
+            //Formular schlieï¿½en und OK zurï¿½ckgeben
             AppSession.CurrentUser = new PersonalInfo() 
             { 
                 PID = personalId, 
@@ -329,7 +325,7 @@ namespace TaMi_Kassenclient
                 using (var db = new DatabaseHelperKassen())
                 {
                     if (!int.TryParse(pidText, out var pid) || pid <= 0)
-                    { lblError.Text = "Bitte gültige Personalnummer eingeben."; return; }
+                    { lblError.Text = "Bitte gï¿½ltige Personalnummer eingeben."; return; }
 
                     var p = await db.GetPersonalInfoAsync(pid);
                     if (p == null)
@@ -350,11 +346,11 @@ namespace TaMi_Kassenclient
                             return; // Nutzer gibt zweite Eingabe ein und klickt erneut
                         }
 
-                        // Zweiter Klick im Create-Mode: prüfen und setzen
+                        // Zweiter Klick im Create-Mode: prï¿½fen und setzen
                         if (pwd.Length < 4)
                         { lblError.Text = "Bitte neues Passwort (min. 4 Ziffern) eingeben."; return; }
                         if (!string.Equals(pwd, pwd2))
-                        { lblError.Text = "Passwörter stimmen nicht überein."; return; }
+                        { lblError.Text = "Passwï¿½rter stimmen nicht ï¿½berein."; return; }
                         await db.SetFahrercodeAsync(_pendingPid, pwd);
                         _expectedCode = pwd; _createMode = false;
                         // Erfolgreich gesetzt -> weiter einloggen

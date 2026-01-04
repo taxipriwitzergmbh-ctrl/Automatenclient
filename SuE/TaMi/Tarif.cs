@@ -56,7 +56,6 @@ namespace SuE.TaMi
         private float   mKMKorrekturFaktor = 1;
 
         private byte    mSteuersatz1 = 1;
-        private byte    mSteuersatz2 = 1;
         private float   mSteuerStrecke = 0;
 
         private float   mRabattPercent = 0;
@@ -117,7 +116,7 @@ namespace SuE.TaMi
         private decimal mMindestBetrag = 0;
         private string  mMindestBetragDTAPNr = "";
 
-        private bool    mChanged = false;
+
 
         #endregion
 

@@ -49,13 +49,15 @@ namespace SuE.TaMi
         private bool mbChanged;
         private bool mbChangedValue;
 
-        public ConfigItem(string app, string group, string field, string defaultvalue, string value)
+        public ConfigItem(string app, string group, string field, string defaultvalue, string value, int cfgId = 0, string description = null)
         {
             msApplication = app;
             msGroup = group;
             msField = field;
             msDefaultValue = defaultvalue;
             msValue1 = value;
+            mlCfgID = cfgId;
+            msDescription = description ?? string.Empty;
             mbChanged = true;
             mbChangedValue = true;
         }
@@ -67,7 +69,33 @@ namespace SuE.TaMi
             msField = reader.GetSqlString(reader.GetOrdinal("Field")).Value;
             msDefaultValue = reader.GetSqlString(reader.GetOrdinal("DefaultValue")).Value;
 
-            //TODO: Description
+            // Description (optional column)
+            try
+            {
+                int ordDesc = reader.GetOrdinal("Description");
+                if (ordDesc >= 0 && !reader.IsDBNull(ordDesc))
+                    msDescription = reader.GetSqlString(ordDesc).Value;
+                else
+                    msDescription = string.Empty;
+            }
+            catch
+            {
+                msDescription = string.Empty;
+            }
+
+            // CfgID (optional column)
+            try
+            {
+                int ordId = reader.GetOrdinal("CfgID");
+                if (ordId >= 0 && !reader.IsDBNull(ordId))
+                    mlCfgID = reader.GetInt32(ordId);
+                else
+                    mlCfgID = 0;
+            }
+            catch
+            {
+                mlCfgID = 0;
+            }
 
             if (!reader.IsDBNull(reader.GetOrdinal("Value1")))
                 msValue1 = reader.GetSqlString(reader.GetOrdinal("Value1")).Value;

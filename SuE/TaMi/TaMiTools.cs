@@ -38,7 +38,6 @@ namespace SuE.TaMi
         */
 
         private static string SERVER_DECIMAL_SEP = ",";  //Vom Server
-        private static string SERVER_THOUSAND_SEP = ",";
         private static string NUMBER_DECIMAL_SEP = ",";  //Vom aktuellen Windows-Benutzer
         private static string NUMBER_THOUSAND_SEP = ".";
 

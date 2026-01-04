@@ -27,7 +27,6 @@ namespace TaMi_Kassenclient
 
         private static string mAppPath;
         private static string mAppDataPath = "";
-        private static string mAppConfigFilename = "";
 
         public static string tamiServerHost = "localhost";
         public static int    tamiServerPort = 63500;
@@ -173,7 +172,7 @@ namespace TaMi_Kassenclient
                 return ex.HResult;
             }
 
-        ExitApp:
+    
 
             //ReconnectTimer stoppen und freigeben
             try { mReconnectTimer?.Dispose(); mReconnectTimer = null; } catch { }

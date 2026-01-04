@@ -14,6 +14,11 @@ namespace SuE.Tools
         /// The default length for the read buffer.
         /// </summary>
         private const int DefaultClientReadBufferLength = 256; //32767; //4096;
+        
+        /// <summary>
+        /// Max number of connect retries.
+        /// </summary>
+        private const int MaxConnectRetries = 3;
  
         /// <summary>
         /// The tcp client used for the outgoing connection.
@@ -131,6 +136,7 @@ namespace SuE.Tools
             this.client = new TcpClient();
             this.port = port;
             this.clientReadBufferLength = clientReadBufferLength;
+            this.retries = 0;
         }
  
         /// <summary>
@@ -222,16 +228,24 @@ namespace SuE.Tools
             }
             catch (Exception ex)
             {
-                //retries++;
-                //if (retries < 3)
-                //{
-                //    this.client.BeginConnect(this.addresses, this.port, this.ClientConnectCallback, null);
-                //}
-                //else
-                //{
-                    if (this.ClientConnectException != null)
-                        this.ClientConnectException(this, new ExceptionEventArgs(ex));
-                //}
+                // implement simple retry logic using 'retries'
+                retries++;
+                if (retries < MaxConnectRetries)
+                {
+                    try
+                    {
+                        this.client.BeginConnect(this.addresses, this.port, this.ClientConnectCallback, null);
+                        return;
+                    }
+                    catch (Exception inner)
+                    {
+                        // fall through and notify using original exception if reconnect also fails synchronously
+                        ex = inner;
+                    }
+                }
+
+                if (this.ClientConnectException != null)
+                    this.ClientConnectException(this, new ExceptionEventArgs(ex));
                 return;
             }
  

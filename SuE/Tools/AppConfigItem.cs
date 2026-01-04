@@ -55,8 +55,19 @@ namespace SuE.Tools
             msField = field;
             msDefaultValue = defaultvalue;
             msValue1 = value;
+            // initialize optional fields to explicit defaults to avoid warnings
+            mlCfgID = 0;
+            msDescription = string.Empty;
             mbChanged = true;
             mbChangedValue = true;
+        }
+
+        // optional extended ctor allowing direct assignment
+        public AppConfigItem(string app, string group, string field, string defaultvalue, string value, int cfgId, string description)
+            : this(app, group, field, defaultvalue, value)
+        {
+            mlCfgID = cfgId;
+            msDescription = description ?? string.Empty;
         }
 
         public string Key

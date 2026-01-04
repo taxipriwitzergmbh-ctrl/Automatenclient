@@ -37,12 +37,12 @@ namespace SuE.Tools
                             {
                                 retVal = synchronizeInvoke.EndInvoke(asyncResultBegin);
                             }
-                            catch (ObjectDisposedException ex)
+                            catch (ObjectDisposedException)
                             {
                                 //Debug.WriteLine("Ignore: " + ex);
                                 //Ignore: Das kann passieren wenn der TaMiClient SocketThread noch ein Event feuert obwohl die Map schon beendet wird
                             }
-                            catch (ThreadAbortException ex)
+                            catch (ThreadAbortException)
                             {
                                 //ExceptionReporter.DoReportError(ex, "sender: " + (sender != null ? sender.ToString() : "null"), "eventArgs: " + (eventArgs != null ? eventArgs.ToString() : "null"));
                                 //Debug.WriteLine("Ignore: " + ex);
@@ -52,11 +52,11 @@ namespace SuE.Tools
                             catch (Exception ex)
                             {
                                 ExceptionReporter.DoReportError(ex, "sender: " + (sender != null ? sender.ToString() : "null"), "eventArgs: " + (eventArgs != null ? eventArgs.ToString() : "null"));
-                                throw ex;
+                                throw; // preserve stack
                             }
 
                         }
-                        catch (ObjectDisposedException ex)  { Debug.WriteLine("Ignore: " + ex); } 
+                        catch (ObjectDisposedException)  { Debug.WriteLine("Ignore: ObjectDisposedException"); } 
                     }
                     else
                     {
