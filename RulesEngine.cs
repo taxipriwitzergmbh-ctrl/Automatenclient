@@ -1,4 +1,4 @@
-using System;
+ï»¿using System;
 using System.Collections.Generic;
 using System.Data;
 using System.Linq;
@@ -185,7 +185,7 @@ namespace TaMi_Kassenclient
                     while (e.StartsWith("(") && e.EndsWith(")") && e.Length >= 2) e = e.Substring(1, e.Length - 2).Trim();
                     // Fallback: if parsing gets too complex, ignore (do not block rule)
                     if (!(e.Contains("=") || e.Contains(">") || e.Contains("<"))) continue;
-                    // Very light-weight evaluation (only Typ/FhzId/ManId/BetragX) – kept for legacy rows
+                    // Very light-weight evaluation (only Typ/FhzId/ManId/BetragX) ï¿½ kept for legacy rows
                     var ops = new[] { ">=", "<=", "!=", "=", ">", "<" };
                     string found = null; foreach (var op in ops) { var idx = e.IndexOf(op, StringComparison.OrdinalIgnoreCase); if (idx > 0) { found = op; break; } }
                     if (found == null) continue;
@@ -234,7 +234,7 @@ namespace TaMi_Kassenclient
                 }
                 if (!anyGroupTrue) return false;
             }
-            // AdditionalWhere (legacy) last – permissive if null/empty
+            // AdditionalWhere (legacy) last ï¿½ permissive if null/empty
             // removed: legacy AdditionalWhere handling
             return true;
         }
@@ -388,9 +388,10 @@ namespace TaMi_Kassenclient
                 }
                 else
                 {
-                    if (r.ResultKost1.HasValue) specK1 = r.ResultKost1; // last specific (by priority) wins
-                    if (r.ResultKost2.HasValue) specK2 = r.ResultKost2;
-                    if (r.ResultKonto.HasValue) specKto = r.ResultKonto;
+                    // Highest-priority wins per field: fill only if not set yet by a previous (higher-priority) specific rule
+                    if (!specK1.HasValue && r.ResultKost1.HasValue) specK1 = r.ResultKost1;
+                    if (!specK2.HasValue && r.ResultKost2.HasValue) specK2 = r.ResultKost2;
+                    if (!specKto.HasValue && r.ResultKonto.HasValue) specKto = r.ResultKonto;
                     if (string.IsNullOrWhiteSpace(specTxt) && !string.IsNullOrWhiteSpace(r.ResultBuchungstext)) specTxt = r.ResultBuchungstext;
                 }
             }
