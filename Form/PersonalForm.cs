@@ -1207,8 +1207,7 @@ namespace TaMi_Kassenclient
                     string s = v == null ? string.Empty : Convert.ToString(v);
                     if (string.IsNullOrWhiteSpace(s)) return;
                     s = s.Trim();
-                    // In Guthaben-Verlauf entspricht '5' Trinkgeld
-                    if (s == "5") { e.Value = "Trinkgeld"; e.FormattingApplied = true; return; }
+                    // Korrekte Abbildung über zentrale Funktion
                     var mapped = MapTypCodeToText(s);
                     if (!string.Equals(mapped, s, StringComparison.Ordinal))
                     {
