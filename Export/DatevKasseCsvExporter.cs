@@ -1,4 +1,4 @@
-using System;
+ï»¿using System;
 using System.Collections.Generic;
 using System.Globalization;
 using System.IO;
@@ -9,8 +9,8 @@ namespace TaMi_Kassenclient.Export
 {
     public enum DatevCsvFormat
     {
-        UnternehmenOnlineKasse, // Belegdatum;Belegnummer;Buchungstext;Umsatz (ohne Soll/Haben-Kennzeichen);Soll/Haben-Kennzeichen;Steuersatz;Kost1;Kost2;Gegenkonto (ohne BU-Schlüssel);Währung
-        StandardVorzBetrag      // "Währung";"VorzBetrag";"RechNr";"BelegDatum";"Belegtext";"UStSatz";"BU";"Gegenkonto";"Kost1";"Kost2";"Kostmenge";"Skonto";"Nachricht"
+        UnternehmenOnlineKasse, // Belegdatum;Belegnummer;Buchungstext;Umsatz (ohne Soll/Haben-Kennzeichen);Soll/Haben-Kennzeichen;Steuersatz;Kost1;Kost2;Gegenkonto (ohne BU-Schlï¿½ssel);Wï¿½hrung
+        StandardVorzBetrag      // "Wï¿½hrung";"VorzBetrag";"RechNr";"BelegDatum";"Belegtext";"UStSatz";"BU";"Gegenkonto";"Kost1";"Kost2";"Kostmenge";"Skonto";"Nachricht"
     }
 
     public class DatevKasseCsvExporterOptions
@@ -19,11 +19,11 @@ namespace TaMi_Kassenclient.Export
         public string Delimiter { get; set; } = ";";
         public CultureInfo Culture { get; set; } = CultureInfo.GetCultureInfo("de-DE");
         public bool Utf8Bom { get; set; } = true;
-        // TT.MM.JJJJ (true) oder TTMMJJJJ (false) – für UnternehmenOnlineKasse
+        // TT.MM.JJJJ (true) oder TTMMJJJJ (false) ï¿½ fï¿½r UnternehmenOnlineKasse
         public bool UseDotDateFormat { get; set; } = true;
         public string Currency { get; set; } = "EUR";
         public DatevCsvFormat Format { get; set; } = DatevCsvFormat.UnternehmenOnlineKasse;
-        // Für StandardVorzBetrag: BelegDatum-Format TTMM (true) oder TTMMJJJJ (false)
+        // Fï¿½r StandardVorzBetrag: BelegDatum-Format TTMM (true) oder TTMMJJJJ (false)
         public bool UseDayMonthOnly { get; set; } = true;
         // Nachricht Standardwert
         public string DefaultNachricht { get; set; } = "Kasse Import Standardformat";
@@ -41,7 +41,7 @@ namespace TaMi_Kassenclient.Export
         public string Steuersatz { get; set; } // 0,7,19 (ohne %)
         public string Kostenstelle1 { get; set; } // Kost1
         public string Kostenstelle2 { get; set; } // Kost2
-        public string Gegenkonto { get; set; } // ohne BU-Schlüssel
+        public string Gegenkonto { get; set; } // ohne BU-Schlï¿½ssel
         public string Waehrung { get; set; } = "EUR";
 
         // StandardVorzBetrag
@@ -76,15 +76,15 @@ namespace TaMi_Kassenclient.Export
                             "Steuersatz",
                             "Kost1",
                             "Kost2",
-                            "Gegenkonto (ohne BU-Schlüssel)",
-                            "Währung"
+                            "Gegenkonto (ohne BU-Schlï¿½ssel)",
+                            "Wï¿½hrung"
                         }));
                     }
                     else // StandardVorzBetrag
                     {
                         await sw.WriteLineAsync(string.Join(options.Delimiter, new[]
                         {
-                            "Währung",
+                            "Wï¿½hrung",
                             "VorzBetrag",
                             "RechNr",
                             "BelegDatum",
@@ -128,12 +128,12 @@ namespace TaMi_Kassenclient.Export
                     }
                     else
                     {
-                        // BelegDatum im Standardformat: TTMM (oder TTMMJJJJ wenn gewünscht)
+                        // BelegDatum im Standardformat: TTMM (oder TTMMJJJJ wenn gewï¿½nscht)
                         string belegdatum = options.UseDayMonthOnly
                             ? r.Belegdatum.ToString("ddMM", options.Culture)
                             : r.Belegdatum.ToString("ddMMyyyy", options.Culture);
 
-                        // VorzBetrag mit führendem + oder -
+                        // VorzBetrag mit fï¿½hrendem + oder -
                         string sign = r.BetragSigned >= 0m ? "+" : "-";
                         string betrag = Math.Abs(r.BetragSigned).ToString("0.00", options.Culture);
                         string vorzBetrag = sign + betrag;
