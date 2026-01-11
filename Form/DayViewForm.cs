@@ -158,8 +158,9 @@ namespace TaMi_Kassenclient
             {
                 Text = "",
                 Location = new Point(24, 82),
-                Size = new Size(320, 28),
-                Font = new Font("Segoe UI Variable", 12F, FontStyle.Bold)
+                Size = new Size(288, 28),
+                Font = new Font("Segoe UI Variable", 12F, FontStyle.Bold),
+                AutoEllipsis = true
             };
             Controls.Add(lblDatum);
             UpdateDateLabel();
@@ -177,6 +178,7 @@ namespace TaMi_Kassenclient
             btnCalendar.FlatAppearance.BorderSize = 0;
             btnCalendar.Click += (s, e) => ToggleCalendar();
             Controls.Add(btnCalendar);
+            try { btnCalendar.BringToFront(); } catch { }
 
             // NEW: MonthCalendar dropdown (hidden until needed)
             _monthCalendar = new MonthCalendar
