@@ -1,4 +1,4 @@
-using System;
+ï»¿using System;
 using System.Collections.Generic;
 using System.Data;
 using System.Data.SqlClient;
@@ -26,6 +26,7 @@ namespace TaMi_Kassenclient
         private string _tblPersonal;     // [dbo].[TPersonal]
         private string _tblZahlungen;    // [dbo].[TKassenbuchZahlungen]
         private string _tblFahrzeuge;    // [dbo].[TFahrzeuge] (NEU)
+        private string _tblSchichten;    // [dbo].[TSchichten] (NEU)
 
 
         public DatabaseHelperKassen()
@@ -35,7 +36,7 @@ namespace TaMi_Kassenclient
 
         public static string GetConnectionString()
         {
-            // Primär: aus MainTaMiClient (wenn in TaMi-Kassenclient ausgeführt)
+            // PrimÃ¤r: aus MainTaMiClient (wenn in TaMi-Kassenclient ausgefÃ¼hrt)
             try
             {
                 if (Program.MainTaMiClient != null && !string.IsNullOrWhiteSpace(Program.MainTaMiClient.DatabaseConnectionStr))
@@ -67,7 +68,7 @@ namespace TaMi_Kassenclient
             }
             catch { }
 
-            // Letzter Rückfall: lokale Standardwerte
+            // Letzter RÃ¼ckfall: lokale Standardwerte
             return "Data Source=localhost,1433;Initial Catalog=SuE-TaMi;User ID=TaMiCli;Password=tami;Network Library=DBMSSOCN;";
         }
 
@@ -107,6 +108,7 @@ namespace TaMi_Kassenclient
             _tblZahlungen = await ResolveQualifiedTableAsync("TKassenbuchZahlungen") ?? "[dbo].[TKassenbuchZahlungen]";
             _tblFahrzeuge = await ResolveQualifiedTableAsync("TFahrzeuge") ?? "[dbo].[TFahrzeuge]"; // NEU
             _tblVorlagen  = await ResolveQualifiedTableAsync("TKassenbuchVorlagen") ?? "[dbo].[TKassenbuchVorlagen]"; // NEU
+            _tblSchichten = await ResolveQualifiedTableAsync("TSchichten") ?? "[dbo].[TSchichten]"; // NEU
 
             using (var cmd = _connection.CreateCommand())
             {
@@ -279,13 +281,13 @@ ORDER BY s.StartZeit DESC;";
             }
         }
 
-        // NEU: Alle offenen Zahlungen für alle Mitarbeiter (mit Namen)
+        // NEU: Alle offenen Zahlungen fÃ¼r alle Mitarbeiter (mit Namen)
         public async Task<DataTable> GetAllOffeneAuszahlungenAsync()
         {
             await EnsureOpenAsync();
             using (var cmd = _connection.CreateCommand())
             {
-                // UI mappt später Typ-Code zu Text und generiert Betrag/MwSt aus Einzelbeträgen
+                // UI mappt spÃ¤ter Typ-Code zu Text und generiert Betrag/MwSt aus EinzelbetrÃ¤gen
                 cmd.CommandText = $@"SELECT z.*, (p.Name + ' ' + p.Vorname) AS PersName
 FROM {_tblZahlungen} z WITH (NOLOCK)
 LEFT JOIN {_tblPersonal} p WITH (NOLOCK) ON p.PID = z.PersId
@@ -305,7 +307,7 @@ ORDER BY z.ErfasstAm DESC, z.Belegnummer DESC";
             {
                 using (var chk = _connection.CreateCommand())
                 {
-                    // _tblZahlungen liegt in Form [schema].[name] vor -> Klammern entfernen für OBJECT_ID
+                    // _tblZahlungen liegt in Form [schema].[name] vor -> Klammern entfernen fÃ¼r OBJECT_ID
                     string obj = (_tblZahlungen ?? "[dbo].[TKassenbuchZahlungen]").Replace("[", string.Empty).Replace("]", string.Empty);
                     chk.CommandText = "SELECT 1 FROM sys.columns WHERE Name='UserAnlage' AND object_id = OBJECT_ID(@obj)";
                     chk.Parameters.AddWithValue("@obj", obj);
@@ -367,7 +369,7 @@ VALUES(@pid,@typ,@txt,@b19,@b7,@b0,@bg,@k1,@k2,@kto,@fid,0,0,SYSDATETIME());";
             }
         }
 
-        // Vorlagen (Templates) – Erkennung: eigene Tabelle TKassenbuchVorlagen (NEU)
+        // Vorlagen (Templates) â€“ Erkennung: eigene Tabelle TKassenbuchVorlagen (NEU)
         public async Task<int> InsertZahlungsVorlageAsync(string typ, string vorlagenName, string buchungstext, string kost1, string kost2, string konto, string mwst, int firmenId = 0)
         {
             await EnsureOpenAsync();
@@ -511,7 +513,7 @@ ORDER BY v.VorlagenName ASC, v.Typ ASC;";
             }
         }
 
-        // NEU: Aktuelle Personalguthaben-Salden (nur != 0) für alle Mitarbeiter
+        // NEU: Aktuelle Personalguthaben-Salden (nur != 0) fÃ¼r alle Mitarbeiter
         public async Task<DataTable> GetAllPersonalGuthabenSaldenAsync()
         {
             await EnsureOpenAsync();
@@ -536,7 +538,7 @@ ORDER BY p.Name ASC, p.Vorname ASC;";
             }
         }
 
-        // NEU: Alle offenen Schichten für alle Mitarbeiter
+        // NEU: Alle offenen Schichten fÃ¼r alle Mitarbeiter
         public async Task<DataTable> GetAllOpenShiftsAsync()
         {
             await EnsureOpenAsync();
@@ -569,7 +571,7 @@ ORDER BY s.StartZeit DESC;";
             }
         }
 
-        // NEU: Personalguthaben-Verlauf (jüngste zuerst)
+        // NEU: Personalguthaben-Verlauf (jÃ¼ngste zuerst)
         public async Task<DataTable> GetPersonalGuthabenVerlaufAsync(int persId)
         {
             await EnsureOpenAsync();
@@ -610,7 +612,7 @@ ORDER BY ErfasstAm DESC, Belegnummer DESC;";
             }
         }
 
-        // Bearbeiten/Löschen offener Zahlungen
+        // Bearbeiten/LÃ¶schen offener Zahlungen
         public async Task<int> UpdateOffeneZahlungAsync(int belegnummer, string typ, string buchungstext, decimal b19, decimal b7, decimal b0, int? k1, int? k2, int? kto)
         {
             await EnsureOpenAsync();
@@ -659,7 +661,7 @@ WHERE Belegnummer=@bnr AND (Verbucht=0 OR Verbucht IS NULL)";
             await EnsureOpenAsync();
             using (var cmd = _connection.CreateCommand())
             {
-                // AutomatenName nicht mehr verändern, nur Verbucht setzen
+                // AutomatenName nicht mehr verÃ¤ndern, nur Verbucht setzen
                 cmd.CommandText = $@"UPDATE {_tblZahlungen} SET Verbucht=1 WHERE Belegnummer=@bnr AND (Verbucht=0 OR Verbucht IS NULL)";
                 cmd.Parameters.AddWithValue("@bnr", belegnummer);
                 return await cmd.ExecuteNonQueryAsync();
@@ -683,7 +685,7 @@ WHERE Belegnummer=@bnr AND (Verbucht=0 OR Verbucht IS NULL)";
             }
         }
 
-        // Hilfsfunktion: Belegnummer über KassenBelegnummer auflösen (neueste, nicht alte Revision)
+        // Hilfsfunktion: Belegnummer Ã¼ber KassenBelegnummer auflÃ¶sen (neueste, nicht alte Revision)
         public async Task<string> ResolveBelegnummerByKassenBelegAsync(string kassenBelegnummer)
         {
             await EnsureOpenAsync();
@@ -698,7 +700,7 @@ WHERE Belegnummer=@bnr AND (Verbucht=0 OR Verbucht IS NULL)";
             }
         }
 
-        // Direkte Bearbeitung des aktuellen Eintrags ohne Revision – NUR per eindeutiger Belegnummer
+        // Direkte Bearbeitung des aktuellen Eintrags ohne Revision â€“ NUR per eindeutiger Belegnummer
         public async Task<int> UpdateEntryDirectAsync(string belegnummer, string kassenBelegnummer,
             string buchungstext, int? kost1, int? kost2, int? konto,
             decimal betrag19, decimal betrag7, decimal betrag0)
@@ -741,7 +743,7 @@ WHERE ISNULL(RevIsOld,0)=0 AND Belegnummer = @bnr";
                     var name = c.ColumnName;
                     if (!writable.Contains(name)) continue;
                     if (name.Equals("RevIsOld", StringComparison.OrdinalIgnoreCase)) continue;
-                    if (name.Equals("Belegnummer", StringComparison.OrdinalIgnoreCase)) continue; // NIE explizit setzen -> Identity übernimmt
+                    if (name.Equals("Belegnummer", StringComparison.OrdinalIgnoreCase)) continue; // NIE explizit setzen -> Identity Ã¼bernimmt
 
                     object value;
                     if (name.Equals("RevNum", StringComparison.OrdinalIgnoreCase)) value = newRevNum;
@@ -800,7 +802,7 @@ WHERE ISNULL(RevIsOld,0)=0 AND Belegnummer = @bnr";
 SELECT 
     x.FirmenId,
     x.DeviceID,
-    COALESCE(NULLIF(LTRIM(RTRIM(d.AutomatenName)), ''), 'Gerät ' + CAST(x.DeviceID AS varchar(10))) AS AutomatenName,
+    COALESCE(NULLIF(LTRIM(RTRIM(d.AutomatenName)), ''), 'GerÃ¤t ' + CAST(x.DeviceID AS varchar(10))) AS AutomatenName,
     CASE 
         WHEN x.FirmenId = -1 THEN 'Personalguthaben'
         WHEN x.FirmenId BETWEEN 0 AND 255 THEN ISNULL(m.ManName, 'ID ' + CAST(x.FirmenId AS varchar(10)))
@@ -922,7 +924,7 @@ ORDER BY ErfasstAm ASC, Belegnummer ASC;";
             }
         }
 
-        // Revision / Split Methoden bleiben unverändert, da sie Belegnummer-basiert arbeiten
+        // Revision / Split Methoden bleiben unverÃ¤ndert, da sie Belegnummer-basiert arbeiten
         public async Task ReviseSingleAsync(string belegnummer, string buchungstext, int? kost1, int? kost2, int? konto,
             decimal betrag19, decimal betrag7, decimal betrag0)
         {
@@ -939,7 +941,7 @@ ORDER BY ErfasstAm ASC, Belegnummer ASC;";
                 int currentRev = (r.Table.Columns.Contains("RevNum") && r["RevNum"] != DBNull.Value) ? Convert.ToInt32(r["RevNum"]) : 0;
                 int newRev = currentRev + 1;
 
-                // Kassenbestand für neue Revision berechnen: alter Vor-Kassenbestand + neuer Delta
+                // Kassenbestand fÃ¼r neue Revision berechnen: alter Vor-Kassenbestand + neuer Delta
                 Func<object, decimal> toDec = (o) => (o == null || o == DBNull.Value) ? 0m : Convert.ToDecimal(o);
                 decimal oldDelta = Math.Round(toDec(r["Betrag19"]) + toDec(r["Betrag7"]) + toDec(r["Betrag0"]), 2);
                 decimal kbAfterOld = Math.Round(toDec(r["Kassenbestand"]), 2);
@@ -963,7 +965,7 @@ ORDER BY ErfasstAm ASC, Belegnummer ASC;";
                 // RevPersId (falls Spalte existiert) mit aktuell eingeloggter PID belegen
                 try { overrides["RevPersId"] = (object)(AppSession.CurrentUser?.PID ?? 0); } catch { overrides["RevPersId"] = 0; }
                 if (kost1.HasValue) overrides["Kost1"] = kost1.Value; if (kost2.HasValue) overrides["Kost2"] = kost2.Value; if (konto.HasValue) overrides["Konto"] = konto.Value;
-                // KassenBelegnummer übernehmen, falls vorhanden
+                // KassenBelegnummer Ã¼bernehmen, falls vorhanden
                 if (r.Table.Columns.Contains("KassenBelegnummer")) overrides["KassenBelegnummer"] = r["KassenBelegnummer"];
                 await InsertCloneWithSameBelegnummerAsync(tx, r, overrides, newRev);
                 tx.Commit();
@@ -988,7 +990,7 @@ ORDER BY ErfasstAm ASC, Belegnummer ASC;";
                 int currentRev = (r.Table.Columns.Contains("RevNum") && r["RevNum"] != DBNull.Value) ? Convert.ToInt32(r["RevNum"]) : 0;
                 int nextRev = currentRev + 1;
 
-                // Basis-Kassenbestand vor der ursprünglichen Buchung ermitteln
+                // Basis-Kassenbestand vor der ursprÃ¼nglichen Buchung ermitteln
                 Func<object, decimal> toDec = (o) => (o == null || o == DBNull.Value) ? 0m : Convert.ToDecimal(o);
                 decimal oldDelta = Math.Round(toDec(r["Betrag19"]) + toDec(r["Betrag7"]) + toDec(r["Betrag0"]), 2);
                 decimal kbAfterOld = Math.Round(toDec(r["Kassenbestand"]), 2);
@@ -1000,7 +1002,7 @@ ORDER BY ErfasstAm ASC, Belegnummer ASC;";
                 cmd.Parameters.AddWithValue("@Belegnummer", belegnummer ?? (object)DBNull.Value);
                 await cmd.ExecuteNonQueryAsync();
 
-                // KassenBelegnummer aus Quelle übernehmen, falls vorhanden
+                // KassenBelegnummer aus Quelle Ã¼bernehmen, falls vorhanden
                 object kassenBeleg = r.Table.Columns.Contains("KassenBelegnummer") ? r["KassenBelegnummer"] : (object)DBNull.Value;
 
                 if (b19 != 0m)
@@ -1054,6 +1056,54 @@ ORDER BY ErfasstAm ASC, Belegnummer ASC;";
                     if (!(kassenBeleg is DBNull)) o["KassenBelegnummer"] = kassenBeleg;
                     await InsertCloneWithSameBelegnummerAsync(tx, r, o, nextRev++);
                 }
+
+                // NEU: Wenn Schichtabrechnung, Fahrer-Einzahlungen in TSchichten Ã¼bernehmen
+                try
+                {
+                    byte typCode = 0;
+                    if (r.Table.Columns.Contains("Typ") && r["Typ"] != DBNull.Value)
+                    {
+                        var val = r["Typ"];
+                        if (val is byte) typCode = (byte)val;
+                        else if (val is short) typCode = (byte)(short)val;
+                        else if (val is int) typCode = (byte)(int)val;
+                        else
+                        {
+                            var s = Convert.ToString(val);
+                            if (byte.TryParse(s, out var n)) typCode = n;
+                            else if (string.Equals(s, "Schichtabrechnung", StringComparison.OrdinalIgnoreCase)) typCode = 4;
+                        }
+                    }
+
+                    if (typCode == 4 && r.Table.Columns.Contains("SchichtId") && r["SchichtId"] != DBNull.Value)
+                    {
+                        int schichtId = Convert.ToInt32(r["SchichtId"]);
+                        // Alte Werte aus dem Eintrag holen
+                        decimal old19 = toDec(r["Betrag19"]);
+                        decimal old7  = toDec(r["Betrag7"]);
+                        decimal old0  = toDec(r["Betrag0"]);
+                        // Deltas berechnen: neue Split-Werte minus alte Werte
+                        decimal d19 = Math.Round(b19 - old19, 2);
+                        decimal d7  = Math.Round(b7  - old7,  2);
+                        decimal d0  = Math.Round(b0  - old0,  2);
+
+                        using (var cmdUpd = _connection.CreateCommand())
+                        {
+                            cmdUpd.Transaction = tx;
+                            cmdUpd.CommandText = $@"UPDATE {_tblSchichten}
+SET EinzahlungFahrer1 = ISNULL(EinzahlungFahrer1,0) + @D19,
+    EinzahlungFahrer2 = ISNULL(EinzahlungFahrer2,0) + @D7,
+    EinzahlungFahrer3 = ISNULL(EinzahlungFahrer3,0) + @D0
+WHERE SchichtId=@SID";
+                            cmdUpd.Parameters.AddWithValue("@D19", d19);
+                            cmdUpd.Parameters.AddWithValue("@D7", d7);
+                            cmdUpd.Parameters.AddWithValue("@D0", d0);
+                            cmdUpd.Parameters.AddWithValue("@SID", schichtId);
+                            await cmdUpd.ExecuteNonQueryAsync();
+                        }
+                    }
+                }
+                catch { }
 
                 tx.Commit();
             }
@@ -1231,7 +1281,7 @@ WHERE Id=@Id; SELECT @Id;";
         }
     }
 
-    // DTO für dieses Projekt
+    // DTO fÃ¼r dieses Projekt
     public class PersonalInfo
     {
         public int PID { get; set; }

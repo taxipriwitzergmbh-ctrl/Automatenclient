@@ -1,4 +1,4 @@
-using System;
+ï»¿using System;
 using System.Collections.Generic;
 using System.ComponentModel;
 using System.Data;
@@ -63,13 +63,13 @@ namespace TaMi_Kassenclient
             lvRegeln = new ListView { Dock = DockStyle.Fill, View = View.Details, FullRowSelect = true, GridLines = true, HideSelection = false };
             lvRegeln.Columns.Add("Name",220);
             lvRegeln.Columns.Add("Bedingung",520);
-            lvRegeln.Columns.Add("Priorität",90); // neue Spalte links von Fallback
+            lvRegeln.Columns.Add("Prioritï¿½t",90); // neue Spalte links von Fallback
             lvRegeln.Columns.Add("Fallback",90);
             lvRegeln.Columns.Add("Ergebnis",300);
             lvRegeln.Resize += (s,e)=>AdjustListColumns();
             split.Panel1.Controls.Add(lvRegeln);
             var pnlBtns = new FlowLayoutPanel { Dock = DockStyle.Bottom, Height = 64, FlowDirection = FlowDirection.LeftToRight, Padding = new Padding(8)};
-            btnNeu = MakeBtn("Neu", Accent); btnBearbeiten = MakeBtn("Bearbeiten", Color.FromArgb(0,172,193)); btnDuplizieren = MakeBtn("Duplizieren", Color.FromArgb(3,155,229)); btnLoeschen = MakeBtn("Löschen", Color.IndianRed); btnSpeichernAlle = MakeBtn("Speichern", Color.FromArgb(76,175,80));
+            btnNeu = MakeBtn("Neu", Accent); btnBearbeiten = MakeBtn("Bearbeiten", Color.FromArgb(0,172,193)); btnDuplizieren = MakeBtn("Duplizieren", Color.FromArgb(3,155,229)); btnLoeschen = MakeBtn("Lï¿½schen", Color.IndianRed); btnSpeichernAlle = MakeBtn("Speichern", Color.FromArgb(76,175,80));
             btnNeu.Click += async (s,e)=> await NewRuleViaPopupAsync();
             btnBearbeiten.Click += async (s,e)=> await EditSelectedViaPopupAsync();
             btnDuplizieren.Click += async (s,e)=> await DuplicateSelectedViaPopupAsync();
@@ -98,7 +98,7 @@ namespace TaMi_Kassenclient
             {
                 var item = new ListViewItem(r.Name ?? "(ohne Namen)");
                 item.SubItems.Add(r.GetReadableCondition());
-                item.SubItems.Add(r.Priority.ToString()); // Priorität
+                item.SubItems.Add(r.Priority.ToString()); // Prioritï¿½t
                 item.SubItems.Add(r.IsDefault?"Ja":"Nein"); // Fallback
                 var parts=new List<string>();
                 if(r.ResultKost1.HasValue) parts.Add($"Kost1={r.ResultKost1}");
@@ -126,7 +126,7 @@ namespace TaMi_Kassenclient
                     int bedW=Math.Max(300,w-(nameW+prioW+fallbackW+ergW)-8);
                     lvRegeln.Columns[0].Width=nameW;      // Name
                     lvRegeln.Columns[1].Width=bedW;       // Bedingung
-                    lvRegeln.Columns[2].Width=prioW;      // Priorität
+                    lvRegeln.Columns[2].Width=prioW;      // Prioritï¿½t
                     lvRegeln.Columns[3].Width=fallbackW;  // Fallback
                     lvRegeln.Columns[4].Width=ergW;       // Ergebnis
                 }
@@ -157,7 +157,7 @@ namespace TaMi_Kassenclient
                 MessageBox.Show(this, "Regel konnte nicht gespeichert werden:\r\n" + ex.Message, "Fehler", MessageBoxButtons.OK, MessageBoxIcon.Error);
             }
         }
-        private async void DeleteSelected(){ var r=GetSelectedRule(); if(r==null) return; if(MessageBox.Show(this,$"Regel '{r.Name}' löschen?","Bestätigen",MessageBoxButtons.YesNo,MessageBoxIcon.Question)!=DialogResult.Yes) return; try { await SoftDeleteRuleBySqlAsync(r.Id);} catch { } await LoadRulesAsync(); }
+        private async void DeleteSelected(){ var r=GetSelectedRule(); if(r==null) return; if(MessageBox.Show(this,$"Regel '{r.Name}' lï¿½schen?","Bestï¿½tigen",MessageBoxButtons.YesNo,MessageBoxIcon.Question)!=DialogResult.Yes) return; try { await SoftDeleteRuleBySqlAsync(r.Id);} catch { } await LoadRulesAsync(); }
         private async Task<int> SoftDeleteRuleBySqlAsync(int ruleId){ if(ruleId<=0) return 0; var cs=DatabaseHelperKassen.GetConnectionString(); using(var conn=new SqlConnection(cs)){ await conn.OpenAsync(); string tblRules= await ResolveQualifiedTableAsync(conn,"TAbrechnungsBedingungen") ?? "[dbo].[TAbrechnungsBedingungen]"; string tblClauses= await ResolveQualifiedTableAsync(conn,"TAbrechnungsBedingungenClause") ?? "[dbo].[TAbrechnungsBedingungenClause]"; using(var tx=conn.BeginTransaction()) using(var cmd=conn.CreateCommand()){ cmd.Transaction=tx; cmd.CommandText=$"UPDATE {tblRules} SET IsActive=0, ModifiedAt=SYSUTCDATETIME() WHERE Id=@Id"; cmd.Parameters.AddWithValue("@Id", ruleId); int affected= await cmd.ExecuteNonQueryAsync(); cmd.Parameters.Clear(); try { cmd.CommandText=$"DELETE FROM {tblClauses} WHERE RuleId=@R"; cmd.Parameters.AddWithValue("@R", ruleId); await cmd.ExecuteNonQueryAsync(); cmd.Parameters.Clear(); } catch { cmd.Parameters.Clear(); } tx.Commit(); return affected; } } }
         private static async Task<string> ResolveQualifiedTableAsync(SqlConnection conn,string tableName){ using(var cmd=conn.CreateCommand()){ cmd.CommandText=@"SELECT '[' + s.name + '].[' + t.name + ']' FROM sys.tables t JOIN sys.schemas s ON s.schema_id=t.schema_id WHERE t.name=@n"; cmd.Parameters.AddWithValue("@n", tableName); var o= await cmd.ExecuteScalarAsync(); return (o==null||o==DBNull.Value)? null : Convert.ToString(o);} }
         private async void SaveAll(){ try { using(var db=new DatabaseHelperKassen()){ foreach(var r in _regeln){ r.Id = await db.SaveAbrechnungsRegelAsync(r);} } MessageBox.Show(this,"Regeln gespeichert.","Info",MessageBoxButtons.OK,MessageBoxIcon.Information);} catch(Exception ex){ MessageBox.Show(this,"Fehler beim Speichern: "+ex.Message,"Fehler",MessageBoxButtons.OK,MessageBoxIcon.Error);} }

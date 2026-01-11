@@ -1,4 +1,4 @@
-using System;
+ï»¿using System;
 using System.Data;
 using System.Drawing;
 using System.Runtime.InteropServices;
@@ -203,7 +203,7 @@ namespace TaMi_Kassenclient
 
             lblAnfang = new Label
             {
-                Text = "Anfangsbestand: 0,00 €",
+                Text = "Anfangsbestand: 0,00 ï¿½",
                 Location = new Point(24, 130),
                 Size = new Size(600, 32),
                 Font = new Font("Segoe UI Variable", 16F, FontStyle.Bold)
@@ -212,7 +212,7 @@ namespace TaMi_Kassenclient
 
             lblEnde = new Label
             {
-                Text = "Endbestand: 0,00 €",
+                Text = "Endbestand: 0,00 ï¿½",
                 Location = new Point(24, 170),
                 Size = new Size(600, 32),
                 Font = new Font("Segoe UI Variable", 16F, FontStyle.Bold)
@@ -248,7 +248,7 @@ namespace TaMi_Kassenclient
             InitializeFooter();
 
             Shown += async (s, e) => await RefreshDayAsync();
-            // Beim Schließen speichern
+            // Beim Schlieï¿½en speichern
             FormClosing += (s, e) => TrySaveColumnWidths();
         }
 
@@ -327,7 +327,7 @@ namespace TaMi_Kassenclient
                         MessageBox.Show(this, $"{affected} Buchung(en) festgeschrieben.", "Info", MessageBoxButtons.OK, MessageBoxIcon.Information);
                     }
                 }
-                _dayLocked = true; // lokal sperren (nicht rückgängig machbar)
+                _dayLocked = true; // lokal sperren (nicht rï¿½ckgï¿½ngig machbar)
                 btnLockDay.Enabled = false;
                 btnLockDay.Text = "Tag festgeschrieben";
                 btnBearbeiten.Enabled = false;
@@ -429,7 +429,7 @@ namespace TaMi_Kassenclient
                     btnLockDay.Text = _dayLocked ? "Tag festgeschrieben" : "Tag festschreiben";
                     btnBearbeiten.Enabled = !_dayLocked;
                     btnSplitten.Enabled = !_dayLocked;
-                    // Liste nicht deaktivieren, damit Farb-/Schriftunterschiede für alte Revisionen sichtbar bleiben
+                    // Liste nicht deaktivieren, damit Farb-/Schriftunterschiede fï¿½r alte Revisionen sichtbar bleiben
                     // lvEintraege.Enabled = !_dayLocked; // entfernt
 
                     var start = await db.GetAnfangsbestandAsync(_firmenId, _automatenName, dtpTag.Value.Date);
@@ -454,7 +454,7 @@ namespace TaMi_Kassenclient
                         bool isOld = dt.Columns.Contains("RevIsOld") && row["RevIsOld"] != DBNull.Value && Convert.ToInt32(row["RevIsOld"]) != 0;
                         bool isFest = dt.Columns.Contains("Festgeschrieben") && row["Festgeschrieben"] != DBNull.Value && Convert.ToInt32(row["Festgeschrieben"]) != 0; // NEW
 
-                        // KassenBelegnummer/RevNum für Spalte "Nr."
+                        // KassenBelegnummer/RevNum fï¿½r Spalte "Nr."
                         string kassenBelegnummer = dt.Columns.Contains("KassenBelegnummer") && row["KassenBelegnummer"] != DBNull.Value
                             ? Convert.ToString(row["KassenBelegnummer"]) : (dt.Columns.Contains("Belegnummer") ? Convert.ToString(row["Belegnummer"]) : string.Empty);
                         int revNum = dt.Columns.Contains("RevNum") && row["RevNum"] != DBNull.Value ? Convert.ToInt32(row["RevNum"]) : 0;
@@ -499,9 +499,9 @@ namespace TaMi_Kassenclient
                                 item.Font = new Font(baseFont, FontStyle.Italic | FontStyle.Strikeout);
                             }
                             catch { item.ForeColor = Color.Gray; }
-                            item.SubItems[3].Text = "(Ersetzt durch nächste Buchung) " + (item.SubItems[3].Text ?? "");
+                            item.SubItems[3].Text = "(Ersetzt durch nï¿½chste Buchung) " + (item.SubItems[3].Text ?? "");
                         }
-                        // Hervorhebung festgeschriebener (gültiger) Einträge: hellgraue Hinterlegung
+                        // Hervorhebung festgeschriebener (gï¿½ltiger) Eintrï¿½ge: hellgraue Hinterlegung
                         if (isFest)
                         {
                             try { item.BackColor = Color.FromArgb(245, 245, 245); } catch { item.BackColor = Color.Gainsboro; }
@@ -511,21 +511,21 @@ namespace TaMi_Kassenclient
 
                     if (dt.Rows.Count == 0)
                     {
-                        var empty = new ListViewItem(new[] { "", "", "Keine Buchungen am ausgewählten Tag.", "", "", "", "", "", "", "" }) { ForeColor = Color.DimGray };
+                        var empty = new ListViewItem(new[] { "", "", "Keine Buchungen am ausgewï¿½hlten Tag.", "", "", "", "", "", "", "" }) { ForeColor = Color.DimGray };
                         lvEintraege.Items.Add(empty);
                     }
                 }
             }
             catch (Exception ex)
             {
-                MessageBox.Show(this, $"Fehler beim Laden der Bestände/Buchungen:\r\n{ex.Message}", "Fehler",
+                MessageBox.Show(this, $"Fehler beim Laden der Bestï¿½nde/Buchungen:\r\n{ex.Message}", "Fehler",
                     MessageBoxButtons.OK, MessageBoxIcon.Error);
             }
-            // nach dem Laden sicherstellen, dass benutzerdefinierte Breiten nicht überschrieben werden
+            // nach dem Laden sicherstellen, dass benutzerdefinierte Breiten nicht ï¿½berschrieben werden
             TryApplyColumnWidths();
         }
 
-        // === INI Persistenz für Spaltenbreiten ===
+        // === INI Persistenz fï¿½r Spaltenbreiten ===
         private string GetIniPath()
         {
             try
@@ -548,7 +548,7 @@ namespace TaMi_Kassenclient
 
         private string GetIniSectionKey()
         {
-            // Schlüssel pro Kasse und TagView
+            // Schlï¿½ssel pro Kasse und TagView
             return $"DayViewForm.Columns.{_firmenId}.{_automatenName}";
         }
 
@@ -639,7 +639,7 @@ namespace TaMi_Kassenclient
         private async Task DoBearbeitenAsync()
         {
             if (_dayLocked) { MessageBox.Show(this, "Tag ist festgeschrieben."); return; }
-            if (lvEintraege.SelectedItems.Count == 0) { MessageBox.Show(this, "Bitte Eintrag auswählen."); return; }
+            if (lvEintraege.SelectedItems.Count == 0) { MessageBox.Show(this, "Bitte Eintrag auswï¿½hlen."); return; }
             var item = lvEintraege.SelectedItems[0];
             var meta = item.Tag as EntryMeta; if (meta == null || string.IsNullOrEmpty(meta.Belegnummer)) return;
 
@@ -686,14 +686,14 @@ namespace TaMi_Kassenclient
         private async void BtnSplitten_Click(object sender, System.EventArgs e)
         {
             if (_dayLocked) { MessageBox.Show(this, "Tag ist festgeschrieben."); return; }
-            if (lvEintraege.SelectedItems.Count == 0) { MessageBox.Show(this, "Bitte Eintrag auswählen."); return; }
+            if (lvEintraege.SelectedItems.Count == 0) { MessageBox.Show(this, "Bitte Eintrag auswï¿½hlen."); return; }
             var item = lvEintraege.SelectedItems[0];
             var meta = item.Tag as EntryMeta; if (meta == null || string.IsNullOrEmpty(meta.Belegnummer)) return;
 
             decimal.TryParse(item.SubItems[4].Text, NumberStyles.Currency, CultureInfo.CurrentCulture, out var gesamt);
             var typ = item.SubItems.Count > 2 ? item.SubItems[2].Text : null;
 
-            // SchichtId/PersId laden, um FhzId ermitteln zu können
+            // SchichtId/PersId laden, um FhzId ermitteln zu kï¿½nnen
             string schichtId = null; object persIdObj = null; int? fhzId = null; string fahrerName = string.Empty; string kennzeichen = string.Empty;
             using (var db = new DatabaseHelperKassen())
             {
@@ -710,7 +710,7 @@ namespace TaMi_Kassenclient
                                                   typ: typ,
                                                   buchungstext: item.SubItems[3].Text,
                                                   betragGesamt: item.SubItems[4].Text,
-                                                  // Vorhandene Teilbeträge
+                                                  // Vorhandene Teilbetrï¿½ge
                                                   v19: meta.Betrag19,
                                                   v7:  meta.Betrag7,
                                                   v0:  meta.Betrag0,
@@ -777,7 +777,7 @@ namespace TaMi_Kassenclient
 
                 using (var sfd = new SaveFileDialog
                 {
-                    Title = "CSV-Export (DATEV – Standardformat VorzBetrag)",
+                    Title = "CSV-Export (DATEV ï¿½ Standardformat VorzBetrag)",
                     Filter = "CSV-Datei (*.csv)|*.csv",
                     FileName = $"Kasse_{_kassenName}_{dtpTag.Value:yyyy-MM-dd}.csv",
                     OverwritePrompt = true
@@ -811,7 +811,7 @@ namespace TaMi_Kassenclient
                         try
                         {
                             // Wir holen die Zeile erneut um FhzId/SchichtId sicher zu lesen (Columns jetzt vorhanden)
-                            // (alternativ könnte Meta um diese Felder erweitert werden)
+                            // (alternativ kï¿½nnte Meta um diese Felder erweitert werden)
                             using (var db2 = new DatabaseHelperKassen())
                             {
                                 var row = await db2.GetEintragByBelegnummerAsync(meta.Belegnummer);
