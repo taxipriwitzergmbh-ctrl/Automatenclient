@@ -48,7 +48,7 @@
     <WarningLevel>4</WarningLevel>
   </PropertyGroup>
   <PropertyGroup>
-    <ApplicationIcon>Resources\Einzahlautomat_Win11.ico</ApplicationIcon>
+    <ApplicationIcon>Ressourcen\Einzahlautomat_Win11.ico</ApplicationIcon>
   </PropertyGroup>
   <PropertyGroup>
     <StartupObject>TaMi_Kassenclient.Program</StartupObject>
@@ -185,7 +185,7 @@
     </BootstrapperPackage>
   </ItemGroup>
   <ItemGroup>
-    <Content Include="Resources\Einzahlautomat_Win11.ico" />
+    <Content Include="Ressourcen\Einzahlautomat_Win11.ico" />
   </ItemGroup>
   <Import Project="$(MSBuildToolsPath)\Microsoft.CSharp.targets" />
 </Project>
