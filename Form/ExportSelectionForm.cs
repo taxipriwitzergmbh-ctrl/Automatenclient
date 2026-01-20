@@ -238,51 +238,36 @@ namespace TaMi_Kassenclient
             var doc = new System.Drawing.Printing.PrintDocument();
             doc.DocumentName = $"Kassenbericht_{_kassenName}_{from:yyyy-MM-dd}_bis_{to:yyyy-MM-dd}";
 
-            // sehr kleiner linker Rand + sehr kleiner unterer Rand
-            doc.DefaultPageSettings.Margins = new System.Drawing.Printing.Margins(10, 40, 40, 10);
+            // sehr kleiner linker Rand + kein unterer Rand
+            doc.DefaultPageSettings.Margins = new System.Drawing.Printing.Margins(10, 40, 40, 0);
 
             int currentIndex = 0;
             bool printedTotals = false;
+            int pageNo = 0;
             var rows = data.Rows;
             var de = CultureInfo.GetCultureInfo("de-DE");
 
-            // Bei jedem Drucklauf neu beginnen (gilt für Vorschau + echtes Drucken)
-            doc.BeginPrint += (s, e) => { currentIndex = 0; printedTotals = false; };
+            // Bei jedem Drucklauf neu beginnen
+            doc.BeginPrint += (s, e) => { currentIndex = 0; printedTotals = false; pageNo = 0; };
 
-            // Summen pro Konto+MwSt berechnen -> Netto (Einnahmen-Ausgaben)
+            // Summen pro Konto+MwSt berechnen -> Netto
             var totals = rows.Cast<DataRow>()
                 .Where(r => !IsOld(r))
-                .GroupBy(r => new
-                {
-                    Konto = SafeString(r, "Konto"),
-                    Mwst = MwstText(r)
-                })
-                .Select(g => new
-                {
-                    Konto = g.Key.Konto,
-                    Mwst = g.Key.Mwst,
-                    Betrag = g.Sum(r => BetragSigned(r))
-                })
-                .OrderBy(t => t.Konto)
-                .ThenBy(t => t.Mwst)
-                .ToList();
+                .GroupBy(r => new { Konto = SafeString(r, "Konto"), Mwst = MwstText(r) })
+                .Select(g => new { Konto = g.Key.Konto, Mwst = g.Key.Mwst, Betrag = g.Sum(r => BetragSigned(r)) })
+                .OrderBy(t => t.Konto).ThenBy(t => t.Mwst).ToList();
 
             // Summen nur nach Konto -> Netto
             var kontoTotals = rows.Cast<DataRow>()
                 .Where(r => !IsOld(r))
                 .GroupBy(r => SafeString(r, "Konto"))
-                .Select(g => new
-                {
-                    Konto = g.Key,
-                    Betrag = g.Sum(r => BetragSigned(r))
-                })
-                .OrderBy(t => t.Konto)
-                .ToList();
+                .Select(g => new { Konto = g.Key, Betrag = g.Sum(r => BetragSigned(r)) })
+                .OrderBy(t => t.Konto).ToList();
 
             decimal anfangsbestand = await GetAnfangsbestandAsync(from);
             decimal endbestand = await GetEndbestandAsync(to);
 
-            // Anfangs-/Endbeleg bestimmen (nach Datum)
+            // Anfangs-/Endbeleg
             Func<DataRow, string> getBeleg = r =>
             {
                 var b = SafeString(r, "KassenBelegnummer");
@@ -295,9 +280,11 @@ namespace TaMi_Kassenclient
                 .ToList();
             string anfangsBeleg = orderedValid.Count > 0 ? getBeleg(orderedValid.First()) : string.Empty;
             string endBeleg = orderedValid.Count > 0 ? getBeleg(orderedValid.Last()) : string.Empty;
+            string erstelltAm = DateTime.Now.ToString("dd.MM.yyyy", de);
 
             doc.PrintPage += (s, e) =>
             {
+                pageNo++;
                 var g = e.Graphics;
                 var black = Brushes.Black;
                 var titleFont = new Font("Times New Roman", 14f, FontStyle.Bold);
@@ -309,24 +296,42 @@ namespace TaMi_Kassenclient
                 float right = e.MarginBounds.Right;
                 float pageWidth = e.MarginBounds.Width;
 
-                // Titel: Kassenname + Automatenname
-                string headerTitle = string.IsNullOrWhiteSpace(_automatenName)
-                    ? _kassenName
-                    : ($"{_kassenName} – {_automatenName}");
-                g.DrawString(headerTitle, titleFont, black, left, y); y += 28f;
-                g.DrawString($"Kassenbericht vom:  {to:dd.MM.yyyy} – Zeitraum: {from:dd.MM.yyyy} bis {to:dd.MM.yyyy}", normal, black, left, y); y += 20f;
-                // Zusatzinfozeile
-                string info = $"Anfangsbestand: {anfangsbestand.ToString("C", de)}   Endbestand: {endbestand.ToString("C", de)}   Anfangsbeleg: {anfangsBeleg}   Endbeleg: {endBeleg}";
-                g.DrawString(info, normal, black, left, y); y += 22f;
+                // Kopf: Seite 1 (voll) / Folgeseiten (kompakt)
+                if (pageNo == 1)
+                {
+                    string headerTitle = string.IsNullOrWhiteSpace(_automatenName) ? _kassenName : ($"{_kassenName} – {_automatenName}");
+                    g.DrawString(headerTitle, titleFont, black, left, y); y += 28f;
+                    g.DrawString($"Kassenbericht vom:  {to:dd.MM.yyyy} – Zeitraum: {from:dd.MM.yyyy} bis {to:dd.MM.yyyy}", normal, black, left, y); y += 20f;
+                    string info = $"Anfangsbestand: {anfangsbestand.ToString("C", de)}   Endbestand: {endbestand.ToString("C", de)}   Anfangsbeleg: {anfangsBeleg}   Endbeleg: {endBeleg}";
+                    g.DrawString(info, normal, black, left, y); y += 18f;
+                    // horizontaler Trennstrich
+                    using (var p = new Pen(Color.Black, 1f))
+                    {
+                        g.DrawLine(p, left, y, right, y);
+                    }
+                    y += 8f;
+                }
+                else
+                {
+                    string headerTitle = string.IsNullOrWhiteSpace(_automatenName) ? _kassenName : ($"{_kassenName} – {_automatenName}");
+                    g.DrawString(headerTitle, smallBold, black, left, y);
+                    g.DrawString($"   Kassenbericht vom {erstelltAm}", normal, black, left + 220f, y);
+                    y += 18f;
+                    using (var p = new Pen(Color.Black, 1f))
+                    {
+                        g.DrawLine(p, left, y, right, y);
+                    }
+                    y += 6f;
+                }
 
-                // Spaltenbreiten dynamisch
-                float gap = 8f;       // Standardabstand
-                float gapNarrow = 3f; // enger Abstand für Konto/Kosten/MwSt
-                float wBeleg = 60f;   // Belegnummer schmaler
+                // Spaltenbreiten
+                float gap = 8f;
+                float gapNarrow = 3f;
+                float wBeleg = 60f;
                 float wKonto = 60f;
-                float wKost = 52f;    // etwas breiter
-                float wMwst = 42f;    // leicht schmaler
-                float wBetrag = 96f;  // schmaler Betrag
+                float wKost = 52f;
+                float wMwst = 42f;
+                float wBetrag = 96f;
 
                 float fixedWidth = wBeleg + wKonto + (wKost * 2) + wMwst + wBetrag + (gap * 3) + (gapNarrow * 3);
                 float wText = Math.Max(220f, pageWidth - fixedWidth);
@@ -351,9 +356,8 @@ namespace TaMi_Kassenclient
 
                 var sfWrap = new StringFormat(StringFormatFlags.LineLimit) { Trimming = StringTrimming.EllipsisWord };
                 var sfRight = new StringFormat { Alignment = StringAlignment.Far };
-                float maxTextHeight = normal.GetHeight(g) * 2f + 2f; // max 2 Zeilen
+                float maxTextHeight = normal.GetHeight(g) * 2f + 2f;
 
-                // Detailzeilen
                 while (currentIndex < rows.Count)
                 {
                     var r = rows[currentIndex]; currentIndex++;
@@ -369,45 +373,36 @@ namespace TaMi_Kassenclient
                     decimal betrag = BetragSigned(r);
 
                     float yStart = y;
-                    // Beleg
                     g.DrawString(beleg, normal, black, new RectangleF(xBeleg, yStart, wBeleg, maxTextHeight), null);
-                    // Text max. 2 Zeilen
                     var rectText = new RectangleF(xText, yStart, wText, maxTextHeight);
                     g.DrawString(typText, normal, black, rectText, sfWrap);
-                    // Konto/Kosten/MwSt
                     g.DrawString(konto, normal, black, new RectangleF(xKonto, yStart, wKonto, maxTextHeight), null);
                     g.DrawString(kost1, normal, black, new RectangleF(xKost1, yStart, wKost, maxTextHeight), null);
                     g.DrawString(kost2, normal, black, new RectangleF(xKost2, yStart, wKost, maxTextHeight), null);
                     g.DrawString(mwst, normal, black, new RectangleF(xMwst, yStart, wMwst, maxTextHeight), null);
-
-                    // Betrag (positiv/negativ)
                     g.DrawString(betrag.ToString("C", de), normal, black, new RectangleF(xBetrag, yStart, wBetrag, maxTextHeight), sfRight);
 
-                    // tatsächliche Höhe (ein oder zwei Zeilen)
                     var measured = g.MeasureString(typText, normal, new SizeF(wText, 1000f), sfWrap);
                     float used = Math.Min(maxTextHeight, measured.Height);
                     y += Math.Max(normal.GetHeight(g), used) + 2f;
 
-                    if (y > e.MarginBounds.Bottom - 140)
+                    if (y > e.MarginBounds.Bottom - 120)
                     {
                         e.HasMorePages = true;
                         return;
                     }
                 }
 
-                // Summenblöcke drucken (nach Konto+MwSt und nach Konto)
                 if (!printedTotals)
                 {
-                    // Falls auf dieser Seite nicht genug Platz ist, neue Seite beginnen
-                    float requiredSpace = 20f + (Math.Max(totals.Count, kontoTotals.Count) + 6) * 18f + 80f; // grob geschätzt inkl. Bestände
+                    float requiredSpace = 20f + (Math.Max(totals.Count, kontoTotals.Count) + 6) * 18f + 40f;
                     if (y + requiredSpace > e.MarginBounds.Bottom)
                     {
                         e.HasMorePages = true;
                         return;
                     }
 
-                    // Überschrift Summen
-                    y += 16f;
+                    y += 12f;
                     g.DrawString("Summen nach Konto und %", smallBold, black, left, y); y += 8f;
                     g.DrawString("Konto", smallBold, black, xKonto, y);
                     g.DrawString("%", smallBold, black, xMwst, y);
@@ -421,8 +416,7 @@ namespace TaMi_Kassenclient
                         y += 18f;
                     }
 
-                    // Summen nur nach Konto
-                    y += 10f;
+                    y += 8f;
                     g.DrawString("Summen nach Konto", smallBold, black, left, y); y += 8f;
                     g.DrawString("Konto", smallBold, black, xKonto, y);
                     g.DrawString("Betrag", smallBold, black, xBetrag, y);
@@ -440,15 +434,6 @@ namespace TaMi_Kassenclient
                 e.HasMorePages = currentIndex < rows.Count || !printedTotals;
             };
 
-            // Vorschau anzeigen
-            using (var pv = new PrintPreviewDialog())
-            {
-                pv.Document = doc;
-                pv.Width = 1024; pv.Height = 768;
-                pv.ShowDialog(this);
-            }
-
-            // Danach Windows-Druckdialog anzeigen (z.B. für Microsoft Print to PDF)
             using (var dlg = new PrintDialog())
             {
                 dlg.UseEXDialog = true;
