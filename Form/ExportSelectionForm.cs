@@ -238,8 +238,8 @@ namespace TaMi_Kassenclient
             var doc = new System.Drawing.Printing.PrintDocument();
             doc.DocumentName = $"Kassenbericht_{_kassenName}_{from:yyyy-MM-dd}_bis_{to:yyyy-MM-dd}";
 
-            // sehr kleiner linker Rand
-            doc.DefaultPageSettings.Margins = new System.Drawing.Printing.Margins(10, 40, 40, 40);
+            // sehr kleiner linker Rand + sehr kleiner unterer Rand
+            doc.DefaultPageSettings.Margins = new System.Drawing.Printing.Margins(10, 40, 40, 10);
 
             int currentIndex = 0;
             bool printedTotals = false;
@@ -282,6 +282,20 @@ namespace TaMi_Kassenclient
             decimal anfangsbestand = await GetAnfangsbestandAsync(from);
             decimal endbestand = await GetEndbestandAsync(to);
 
+            // Anfangs-/Endbeleg bestimmen (nach Datum)
+            Func<DataRow, string> getBeleg = r =>
+            {
+                var b = SafeString(r, "KassenBelegnummer");
+                if (string.IsNullOrWhiteSpace(b)) b = SafeString(r, "Belegnummer");
+                return b;
+            };
+            var orderedValid = rows.Cast<DataRow>()
+                .Where(r => !IsOld(r))
+                .OrderBy(r => r.Table.Columns.Contains("ErfasstAm") && r["ErfasstAm"] != DBNull.Value ? r.Field<DateTime>("ErfasstAm") : DateTime.MinValue)
+                .ToList();
+            string anfangsBeleg = orderedValid.Count > 0 ? getBeleg(orderedValid.First()) : string.Empty;
+            string endBeleg = orderedValid.Count > 0 ? getBeleg(orderedValid.Last()) : string.Empty;
+
             doc.PrintPage += (s, e) =>
             {
                 var g = e.Graphics;
@@ -300,19 +314,22 @@ namespace TaMi_Kassenclient
                     ? _kassenName
                     : ($"{_kassenName} – {_automatenName}");
                 g.DrawString(headerTitle, titleFont, black, left, y); y += 28f;
-                g.DrawString($"Kassenbericht vom:  {to:dd.MM.yyyy} – Zeitraum: {from:dd.MM.yyyy} bis {to:dd.MM.yyyy}", normal, black, left, y); y += 22f;
+                g.DrawString($"Kassenbericht vom:  {to:dd.MM.yyyy} – Zeitraum: {from:dd.MM.yyyy} bis {to:dd.MM.yyyy}", normal, black, left, y); y += 20f;
+                // Zusatzinfozeile
+                string info = $"Anfangsbestand: {anfangsbestand.ToString("C", de)}   Endbestand: {endbestand.ToString("C", de)}   Anfangsbeleg: {anfangsBeleg}   Endbeleg: {endBeleg}";
+                g.DrawString(info, normal, black, left, y); y += 22f;
 
                 // Spaltenbreiten dynamisch
                 float gap = 8f;       // Standardabstand
                 float gapNarrow = 3f; // enger Abstand für Konto/Kosten/MwSt
                 float wBeleg = 60f;   // Belegnummer schmaler
                 float wKonto = 60f;
-                float wKost = 40f;
-                float wMwst = 46f;
-                float wBetrag = 120f; // eine gemeinsame Betrag-Spalte
+                float wKost = 52f;    // etwas breiter
+                float wMwst = 42f;    // leicht schmaler
+                float wBetrag = 96f;  // schmaler Betrag
 
                 float fixedWidth = wBeleg + wKonto + (wKost * 2) + wMwst + wBetrag + (gap * 3) + (gapNarrow * 3);
-                float wText = Math.Max(200f, pageWidth - fixedWidth);
+                float wText = Math.Max(220f, pageWidth - fixedWidth);
 
                 float xBeleg = left;
                 float xText = xBeleg + wBeleg + gap;
@@ -371,7 +388,7 @@ namespace TaMi_Kassenclient
                     float used = Math.Min(maxTextHeight, measured.Height);
                     y += Math.Max(normal.GetHeight(g), used) + 2f;
 
-                    if (y > e.MarginBounds.Bottom - 160)
+                    if (y > e.MarginBounds.Bottom - 140)
                     {
                         e.HasMorePages = true;
                         return;
@@ -416,14 +433,6 @@ namespace TaMi_Kassenclient
                         g.DrawString(t.Betrag.ToString("C", de), normal, black, new RectangleF(xBetrag, y, wBetrag, normal.GetHeight(g) + 4f), sfRight);
                         y += 18f;
                     }
-
-                    // Bestände rechts, am Seitenrand ausrichten
-                    float boxTop = y + 10f;
-                    float labelWidth = 130f;
-                    g.DrawString("Anfangsbestand:", smallBold, black, right - (wBetrag + 40f + labelWidth), boxTop);
-                    g.DrawString(anfangsbestand.ToString("C", de), normal, black, new RectangleF(right - (wBetrag + 40f), boxTop, wBetrag + 40f, normal.GetHeight(g) + 4f), sfRight);
-                    g.DrawString("Endbestand:", smallBold, black, right - (wBetrag + 40f + labelWidth), boxTop + 22f);
-                    g.DrawString(endbestand.ToString("C", de), normal, black, new RectangleF(right - (wBetrag + 40f), boxTop + 22f, wBetrag + 40f, normal.GetHeight(g) + 4f), sfRight);
 
                     printedTotals = true;
                 }
