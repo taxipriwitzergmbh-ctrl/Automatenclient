@@ -232,9 +232,30 @@ namespace TaMi_Kassenclient
             }
         }
 
+        private async Task<string> ResolveAutomatenAnzeigeNameAsync()
+        {
+            try
+            {
+                using (var db = new DatabaseHelperKassen())
+                {
+                    var dt = await db.GetKassenListeAsync(new[] { _automatenName });
+                    if (dt != null && dt.Rows.Count > 0)
+                    {
+                        var r = dt.Rows[0];
+                        string name = r.Table.Columns.Contains("AutomatenName") && r["AutomatenName"] != DBNull.Value ? Convert.ToString(r["AutomatenName"]) : null;
+                        if (!string.IsNullOrWhiteSpace(name)) return name.Trim();
+                    }
+                }
+            }
+            catch { }
+            return _automatenName; // Fallback
+        }
+
         private async Task DoPrintReportAsync(DateTime from, DateTime to)
         {
             var data = await LoadKassenDataAsync(from, to);
+            // Standortname ermitteln (falls _automatenName eine DeviceID ist)
+            string automatenAnzeigeName = await ResolveAutomatenAnzeigeNameAsync();
             var doc = new System.Drawing.Printing.PrintDocument();
             doc.DocumentName = $"Kassenbericht_{_kassenName}_{from:yyyy-MM-dd}_bis_{to:yyyy-MM-dd}";
 
@@ -293,10 +314,11 @@ namespace TaMi_Kassenclient
                 float right = e.MarginBounds.Right;
                 float pageWidth = e.MarginBounds.Width;
 
-                // Kopf
+                // Kopf: Seite 1 (voll) / Folgeseiten (kompakt)
                 if (pageNo == 1)
                 {
-                    string headerTitle = string.IsNullOrWhiteSpace(_automatenName) ? _kassenName : ($"{_kassenName} – {_automatenName}");
+                    // Anzeige: Firmenname – Automatenstandort
+                    string headerTitle = string.IsNullOrWhiteSpace(automatenAnzeigeName) ? _kassenName : ($"{_kassenName} – {automatenAnzeigeName}");
                     g.DrawString(headerTitle, titleFont, black, left, y); y += 28f;
                     g.DrawString($"Kassenbericht vom:  {to:dd.MM.yyyy} – Zeitraum: {from:dd.MM.yyyy} bis {to:dd.MM.yyyy}", normal, black, left, y); y += 20f;
                     string info = $"Anfangsbestand: {anfangsbestand.ToString("C", de)}   Endbestand: {endbestand.ToString("C", de)}   Anfangsbeleg: {anfangsBeleg}   Endbeleg: {endBeleg}";
@@ -306,7 +328,7 @@ namespace TaMi_Kassenclient
                 }
                 else
                 {
-                    string headerTitle = string.IsNullOrWhiteSpace(_automatenName) ? _kassenName : ($"{_kassenName} – {_automatenName}");
+                    string headerTitle = string.IsNullOrWhiteSpace(automatenAnzeigeName) ? _kassenName : ($"{_kassenName} – {automatenAnzeigeName}");
                     g.DrawString(headerTitle, smallBold, black, left, y);
                     g.DrawString($"   Kassenbericht vom {erstelltAm}", normal, black, left + 220f, y);
                     y += 16f;
@@ -395,9 +417,12 @@ namespace TaMi_Kassenclient
                         return;
                     }
 
+                    // Dicker Trennstrich vor den Summen
+                    using (var pBold = new Pen(Color.Black, 2f)) { g.DrawLine(pBold, left, y, right, y); }
+                    y += 10f;
+
                     if (hasDetailOnThisPage)
                     {
-                        y += 12f;
                         g.DrawString("Summen nach Konto und %", smallBold, black, left, y); y += 8f;
                         g.DrawString("Konto", smallBold, black, xKonto, y);
                         g.DrawString("%", smallBold, black, xMwst, y);
@@ -407,7 +432,6 @@ namespace TaMi_Kassenclient
                     else
                     {
                         // Kein Detailbereich auf dieser Seite: keine Spaltenüberschriften
-                        y += 8f;
                         g.DrawString("Summen nach Konto und %", smallBold, black, left, y); y += 12f;
                     }
 
