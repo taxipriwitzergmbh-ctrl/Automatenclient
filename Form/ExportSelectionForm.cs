@@ -5,6 +5,8 @@ using System.Drawing;
 using System.Globalization;
 using System.Threading.Tasks;
 using System.Windows.Forms;
+using System.Drawing.Drawing2D;
+using System.Runtime.InteropServices;
 using TaMi_Kassenclient.Export;
 
 namespace TaMi_Kassenclient
@@ -14,6 +16,11 @@ namespace TaMi_Kassenclient
         private readonly int _firmenId;
         private readonly string _kassenName;
         private readonly string _automatenName;
+
+        private Panel _headerPanel;
+        private Label _lblTitle;
+        private Button _btnClose;
+        private Point _mouseDownLocation;
 
         private DateTimePicker _dtFrom;
         private DateTimePicker _dtTo;
@@ -27,38 +34,153 @@ namespace TaMi_Kassenclient
             _kassenName = kassenName;
             _automatenName = automatenName;
 
-            Text = "Export";
-            FormBorderStyle = FormBorderStyle.FixedDialog;
+            FormBorderStyle = FormBorderStyle.None;
             StartPosition = FormStartPosition.CenterParent;
-            ClientSize = new Size(520, 250);
-            MaximizeBox = false;
-            MinimizeBox = false;
+            ClientSize = new Size(560, 280);
+            BackColor = Color.White;
+            DoubleBuffered = true;
+            try { Region = Region.FromHrgn(CreateRoundRectRgn(0, 0, Width, Height, 16, 16)); } catch { }
 
+            BuildHeader();
             BuildUi();
+        }
+
+        private void BuildHeader()
+        {
+            _headerPanel = new Panel
+            {
+                Location = new Point(0, 0),
+                Size = new Size(ClientSize.Width, 56),
+                Anchor = AnchorStyles.Top | AnchorStyles.Left | AnchorStyles.Right
+            };
+            _headerPanel.Paint += HeaderPanel_Paint;
+            _headerPanel.MouseDown += (s, e) => { if (e.Button == MouseButtons.Left) _mouseDownLocation = e.Location; };
+            _headerPanel.MouseMove += (s, e) =>
+            {
+                if (e.Button == MouseButtons.Left)
+                {
+                    Left += e.X - _mouseDownLocation.X;
+                    Top += e.Y - _mouseDownLocation.Y;
+                }
+            };
+            Controls.Add(_headerPanel);
+
+            _lblTitle = new Label
+            {
+                Text = "Export – Auswahl",
+                AutoSize = false,
+                TextAlign = ContentAlignment.MiddleLeft,
+                Font = new Font("Segoe UI Variable", 16F, FontStyle.Bold),
+                ForeColor = Color.White,
+                Location = new Point(20, 0),
+                Size = new Size(400, 56),
+                BackColor = Color.Transparent
+            };
+            _headerPanel.Controls.Add(_lblTitle);
+
+            _btnClose = new Button
+            {
+                Text = "\u2715",
+                Font = new Font("Segoe UI Symbol", 16F, FontStyle.Bold),
+                ForeColor = Color.White,
+                BackColor = Color.Transparent,
+                FlatStyle = FlatStyle.Flat,
+                Size = new Size(44, 44),
+                Location = new Point(ClientSize.Width - 52, 6),
+                Anchor = AnchorStyles.Top | AnchorStyles.Right,
+                TabStop = false
+            };
+            _btnClose.FlatAppearance.BorderSize = 0;
+            _btnClose.FlatAppearance.MouseOverBackColor = Color.FromArgb(255, 80, 80);
+            _btnClose.Click += (s, e) => Close();
+            _headerPanel.Controls.Add(_btnClose);
         }
 
         private void BuildUi()
         {
-            var lblRange = new Label { Text = "Zeitraum:", Left = 16, Top = 20, Width = 120 };
-            _dtFrom = new DateTimePicker { Left = 140, Top = 16, Width = 160, Format = DateTimePickerFormat.Short, Value = new DateTime(DateTime.Today.Year, DateTime.Today.Month, 1) };
-            _dtTo = new DateTimePicker { Left = 310, Top = 16, Width = 160, Format = DateTimePickerFormat.Short, Value = DateTime.Today };
+            var lblRange = new Label
+            {
+                Text = "Zeitraum:",
+                Left = 24,
+                Top = 72,
+                Width = 110,
+                Font = new Font("Segoe UI Variable", 12F, FontStyle.Bold),
+                ForeColor = Color.FromArgb(33, 37, 41)
+            };
+            Controls.Add(lblRange);
 
-            var lblTpl = new Label { Text = "Vorlage:", Left = 16, Top = 66, Width = 120 };
-            _cmbTemplate = new ComboBox { Left = 140, Top = 62, Width = 330, DropDownStyle = ComboBoxStyle.DropDownList };
+            _dtFrom = new DateTimePicker
+            {
+                Left = 140,
+                Top = 68,
+                Width = 180,
+                Format = DateTimePickerFormat.Custom,
+                CustomFormat = "dd.MM.yyyy",
+                Font = new Font("Segoe UI Variable", 12F),
+                Value = new DateTime(DateTime.Today.Year, DateTime.Today.Month, 1)
+            };
+            Controls.Add(_dtFrom);
+
+            _dtTo = new DateTimePicker
+            {
+                Left = 330,
+                Top = 68,
+                Width = 180,
+                Format = DateTimePickerFormat.Custom,
+                CustomFormat = "dd.MM.yyyy",
+                Font = new Font("Segoe UI Variable", 12F),
+                Value = DateTime.Today
+            };
+            Controls.Add(_dtTo);
+
+            var lblTpl = new Label
+            {
+                Text = "Vorlage:",
+                Left = 24,
+                Top = 120,
+                Width = 110,
+                Font = new Font("Segoe UI Variable", 12F, FontStyle.Bold),
+                ForeColor = Color.FromArgb(33, 37, 41)
+            };
+            Controls.Add(lblTpl);
+
+            _cmbTemplate = new ComboBox
+            {
+                Left = 140,
+                Top = 116,
+                Width = 370,
+                DropDownStyle = ComboBoxStyle.DropDownList,
+                Font = new Font("Segoe UI Variable", 12F)
+            };
             _cmbTemplate.Items.Add(new TemplateItem { Text = "DATEV CSV (Standard VorzBetrag)", Kind = TemplateKind.DatevStandardVorz });
             _cmbTemplate.SelectedIndex = 0;
-
-            _btnCancel = new Button { Text = "Abbrechen", Left = 284, Top = 160, Width = 90, DialogResult = DialogResult.Cancel };
-            _btnExport = new Button { Text = "Export", Left = 380, Top = 160, Width = 90 };
-            _btnExport.Click += async (s, e) => await DoExportAsync();
-
-            Controls.Add(lblRange);
-            Controls.Add(_dtFrom);
-            Controls.Add(_dtTo);
-            Controls.Add(lblTpl);
             Controls.Add(_cmbTemplate);
+
+            _btnCancel = MakeButton("Abbrechen", new Point(264, 200), new Size(130, 44), Color.FromArgb(158, 158, 158));
+            _btnCancel.DialogResult = DialogResult.Cancel;
             Controls.Add(_btnCancel);
+
+            _btnExport = MakeButton("Export", new Point(410, 200), new Size(130, 44), Color.FromArgb(33, 150, 243));
+            _btnExport.Click += async (s, e) => await DoExportAsync();
             Controls.Add(_btnExport);
+        }
+
+        private Button MakeButton(string text, Point location, Size size, Color backColor)
+        {
+            var b = new Button
+            {
+                Text = text,
+                Location = location,
+                Size = size,
+                BackColor = backColor,
+                ForeColor = Color.White,
+                FlatStyle = FlatStyle.Flat,
+                Font = new Font("Segoe UI Variable", 12F, FontStyle.Bold)
+            };
+            b.FlatAppearance.BorderSize = 0;
+            try { b.Region = Region.FromHrgn(CreateRoundRectRgn(0, 0, b.Width, b.Height, 10, 10)); } catch { }
+            b.FlatAppearance.MouseOverBackColor = Color.FromArgb(Math.Max(backColor.R - 10, 0), Math.Max(backColor.G - 10, 0), Math.Max(backColor.B - 10, 0));
+            return b;
         }
 
         private async Task DoExportAsync()
@@ -170,6 +292,18 @@ namespace TaMi_Kassenclient
 
             await DatevKasseCsvExporter.ExportAsync(rows, path, opts);
         }
+
+        private void HeaderPanel_Paint(object sender, PaintEventArgs e)
+        {
+            using (var brush = new LinearGradientBrush(_headerPanel.ClientRectangle,
+                Color.FromArgb(33, 150, 243), Color.FromArgb(33, 203, 243), 0f))
+            {
+                e.Graphics.FillRectangle(brush, _headerPanel.ClientRectangle);
+            }
+        }
+
+        [DllImport("gdi32.dll", SetLastError = true)]
+        private static extern IntPtr CreateRoundRectRgn(int nLeftRect, int nTopRect, int nRightRect, int nBottomRect, int nWidthEllipse, int nHeightEllipse);
 
         private class TemplateItem
         {
