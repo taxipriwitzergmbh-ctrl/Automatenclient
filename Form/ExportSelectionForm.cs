@@ -246,7 +246,10 @@ namespace TaMi_Kassenclient
             var rows = data.Rows;
             var de = CultureInfo.GetCultureInfo("de-DE");
 
-            // Summen pro Konto+MwSt berechnen
+            // Bei jedem Drucklauf neu beginnen (gilt für Vorschau + echtes Drucken)
+            doc.BeginPrint += (s, e) => { currentIndex = 0; printedTotals = false; };
+
+            // Summen pro Konto+MwSt berechnen -> Netto (Einnahmen-Ausgaben)
             var totals = rows.Cast<DataRow>()
                 .Where(r => !IsOld(r))
                 .GroupBy(r => new
@@ -258,22 +261,20 @@ namespace TaMi_Kassenclient
                 {
                     Konto = g.Key.Konto,
                     Mwst = g.Key.Mwst,
-                    Einnahmen = g.Sum(r => Math.Max(0m, BetragSigned(r))),
-                    Ausgaben = g.Sum(r => Math.Max(0m, -BetragSigned(r)))
+                    Betrag = g.Sum(r => BetragSigned(r))
                 })
                 .OrderBy(t => t.Konto)
                 .ThenBy(t => t.Mwst)
                 .ToList();
 
-            // Summen nur nach Konto
+            // Summen nur nach Konto -> Netto
             var kontoTotals = rows.Cast<DataRow>()
                 .Where(r => !IsOld(r))
                 .GroupBy(r => SafeString(r, "Konto"))
                 .Select(g => new
                 {
                     Konto = g.Key,
-                    Einnahmen = g.Sum(r => Math.Max(0m, BetragSigned(r))),
-                    Ausgaben = g.Sum(r => Math.Max(0m, -BetragSigned(r)))
+                    Betrag = g.Sum(r => BetragSigned(r))
                 })
                 .OrderBy(t => t.Konto)
                 .ToList();
@@ -302,24 +303,24 @@ namespace TaMi_Kassenclient
                 g.DrawString($"Kassenbericht vom:  {to:dd.MM.yyyy} – Zeitraum: {from:dd.MM.yyyy} bis {to:dd.MM.yyyy}", normal, black, left, y); y += 22f;
 
                 // Spaltenbreiten dynamisch
-                float gap = 8f;
-                float wBeleg = 60f; // Belegnummer schmaler
-                float wKonto = 70f;
-                float wKost = 60f;
-                float wMwst = 60f;
-                float wEin = 100f;
-                float wAus = 100f;
-                float fixedWidth = wBeleg + wKonto + (wKost * 2) + wMwst + wEin + wAus + gap * 7;
-                float wText = Math.Max(140f, pageWidth - fixedWidth);
+                float gap = 8f;       // Standardabstand
+                float gapNarrow = 3f; // enger Abstand für Konto/Kosten/MwSt
+                float wBeleg = 60f;   // Belegnummer schmaler
+                float wKonto = 60f;
+                float wKost = 40f;
+                float wMwst = 46f;
+                float wBetrag = 120f; // eine gemeinsame Betrag-Spalte
+
+                float fixedWidth = wBeleg + wKonto + (wKost * 2) + wMwst + wBetrag + (gap * 3) + (gapNarrow * 3);
+                float wText = Math.Max(200f, pageWidth - fixedWidth);
 
                 float xBeleg = left;
                 float xText = xBeleg + wBeleg + gap;
                 float xKonto = xText + wText + gap;
-                float xKost1 = xKonto + wKonto + gap;
-                float xKost2 = xKost1 + wKost + gap;
-                float xMwst = xKost2 + wKost + gap;
-                float xEin = xMwst + wMwst + gap;
-                float xAus = xEin + wEin + gap;
+                float xKost1 = xKonto + wKonto + gapNarrow;
+                float xKost2 = xKost1 + wKost + gapNarrow;
+                float xMwst = xKost2 + wKost + gapNarrow;
+                float xBetrag = xMwst + wMwst + gap;
 
                 // Kopfzeile
                 g.DrawString("Beleg", smallBold, black, xBeleg, y);
@@ -327,9 +328,8 @@ namespace TaMi_Kassenclient
                 g.DrawString("Konto", smallBold, black, xKonto, y);
                 g.DrawString("Kost1", smallBold, black, xKost1, y);
                 g.DrawString("Kost2", smallBold, black, xKost2, y);
-                g.DrawString("MwSt.%", smallBold, black, xMwst, y);
-                g.DrawString("Einnahmen", smallBold, black, xEin, y);
-                g.DrawString("Ausgaben", smallBold, black, xAus, y);
+                g.DrawString("%", smallBold, black, xMwst, y);
+                g.DrawString("Betrag", smallBold, black, xBetrag, y);
                 y += 22f;
 
                 var sfWrap = new StringFormat(StringFormatFlags.LineLimit) { Trimming = StringTrimming.EllipsisWord };
@@ -363,11 +363,8 @@ namespace TaMi_Kassenclient
                     g.DrawString(kost2, normal, black, new RectangleF(xKost2, yStart, wKost, maxTextHeight), null);
                     g.DrawString(mwst, normal, black, new RectangleF(xMwst, yStart, wMwst, maxTextHeight), null);
 
-                    // Beträge rechtsbündig, Einnahmen (>=0) / Ausgaben (<0)
-                    if (betrag >= 0)
-                        g.DrawString(betrag.ToString("C", de), normal, black, new RectangleF(xEin, yStart, wEin, maxTextHeight), sfRight);
-                    else
-                        g.DrawString(Math.Abs(betrag).ToString("C", de), normal, black, new RectangleF(xAus, yStart, wAus, maxTextHeight), sfRight);
+                    // Betrag (positiv/negativ)
+                    g.DrawString(betrag.ToString("C", de), normal, black, new RectangleF(xBetrag, yStart, wBetrag, maxTextHeight), sfRight);
 
                     // tatsächliche Höhe (ein oder zwei Zeilen)
                     var measured = g.MeasureString(typText, normal, new SizeF(wText, 1000f), sfWrap);
@@ -394,18 +391,16 @@ namespace TaMi_Kassenclient
 
                     // Überschrift Summen
                     y += 16f;
-                    g.DrawString("Summen nach Konto und MwSt", smallBold, black, left, y); y += 8f;
+                    g.DrawString("Summen nach Konto und %", smallBold, black, left, y); y += 8f;
                     g.DrawString("Konto", smallBold, black, xKonto, y);
-                    g.DrawString("MwSt.%", smallBold, black, xMwst, y);
-                    g.DrawString("Einnahmen", smallBold, black, xEin, y);
-                    g.DrawString("Ausgaben", smallBold, black, xAus, y);
+                    g.DrawString("%", smallBold, black, xMwst, y);
+                    g.DrawString("Betrag", smallBold, black, xBetrag, y);
                     y += 20f;
                     foreach (var t in totals)
                     {
                         g.DrawString(t.Konto, normal, black, xKonto, y);
                         g.DrawString(t.Mwst, normal, black, xMwst, y);
-                        g.DrawString(t.Einnahmen.ToString("C", de), normal, black, new RectangleF(xEin, y, wEin, normal.GetHeight(g) + 4f), sfRight);
-                        g.DrawString(t.Ausgaben.ToString("C", de), normal, black, new RectangleF(xAus, y, wAus, normal.GetHeight(g) + 4f), sfRight);
+                        g.DrawString(t.Betrag.ToString("C", de), normal, black, new RectangleF(xBetrag, y, wBetrag, normal.GetHeight(g) + 4f), sfRight);
                         y += 18f;
                     }
 
@@ -413,24 +408,22 @@ namespace TaMi_Kassenclient
                     y += 10f;
                     g.DrawString("Summen nach Konto", smallBold, black, left, y); y += 8f;
                     g.DrawString("Konto", smallBold, black, xKonto, y);
-                    g.DrawString("Einnahmen", smallBold, black, xEin, y);
-                    g.DrawString("Ausgaben", smallBold, black, xAus, y);
+                    g.DrawString("Betrag", smallBold, black, xBetrag, y);
                     y += 20f;
                     foreach (var t in kontoTotals)
                     {
                         g.DrawString(t.Konto, normal, black, xKonto, y);
-                        g.DrawString(t.Einnahmen.ToString("C", de), normal, black, new RectangleF(xEin, y, wEin, normal.GetHeight(g) + 4f), sfRight);
-                        g.DrawString(t.Ausgaben.ToString("C", de), normal, black, new RectangleF(xAus, y, wAus, normal.GetHeight(g) + 4f), sfRight);
+                        g.DrawString(t.Betrag.ToString("C", de), normal, black, new RectangleF(xBetrag, y, wBetrag, normal.GetHeight(g) + 4f), sfRight);
                         y += 18f;
                     }
 
                     // Bestände rechts, am Seitenrand ausrichten
                     float boxTop = y + 10f;
                     float labelWidth = 130f;
-                    g.DrawString("Anfangsbestand:", smallBold, black, right - (wAus + 40f + labelWidth), boxTop);
-                    g.DrawString(anfangsbestand.ToString("C", de), normal, black, new RectangleF(right - (wAus + 40f), boxTop, wAus + 40f, normal.GetHeight(g) + 4f), sfRight);
-                    g.DrawString("Endbestand:", smallBold, black, right - (wAus + 40f + labelWidth), boxTop + 22f);
-                    g.DrawString(endbestand.ToString("C", de), normal, black, new RectangleF(right - (wAus + 40f), boxTop + 22f, wAus + 40f, normal.GetHeight(g) + 4f), sfRight);
+                    g.DrawString("Anfangsbestand:", smallBold, black, right - (wBetrag + 40f + labelWidth), boxTop);
+                    g.DrawString(anfangsbestand.ToString("C", de), normal, black, new RectangleF(right - (wBetrag + 40f), boxTop, wBetrag + 40f, normal.GetHeight(g) + 4f), sfRight);
+                    g.DrawString("Endbestand:", smallBold, black, right - (wBetrag + 40f + labelWidth), boxTop + 22f);
+                    g.DrawString(endbestand.ToString("C", de), normal, black, new RectangleF(right - (wBetrag + 40f), boxTop + 22f, wBetrag + 40f, normal.GetHeight(g) + 4f), sfRight);
 
                     printedTotals = true;
                 }
@@ -438,11 +431,25 @@ namespace TaMi_Kassenclient
                 e.HasMorePages = currentIndex < rows.Count || !printedTotals;
             };
 
+            // Vorschau anzeigen
             using (var pv = new PrintPreviewDialog())
             {
                 pv.Document = doc;
                 pv.Width = 1024; pv.Height = 768;
                 pv.ShowDialog(this);
+            }
+
+            // Danach Windows-Druckdialog anzeigen (z.B. für Microsoft Print to PDF)
+            using (var dlg = new PrintDialog())
+            {
+                dlg.UseEXDialog = true;
+                dlg.AllowPrintToFile = true;
+                dlg.Document = doc;
+                if (dlg.ShowDialog(this) == DialogResult.OK)
+                {
+                    doc.PrinterSettings = dlg.PrinterSettings;
+                    doc.Print();
+                }
             }
         }
 
