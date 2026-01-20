@@ -257,10 +257,11 @@ namespace TaMi_Kassenclient
             // Standortname ermitteln (falls _automatenName eine DeviceID ist)
             string automatenAnzeigeName = await ResolveAutomatenAnzeigeNameAsync();
             var doc = new System.Drawing.Printing.PrintDocument();
+            // Einheitliche Dokumentbezeichnung
             doc.DocumentName = $"Einzahlbericht_{_kassenName}_{from:yyyy-MM-dd}_bis_{to:yyyy-MM-dd}";
 
-            // Gewünschte Seitenränder (~0,5 cm links/rechts)
-            var customMargins = new System.Drawing.Printing.Margins(20, 20, 10, 0);
+            // Gewünschte Seitenränder (~0,75–0,8 cm links/rechts)
+            var customMargins = new System.Drawing.Printing.Margins(40, 40, 10, 0);
             doc.DefaultPageSettings.Margins = customMargins;
             doc.OriginAtMargins = false;
 
@@ -314,8 +315,8 @@ namespace TaMi_Kassenclient
                 // Bestimme nutzbaren Bereich über PageBounds und HardMargins
                 // Zeichnen innerhalb der MarginBounds (1 cm links/rechts)
                 // Eigene Ränder verwenden (~0,5 cm links/rechts), unabhängig von Drucker-Dialog
-                float desiredLR = 20f;   // 0.2" ≈ 5,08 mm
-                float desiredTop = 10f;  // 0.1" ≈ 2,54 mm
+                float desiredLR = 40f;   // 0.3" ≈ 7,62 mm
+                float desiredTop = 20f;  // 0.1" ≈ 2,54 mm
                 float hardL = e.PageSettings.HardMarginX;
                 float hardT = e.PageSettings.HardMarginY;
                 float left = e.PageBounds.Left + Math.Max(desiredLR, hardL);
