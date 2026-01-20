@@ -58,6 +58,7 @@ namespace TaMi_Kassenclient
         private Button btnBearbeiten;
         private Button btnSplitten;
         private Button btnExportCsv; // NEW
+        private Button btnExportWizard; // NEW
 
         public DayViewForm(int firmenId, string kassenName, string automatenName)
         {
@@ -354,10 +355,10 @@ namespace TaMi_Kassenclient
 
             btnExportCsv = new Button
             {
-                Text = "CSV-Export",
+                Text = "Aktueller Tag CSV Export",
                 Left = 376,
                 Top = 12,
-                Width = 160,
+                Width = 220,
                 Height = 40,
                 BackColor = Color.FromArgb(76, 175, 80),
                 ForeColor = Color.White,
@@ -366,6 +367,34 @@ namespace TaMi_Kassenclient
             btnExportCsv.FlatAppearance.BorderSize = 0;
             btnExportCsv.Click += async (s, e) => await ExportCsvAsync();
             footerPanel.Controls.Add(btnExportCsv);
+
+            btnExportWizard = new Button
+            {
+                Text = "Export…",
+                Left = 606,
+                Top = 12,
+                Width = 160,
+                Height = 40,
+                BackColor = Color.FromArgb(255, 152, 0),
+                ForeColor = Color.White,
+                FlatStyle = FlatStyle.Flat
+            };
+            btnExportWizard.FlatAppearance.BorderSize = 0;
+            btnExportWizard.Click += (s, e) =>
+            {
+                try
+                {
+                    using (var dlg = new ExportSelectionForm(_firmenId, _kassenName, _automatenName))
+                    {
+                        dlg.ShowDialog(this);
+                    }
+                }
+                catch (Exception ex)
+                {
+                    MessageBox.Show(this, "Fehler beim Öffnen des Export-Dialogs:\r\n" + ex.Message, "Fehler", MessageBoxButtons.OK, MessageBoxIcon.Error);
+                }
+            };
+            footerPanel.Controls.Add(btnExportWizard);
         }
 
         private void UpdateDateLabel()

@@ -892,6 +892,46 @@ ORDER BY ErfasstAm ASC, Belegnummer ASC;";
             }
         }
 
+        // NEU: Einträge für beliebigen Zeitraum (inkl. FhzId/SchichtId)
+        public async Task<DataTable> GetKassenEintraegeAsync(int firmenId, string automatenNameAlsDeviceId, DateTime von, DateTime bis)
+        {
+            await EnsureOpenAsync();
+            byte deviceId = 0; byte.TryParse(automatenNameAlsDeviceId ?? string.Empty, out deviceId);
+            var from = new DateTime(von.Year, von.Month, von.Day, 0, 0, 0);
+            var to = new DateTime(bis.Year, bis.Month, bis.Day, 23, 59, 59);
+            using (var cmd = _connection.CreateCommand())
+            {
+                cmd.CommandText = $@"
+SELECT 
+    Belegnummer,
+    KassenBelegnummer,
+    SchichtId,
+    FhzId,
+    ErfasstAm,
+    Typ,
+    Buchungstext,
+    CAST(ISNULL(Betrag19,0) + ISNULL(Betrag7,0) + ISNULL(Betrag0,0) AS money) AS Betrag,
+    Betrag19,
+    Betrag7,
+    Betrag0,
+    Kassenbestand,
+    Kost1,
+    Kost2,
+    Konto,
+    ISNULL(RevNum, 0) AS RevNum,
+    ISNULL(RevIsOld, 0) AS RevIsOld,
+    ISNULL(Festgeschrieben, 0) AS Festgeschrieben
+FROM {_tblKassenbuch} WITH (NOLOCK)
+WHERE ManID = @FID AND DeviceID = @Dev AND ErfasstAm >= @From AND ErfasstAm <= @To
+ORDER BY ErfasstAm ASC, Belegnummer ASC;";
+                cmd.Parameters.AddWithValue("@FID", firmenId);
+                cmd.Parameters.AddWithValue("@Dev", deviceId);
+                cmd.Parameters.AddWithValue("@From", from);
+                cmd.Parameters.AddWithValue("@To", to);
+                using (var rdr = await cmd.ExecuteReaderAsync()) { var dt = new DataTable(); dt.Load(rdr); return dt; }
+            }
+        }
+
         public async Task<int> LockDayAsync(int firmenId, string automatenNameAlsDeviceId, DateTime tag)
         {
             await EnsureOpenAsync();
