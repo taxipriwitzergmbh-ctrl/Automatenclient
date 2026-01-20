@@ -154,7 +154,7 @@ namespace TaMi_Kassenclient
                 Font = new Font("Segoe UI Variable", 12F)
             };
             _cmbTemplate.Items.Add(new TemplateItem { Text = "DATEV CSV ", Kind = TemplateKind.DatevStandardVorz });
-            _cmbTemplate.Items.Add(new TemplateItem { Text = "Kassenbericht drucken", Kind = TemplateKind.Kassenbericht });
+            _cmbTemplate.Items.Add(new TemplateItem { Text = "Einzahlbericht drucken", Kind = TemplateKind.Kassenbericht });
             _cmbTemplate.SelectedIndex = 0;
             Controls.Add(_cmbTemplate);
 
@@ -257,10 +257,12 @@ namespace TaMi_Kassenclient
             // Standortname ermitteln (falls _automatenName eine DeviceID ist)
             string automatenAnzeigeName = await ResolveAutomatenAnzeigeNameAsync();
             var doc = new System.Drawing.Printing.PrintDocument();
-            doc.DocumentName = $"Kassenbericht_{_kassenName}_{from:yyyy-MM-dd}_bis_{to:yyyy-MM-dd}";
+            doc.DocumentName = $"Einzahlbericht_{_kassenName}_{from:yyyy-MM-dd}_bis_{to:yyyy-MM-dd}";
 
-            // kleinste Ränder, kein unterer Rand
-            doc.DefaultPageSettings.Margins = new System.Drawing.Printing.Margins(10, 40, 20, 0);
+            // Gewünschte Seitenränder (~0,5 cm links/rechts)
+            var customMargins = new System.Drawing.Printing.Margins(20, 20, 10, 0);
+            doc.DefaultPageSettings.Margins = customMargins;
+            doc.OriginAtMargins = false;
 
             int currentIndex = 0;
             bool printedTotals = false;
@@ -309,18 +311,25 @@ namespace TaMi_Kassenclient
                 var normal = new Font("Times New Roman", 12f, FontStyle.Regular);
                 var smallBold = new Font("Times New Roman", 12f, FontStyle.Bold);
 
-                float y = e.MarginBounds.Top - 10f;
-                float left = e.MarginBounds.Left;
-                float right = e.MarginBounds.Right;
-                float pageWidth = e.MarginBounds.Width;
+                // Bestimme nutzbaren Bereich über PageBounds und HardMargins
+                // Zeichnen innerhalb der MarginBounds (1 cm links/rechts)
+                // Eigene Ränder verwenden (~0,5 cm links/rechts), unabhängig von Drucker-Dialog
+                float desiredLR = 20f;   // 0.2" ≈ 5,08 mm
+                float desiredTop = 10f;  // 0.1" ≈ 2,54 mm
+                float hardL = e.PageSettings.HardMarginX;
+                float hardT = e.PageSettings.HardMarginY;
+                float left = e.PageBounds.Left + Math.Max(desiredLR, hardL);
+                float right = e.PageBounds.Right - Math.Max(desiredLR, hardL);
+                float y = e.PageBounds.Top + Math.Max(desiredTop, hardT);
+                float pageWidth = right - left;
+                float pageBottom = e.PageBounds.Bottom - Math.Max(0f, hardT);
 
                 // Kopf: Seite 1 (voll) / Folgeseiten (kompakt)
                 if (pageNo == 1)
                 {
-                    // Anzeige: Firmenname – Automatenstandort
                     string headerTitle = string.IsNullOrWhiteSpace(automatenAnzeigeName) ? _kassenName : ($"{_kassenName} – {automatenAnzeigeName}");
                     g.DrawString(headerTitle, titleFont, black, left, y); y += 28f;
-                    g.DrawString($"Kassenbericht vom:  {to:dd.MM.yyyy} – Zeitraum: {from:dd.MM.yyyy} bis {to:dd.MM.yyyy}", normal, black, left, y); y += 20f;
+                    g.DrawString($"Einzahlbericht vom:  {to:dd.MM.yyyy} – Zeitraum: {from:dd.MM.yyyy} bis {to:dd.MM.yyyy}", normal, black, left, y); y += 20f;
                     string info = $"Anfangsbestand: {anfangsbestand.ToString("C", de)}   Endbestand: {endbestand.ToString("C", de)}   Anfangsbeleg: {anfangsBeleg}   Endbeleg: {endBeleg}";
                     g.DrawString(info, normal, black, left, y); y += 18f;
                     using (var p = new Pen(Color.Black, 1f)) { g.DrawLine(p, left, y, right, y); }
@@ -330,17 +339,17 @@ namespace TaMi_Kassenclient
                 {
                     string headerTitle = string.IsNullOrWhiteSpace(automatenAnzeigeName) ? _kassenName : ($"{_kassenName} – {automatenAnzeigeName}");
                     g.DrawString(headerTitle, smallBold, black, left, y);
-                    g.DrawString($"   Kassenbericht vom {erstelltAm}", normal, black, left + 220f, y);
+                    g.DrawString($"   Einzahlbericht vom {erstelltAm}", normal, black, left + 220f, y);
                     y += 16f;
                     using (var p = new Pen(Color.Black, 1f)) { g.DrawLine(p, left, y, right, y); }
                     y += 4f;
                 }
 
                 // Spaltenbreiten
-                float gap = 8f, gapNarrow = 3f;
-                float wBeleg = 60f, wKonto = 60f, wKost = 52f, wMwst = 42f, wBetrag = 96f;
+                float gap = 6f, gapNarrow = 3f;
+                float wBeleg = 40f, wKonto = 54f, wKost = 46f, wMwst = 34f, wBetrag = 74f;
                 float fixedWidth = wBeleg + wKonto + (wKost * 2) + wMwst + wBetrag + (gap * 3) + (gapNarrow * 3);
-                float wText = Math.Max(220f, pageWidth - fixedWidth);
+                float wText = Math.Max(300f, pageWidth - fixedWidth);
                 float xBeleg = left;
                 float xText = xBeleg + wBeleg + gap;
                 float xKonto = xText + wText + gap;
@@ -352,7 +361,7 @@ namespace TaMi_Kassenclient
                 var sfWrap = new StringFormat(StringFormatFlags.LineLimit) { Trimming = StringTrimming.EllipsisWord };
                 var sfRight = new StringFormat { Alignment = StringAlignment.Far };
                 float lineH = normal.GetHeight(g);
-                float maxTextHeight = lineH * 2f + 2f;
+                float maxTextHeight = lineH * 4f + 2f;
 
                 bool hasDetailOnThisPage = false;
 
@@ -400,7 +409,7 @@ namespace TaMi_Kassenclient
                     y += Math.Max(lineH, used) + 2f;
 
                     // mehr Inhalte am Seitenende zulassen
-                    if (y > e.MarginBounds.Bottom - 40)
+                    if (y > pageBottom - 40)
                     {
                         e.HasMorePages = true;
                         return;
@@ -411,7 +420,7 @@ namespace TaMi_Kassenclient
                 if (!printedTotals)
                 {
                     float requiredSpace = 12f + (totals.Count + kontoTotals.Count + 10) * 16f;
-                    if (y + requiredSpace > e.MarginBounds.Bottom)
+                    if (y + requiredSpace > pageBottom)
                     {
                         e.HasMorePages = true;
                         return;
@@ -423,7 +432,7 @@ namespace TaMi_Kassenclient
 
                     if (hasDetailOnThisPage)
                     {
-                        g.DrawString("Summen nach Konto und %", smallBold, black, left, y); y += 8f;
+                        g.DrawString("Summen nach Konto und MwSt", smallBold, black, left, y); y += 8f;
                         g.DrawString("Konto", smallBold, black, xKonto, y);
                         g.DrawString("%", smallBold, black, xMwst, y);
                         g.DrawString("Betrag", smallBold, black, xBetrag, y);
@@ -466,6 +475,7 @@ namespace TaMi_Kassenclient
                 if (dlg.ShowDialog(this) == DialogResult.OK)
                 {
                     doc.PrinterSettings = dlg.PrinterSettings;
+                    try { doc.PrinterSettings.DefaultPageSettings.Margins = doc.DefaultPageSettings.Margins; } catch { }
                     doc.Print();
                 }
             }
