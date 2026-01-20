@@ -3,6 +3,7 @@ using System.Collections.Generic;
 using System.Data;
 using System.Drawing;
 using System.Globalization;
+using System.Linq;
 using System.Threading.Tasks;
 using System.Windows.Forms;
 using System.Drawing.Drawing2D;
@@ -36,7 +37,7 @@ namespace TaMi_Kassenclient
 
             FormBorderStyle = FormBorderStyle.None;
             StartPosition = FormStartPosition.CenterParent;
-            ClientSize = new Size(560, 280);
+            ClientSize = new Size(640, 320);
             BackColor = Color.White;
             DoubleBuffered = true;
             try { Region = Region.FromHrgn(CreateRoundRectRgn(0, 0, Width, Height, 16, 16)); } catch { }
@@ -73,7 +74,7 @@ namespace TaMi_Kassenclient
                 Font = new Font("Segoe UI Variable", 16F, FontStyle.Bold),
                 ForeColor = Color.White,
                 Location = new Point(20, 0),
-                Size = new Size(400, 56),
+                Size = new Size(460, 56),
                 BackColor = Color.Transparent
             };
             _headerPanel.Controls.Add(_lblTitle);
@@ -113,7 +114,7 @@ namespace TaMi_Kassenclient
             {
                 Left = 140,
                 Top = 68,
-                Width = 180,
+                Width = 200,
                 Format = DateTimePickerFormat.Custom,
                 CustomFormat = "dd.MM.yyyy",
                 Font = new Font("Segoe UI Variable", 12F),
@@ -123,9 +124,9 @@ namespace TaMi_Kassenclient
 
             _dtTo = new DateTimePicker
             {
-                Left = 330,
+                Left = 350,
                 Top = 68,
-                Width = 180,
+                Width = 200,
                 Format = DateTimePickerFormat.Custom,
                 CustomFormat = "dd.MM.yyyy",
                 Font = new Font("Segoe UI Variable", 12F),
@@ -148,19 +149,20 @@ namespace TaMi_Kassenclient
             {
                 Left = 140,
                 Top = 116,
-                Width = 370,
+                Width = 410,
                 DropDownStyle = ComboBoxStyle.DropDownList,
                 Font = new Font("Segoe UI Variable", 12F)
             };
             _cmbTemplate.Items.Add(new TemplateItem { Text = "DATEV CSV (Standard VorzBetrag)", Kind = TemplateKind.DatevStandardVorz });
+            _cmbTemplate.Items.Add(new TemplateItem { Text = "Kassenbericht drucken", Kind = TemplateKind.Kassenbericht });
             _cmbTemplate.SelectedIndex = 0;
             Controls.Add(_cmbTemplate);
 
-            _btnCancel = MakeButton("Abbrechen", new Point(264, 200), new Size(130, 44), Color.FromArgb(158, 158, 158));
+            _btnCancel = MakeButton("Abbrechen", new Point(294, 232), new Size(140, 44), Color.FromArgb(158, 158, 158));
             _btnCancel.DialogResult = DialogResult.Cancel;
             Controls.Add(_btnCancel);
 
-            _btnExport = MakeButton("Export", new Point(410, 200), new Size(130, 44), Color.FromArgb(33, 150, 243));
+            _btnExport = MakeButton("Ausführen", new Point(444, 232), new Size(140, 44), Color.FromArgb(33, 150, 243));
             _btnExport.Click += async (s, e) => await DoExportAsync();
             Controls.Add(_btnExport);
         }
@@ -194,6 +196,26 @@ namespace TaMi_Kassenclient
                 return;
             }
 
+            try
+            {
+                switch (sel.Kind)
+                {
+                    case TemplateKind.DatevStandardVorz:
+                        await DoCsvExportAsync(from, to);
+                        break;
+                    case TemplateKind.Kassenbericht:
+                        await DoPrintReportAsync(from, to);
+                        break;
+                }
+            }
+            catch (Exception ex)
+            {
+                MessageBox.Show(this, "Fehler:\r\n" + ex.Message, "Fehler", MessageBoxButtons.OK, MessageBoxIcon.Error);
+            }
+        }
+
+        private async Task DoCsvExportAsync(DateTime from, DateTime to)
+        {
             using (var sfd = new SaveFileDialog
             {
                 Title = "Export speichern",
@@ -203,25 +225,220 @@ namespace TaMi_Kassenclient
             })
             {
                 if (sfd.ShowDialog(this) != DialogResult.OK) return;
-
-                try
-                {
-                    switch (sel.Kind)
-                    {
-                        case TemplateKind.DatevStandardVorz:
-                            await ExportDatevStandardVorzAsync(from, to, sfd.FileName);
-                            break;
-                    }
-
-                    MessageBox.Show(this, "Export wurde erstellt.", "Erfolg", MessageBoxButtons.OK, MessageBoxIcon.Information);
-                    DialogResult = DialogResult.OK;
-                    Close();
-                }
-                catch (Exception ex)
-                {
-                    MessageBox.Show(this, "Fehler beim Export:\r\n" + ex.Message, "Fehler", MessageBoxButtons.OK, MessageBoxIcon.Error);
-                }
+                await ExportDatevStandardVorzAsync(from, to, sfd.FileName);
+                MessageBox.Show(this, "Export wurde erstellt.", "Erfolg", MessageBoxButtons.OK, MessageBoxIcon.Information);
+                DialogResult = DialogResult.OK;
+                Close();
             }
+        }
+
+        private async Task DoPrintReportAsync(DateTime from, DateTime to)
+        {
+            var data = await LoadKassenDataAsync(from, to);
+            var doc = new System.Drawing.Printing.PrintDocument();
+            doc.DocumentName = $"Kassenbericht_{_kassenName}_{from:yyyy-MM-dd}_bis_{to:yyyy-MM-dd}";
+
+            int currentIndex = 0;
+            var rows = data.Rows;
+            var de = CultureInfo.GetCultureInfo("de-DE");
+
+            // Summen pro Konto+MwSt berechnen
+            var totals = rows.Cast<DataRow>()
+                .Where(r => !IsOld(r))
+                .GroupBy(r => new
+                {
+                    Konto = SafeString(r, "Konto"),
+                    Mwst = MwstText(r)
+                })
+                .Select(g => new
+                {
+                    Konto = g.Key.Konto,
+                    Mwst = g.Key.Mwst,
+                    Einnahmen = g.Sum(r => Math.Max(0m, BetragSigned(r))),
+                    Ausgaben = g.Sum(r => Math.Max(0m, -BetragSigned(r)))
+                })
+                .ToList();
+
+            decimal anfangsbestand = await GetAnfangsbestandAsync(from);
+            decimal endbestand = await GetEndbestandAsync(to);
+
+            doc.PrintPage += (s, e) =>
+            {
+                var g = e.Graphics;
+                var black = Brushes.Black;
+                var titleFont = new Font("Times New Roman", 14f, FontStyle.Bold);
+                var normal = new Font("Times New Roman", 12f, FontStyle.Regular);
+                var smallBold = new Font("Times New Roman", 12f, FontStyle.Bold);
+
+                float y = e.MarginBounds.Top - 10f;
+                float left = e.MarginBounds.Left;
+                float right = e.MarginBounds.Right;
+                float pageWidth = e.MarginBounds.Width;
+
+                // Titel: Kassenname + Automatenname
+                string headerTitle = string.IsNullOrWhiteSpace(_automatenName)
+                    ? _kassenName
+                    : ($"{_kassenName} – {_automatenName}");
+                g.DrawString(headerTitle, titleFont, black, left, y); y += 28f;
+                g.DrawString($"Kassenbericht vom:  {to:dd.MM.yyyy} – Zeitraum: {from:dd.MM.yyyy} bis {to:dd.MM.yyyy}", normal, black, left, y); y += 22f;
+
+                // Spaltenbreiten dynamisch
+                float gap = 8f;
+                float wBeleg = 90f;
+                float wKonto = 70f;
+                float wKost = 60f;
+                float wMwst = 60f;
+                float wEin = 100f;
+                float wAus = 100f;
+                float fixedWidth = wBeleg + wKonto + (wKost * 2) + wMwst + wEin + wAus + gap * 7;
+                float wText = Math.Max(140f, pageWidth - fixedWidth);
+
+                float xBeleg = left;
+                float xText = xBeleg + wBeleg + gap;
+                float xKonto = xText + wText + gap;
+                float xKost1 = xKonto + wKonto + gap;
+                float xKost2 = xKost1 + wKost + gap;
+                float xMwst = xKost2 + wKost + gap;
+                float xEin = xMwst + wMwst + gap;
+                float xAus = xEin + wEin + gap;
+
+                // Kopfzeile
+                g.DrawString("Beleg", smallBold, black, xBeleg, y);
+                g.DrawString("Buchung", smallBold, black, xText, y);
+                g.DrawString("Konto", smallBold, black, xKonto, y);
+                g.DrawString("Kost1", smallBold, black, xKost1, y);
+                g.DrawString("Kost2", smallBold, black, xKost2, y);
+                g.DrawString("MwSt.%", smallBold, black, xMwst, y);
+                g.DrawString("Einnahmen", smallBold, black, xEin, y);
+                g.DrawString("Ausgaben", smallBold, black, xAus, y);
+                y += 22f;
+
+                var sfWrap = new StringFormat(StringFormatFlags.LineLimit) { Trimming = StringTrimming.EllipsisWord };
+                var sfRight = new StringFormat { Alignment = StringAlignment.Far };
+                float maxTextHeight = normal.GetHeight(g) * 2f + 2f; // max 2 Zeilen
+
+                while (currentIndex < rows.Count)
+                {
+                    var r = rows[currentIndex]; currentIndex++;
+                    if (IsOld(r)) continue;
+
+                    string beleg = SafeString(r, "KassenBelegnummer");
+                    if (string.IsNullOrWhiteSpace(beleg)) beleg = SafeString(r, "Belegnummer");
+                    string typText = SafeString(r, "Buchungstext");
+                    string konto = SafeString(r, "Konto");
+                    string kost1 = SafeString(r, "Kost1");
+                    string kost2 = SafeString(r, "Kost2");
+                    string mwst = MwstText(r);
+                    decimal betrag = BetragSigned(r);
+
+                    float yStart = y;
+                    // Beleg
+                    g.DrawString(beleg, normal, black, new RectangleF(xBeleg, yStart, wBeleg, maxTextHeight), null);
+                    // Text max. 2 Zeilen
+                    var rectText = new RectangleF(xText, yStart, wText, maxTextHeight);
+                    g.DrawString(typText, normal, black, rectText, sfWrap);
+                    // Konto/Kosten/MwSt
+                    g.DrawString(konto, normal, black, new RectangleF(xKonto, yStart, wKonto, maxTextHeight), null);
+                    g.DrawString(kost1, normal, black, new RectangleF(xKost1, yStart, wKost, maxTextHeight), null);
+                    g.DrawString(kost2, normal, black, new RectangleF(xKost2, yStart, wKost, maxTextHeight), null);
+                    g.DrawString(mwst, normal, black, new RectangleF(xMwst, yStart, wMwst, maxTextHeight), null);
+
+                    // Beträge rechtsbündig, Einnahmen (>=0) / Ausgaben (<0)
+                    if (betrag >= 0)
+                        g.DrawString(betrag.ToString("C", de), normal, black, new RectangleF(xEin, yStart, wEin, maxTextHeight), sfRight);
+                    else
+                        g.DrawString(Math.Abs(betrag).ToString("C", de), normal, black, new RectangleF(xAus, yStart, wAus, maxTextHeight), sfRight);
+
+                    // tatsächliche Höhe (ein oder zwei Zeilen)
+                    var measured = g.MeasureString(typText, normal, new SizeF(wText, 1000f), sfWrap);
+                    float used = Math.Min(maxTextHeight, measured.Height);
+                    y += Math.Max(normal.GetHeight(g), used) + 2f;
+
+                    if (y > e.MarginBounds.Bottom - 160)
+                    {
+                        e.HasMorePages = true;
+                        return;
+                    }
+                }
+
+                // Summen-Tabelle
+                y += 16f;
+                g.DrawString("Konto", smallBold, black, xKonto, y);
+                g.DrawString("MwSt.%", smallBold, black, xMwst, y);
+                g.DrawString("Einnahmen", smallBold, black, xEin, y);
+                g.DrawString("Ausgaben", smallBold, black, xAus, y);
+                y += 20f;
+                foreach (var t in totals)
+                {
+                    g.DrawString(t.Konto, normal, black, xKonto, y);
+                    g.DrawString(t.Mwst, normal, black, xMwst, y);
+                    g.DrawString(t.Einnahmen.ToString("C", de), normal, black, new RectangleF(xEin, y, wEin, normal.GetHeight(g) + 4f), sfRight);
+                    g.DrawString(t.Ausgaben.ToString("C", de), normal, black, new RectangleF(xAus, y, wAus, normal.GetHeight(g) + 4f), sfRight);
+                    y += 18f;
+                }
+
+                // Bestände rechts, am Seitenrand ausrichten
+                float boxTop = y + 10f;
+                float labelWidth = 130f;
+                g.DrawString("Anfangsbestand:", smallBold, black, right - (wAus + 40f + labelWidth), boxTop);
+                g.DrawString(anfangsbestand.ToString("C", de), normal, black, new RectangleF(right - (wAus + 40f), boxTop, wAus + 40f, normal.GetHeight(g) + 4f), sfRight);
+                g.DrawString("Endbestand:", smallBold, black, right - (wAus + 40f + labelWidth), boxTop + 22f);
+                g.DrawString(endbestand.ToString("C", de), normal, black, new RectangleF(right - (wAus + 40f), boxTop + 22f, wAus + 40f, normal.GetHeight(g) + 4f), sfRight);
+
+                e.HasMorePages = false;
+            };
+
+            using (var pv = new PrintPreviewDialog())
+            {
+                pv.Document = doc;
+                pv.Width = 1024; pv.Height = 768;
+                pv.ShowDialog(this);
+            }
+        }
+
+        private async Task<DataTable> LoadKassenDataAsync(DateTime from, DateTime to)
+        {
+            using (var db = new DatabaseHelperKassen())
+            {
+                return await db.GetKassenEintraegeAsync(_firmenId, _automatenName, from, to);
+            }
+        }
+        private async Task<decimal> GetAnfangsbestandAsync(DateTime from)
+        {
+            using (var db = new DatabaseHelperKassen())
+            {
+                return await db.GetAnfangsbestandAsync(_firmenId, _automatenName, from);
+            }
+        }
+        private async Task<decimal> GetEndbestandAsync(DateTime to)
+        {
+            using (var db = new DatabaseHelperKassen())
+            {
+                return await db.GetEndbestandAsync(_firmenId, _automatenName, to);
+            }
+        }
+
+        private static bool IsOld(DataRow r)
+        {
+            try { return r.Table.Columns.Contains("RevIsOld") && r["RevIsOld"] != DBNull.Value && Convert.ToInt32(r["RevIsOld"]) != 0; } catch { return false; }
+        }
+        private static string SafeString(DataRow r, string col)
+        {
+            try { return r.Table.Columns.Contains(col) && r[col] != DBNull.Value ? Convert.ToString(r[col]) : string.Empty; } catch { return string.Empty; }
+        }
+        private static string MwstText(DataRow r)
+        {
+            decimal b19 = r.Table.Columns.Contains("Betrag19") && r["Betrag19"] != DBNull.Value ? Convert.ToDecimal(r["Betrag19"]) : 0m;
+            decimal b7 = r.Table.Columns.Contains("Betrag7") && r["Betrag7"] != DBNull.Value ? Convert.ToDecimal(r["Betrag7"]) : 0m;
+            decimal b0 = r.Table.Columns.Contains("Betrag0") && r["Betrag0"] != DBNull.Value ? Convert.ToDecimal(r["Betrag0"]) : 0m;
+            return b19 != 0 ? "19" : b7 != 0 ? "7" : b0 != 0 ? "0" : string.Empty;
+        }
+        private static decimal BetragSigned(DataRow r)
+        {
+            decimal b19 = r.Table.Columns.Contains("Betrag19") && r["Betrag19"] != DBNull.Value ? Convert.ToDecimal(r["Betrag19"]) : 0m;
+            decimal b7 = r.Table.Columns.Contains("Betrag7") && r["Betrag7"] != DBNull.Value ? Convert.ToDecimal(r["Betrag7"]) : 0m;
+            decimal b0 = r.Table.Columns.Contains("Betrag0") && r["Betrag0"] != DBNull.Value ? Convert.ToDecimal(r["Betrag0"]) : 0m;
+            return b19 + b7 + b0;
         }
 
         private async Task ExportDatevStandardVorzAsync(DateTime from, DateTime to, string path)
@@ -314,7 +531,8 @@ namespace TaMi_Kassenclient
 
         private enum TemplateKind
         {
-            DatevStandardVorz
+            DatevStandardVorz,
+            Kassenbericht
         }
     }
 }
