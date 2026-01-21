@@ -1173,14 +1173,29 @@ BEGIN
         ManId           int NULL,
         FhzIdList       varchar(4000) NULL,
         PersId          int NULL,
-        ResultKost1     int NULL,
-        ResultKost2     int NULL,
-        ResultKonto     int NULL,
+        ResultKost1     varchar(20) NULL,
+        ResultKost2     varchar(20) NULL,
+        ResultKonto     varchar(20) NULL,
         ResultText      nvarchar(4000) NULL,
         IsActive        bit NOT NULL DEFAULT(1),
         CreatedAt       datetime2(0) NOT NULL DEFAULT(SYSUTCDATETIME()),
         ModifiedAt      datetime2(0) NULL
     );
+END
+
+-- Migration: vorhandene int-Spalten auf varchar(20) ändern
+DECLARE @objRules nvarchar(256) = REPLACE(REPLACE('{_tblAbrechnungsRegeln}', '[', ''), ']', '');
+IF EXISTS (SELECT 1 FROM sys.columns WHERE object_id = OBJECT_ID(@objRules) AND name = 'ResultKost1' AND system_type_id IN (48,52,56,127))
+BEGIN
+    EXEC('ALTER TABLE {_tblAbrechnungsRegeln} ALTER COLUMN ResultKost1 varchar(20) NULL');
+END
+IF EXISTS (SELECT 1 FROM sys.columns WHERE object_id = OBJECT_ID(@objRules) AND name = 'ResultKost2' AND system_type_id IN (48,52,56,127))
+BEGIN
+    EXEC('ALTER TABLE {_tblAbrechnungsRegeln} ALTER COLUMN ResultKost2 varchar(20) NULL');
+END
+IF EXISTS (SELECT 1 FROM sys.columns WHERE object_id = OBJECT_ID(@objRules) AND name = 'ResultKonto' AND system_type_id IN (48,52,56,127))
+BEGIN
+    EXEC('ALTER TABLE {_tblAbrechnungsRegeln} ALTER COLUMN ResultKonto varchar(20) NULL');
 END
 
 IF NOT EXISTS (SELECT 1 FROM sys.tables t JOIN sys.schemas s ON s.schema_id=t.schema_id WHERE t.name='TAbrechnungsBedingungenClause')
@@ -1253,9 +1268,21 @@ WHERE Id=@Id; SELECT @Id;";
                 cmd.Parameters.AddWithValue("@Join", (object)(r.JoinKind ?? (object)DBNull.Value) ?? DBNull.Value);
                 cmd.Parameters.AddWithValue("@Def", r.IsDefault);
                 cmd.Parameters.AddWithValue("@Prio", r.Priority);
-                cmd.Parameters.AddWithValue("@K1", (object)r.ResultKost1 ?? DBNull.Value);
-                cmd.Parameters.AddWithValue("@K2", (object)r.ResultKost2 ?? DBNull.Value);
-                cmd.Parameters.AddWithValue("@Kto", (object)r.ResultKonto ?? DBNull.Value);
+
+                // Werte als String speichern (varchar(20)); numerische werden konvertiert, leere zu NULL
+                string Normalize(object v)
+                {
+                    if (v == null) return null;
+                    var s = Convert.ToString(v);
+                    return string.IsNullOrWhiteSpace(s) ? null : s.Trim();
+                }
+                var pK1 = Normalize(r.ResultKost1);
+                var pK2 = Normalize(r.ResultKost2);
+                var pKto = Normalize(r.ResultKonto);
+                cmd.Parameters.AddWithValue("@K1", (object)pK1 ?? DBNull.Value);
+                cmd.Parameters.AddWithValue("@K2", (object)pK2 ?? DBNull.Value);
+                cmd.Parameters.AddWithValue("@Kto", (object)pKto ?? DBNull.Value);
+
                 cmd.Parameters.AddWithValue("@Txt", (object)(r.ResultBuchungstext ?? (object)DBNull.Value) ?? DBNull.Value);
                 var o = await cmd.ExecuteScalarAsync();
                 int ruleId = Convert.ToInt32(Convert.ToDecimal(o));
