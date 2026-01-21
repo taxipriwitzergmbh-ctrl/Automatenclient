@@ -9,7 +9,7 @@ using System.Collections.Generic;
 using System.Globalization;
 using System.ComponentModel;
 
-namespace TaMi_Kassenclient
+namespace TaMi_Automatenclient
 {
     public class PersonalForm : Form
     {
@@ -456,14 +456,14 @@ namespace TaMi_Kassenclient
 
                 // NEU: Mandant/Kasse Dropdown zwischen Vorlage und Typ
                 nzY += 30;
-                var lblMandant = new Label { Text = "Kasse:", Location = new Point(12, nzY + 3), AutoSize = true };
+                var lblMandant = new Label { Text = "Firma :", Location = new Point(12, nzY + 3), AutoSize = true };
                 cboMandant = new ComboBox { Location = new Point(120, nzY), Width = 220, DropDownStyle = ComboBoxStyle.DropDownList };
                 grpNewPayment.Controls.Add(lblMandant); grpNewPayment.Controls.Add(cboMandant);
                 // Mandanten-Placeholder
                 try
                 {
                     cboMandant.Items.Clear();
-                    cboMandant.Items.Add("— Kassen werden geladen … —");
+                    cboMandant.Items.Add("— Daten werden geladen … —");
                     cboMandant.SelectedIndex = 0;
                     cboMandant.Enabled = false;
                 }
@@ -665,7 +665,7 @@ namespace TaMi_Kassenclient
             cbMwst.Items.AddRange(new object[] { "19", "7", "0" }); cbMwst.SelectedIndex = 0; body.Controls.Add(makeLbl("MwSt:")); body.Controls.Add(cbMwst); curY += spacing;
             var tbTxt = new TextBox { Left = baseX + wLabel + 4, Top = curY, Width = 340 }; body.Controls.Add(makeLbl("Text:")); body.Controls.Add(tbTxt); curY += spacing;
             cbFirma = new ComboBox { Left = baseX + wLabel + 4, Top = curY, Width = 200, DropDownStyle = ComboBoxStyle.DropDownList };
-            body.Controls.Add(makeLbl("Kasse:")); body.Controls.Add(cbFirma); curY += spacing;
+            body.Controls.Add(makeLbl("Firma:")); body.Controls.Add(cbFirma); curY += spacing;
             var tbK1 = new TextBox { Left = baseX + wLabel + 4, Top = curY, Width = 70 }; var lblK2 = new Label { Text = "Kost2:", Left = tbK1.Right + 14, Top = curY + 4, Width = 45, ForeColor = Color.FromArgb(55,71,79) }; var tbK2 = new TextBox { Left = lblK2.Right + 4, Top = curY, Width = 70 }; var lblKto = new Label { Text = "Konto:", Left = tbK2.Right + 14, Top = curY + 4, Width = 50, ForeColor = Color.FromArgb(55,71,79) }; var tbKto = new TextBox { Left = lblKto.Right + 4, Top = curY, Width = 80 }; body.Controls.Add(makeLbl("Kost1:")); body.Controls.Add(tbK1); body.Controls.Add(lblK2); body.Controls.Add(tbK2); body.Controls.Add(lblKto); body.Controls.Add(tbKto); curY += spacing + 6;
 
             var btnCancel = new Button { Text = "Abbrechen", Left = baseX + wLabel + 4, Top = body.Height - 46, Width = 140, Height = 40, Anchor = AnchorStyles.Right | AnchorStyles.Bottom, BackColor = Color.Gainsboro, FlatStyle = FlatStyle.Flat };

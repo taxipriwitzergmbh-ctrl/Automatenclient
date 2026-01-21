@@ -9,7 +9,7 @@ using System.Linq;
 using System.Threading.Tasks;
 using System.Windows.Forms;
 
-namespace TaMi_Kassenclient
+namespace TaMi_Automatenclient
 {
     public partial class AbrechnungBedingungenForm : Form
     {

@@ -6,7 +6,7 @@ using System.Windows.Forms;
 using System.Drawing.Drawing2D;
 using System.Threading.Tasks;
 
-namespace TaMi_Kassenclient
+namespace TaMi_Automatenclient
 {
     public class EntrySplitForm : Form
     {

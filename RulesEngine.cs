@@ -6,7 +6,7 @@ using System.Threading.Tasks;
 using System.Text.RegularExpressions;
 using System.Text; // added for diagnostics
 
-namespace TaMi_Kassenclient
+namespace TaMi_Automatenclient
 {
     public static class RulesEngine
     {

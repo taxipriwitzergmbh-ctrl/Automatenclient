@@ -8,9 +8,9 @@ using System.Threading.Tasks;
 using System.Windows.Forms;
 using System.Drawing.Drawing2D;
 using System.Runtime.InteropServices;
-using TaMi_Kassenclient.Export;
+using TaMi_Automatenclient.Export;
 
-namespace TaMi_Kassenclient
+namespace TaMi_Automatenclient
 {
     public class ExportSelectionForm : Form
     {

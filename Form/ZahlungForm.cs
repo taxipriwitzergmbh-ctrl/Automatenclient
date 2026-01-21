@@ -7,7 +7,7 @@ using System.Drawing.Drawing2D;
 using System.Data.SqlClient;
 using System.Collections.Generic;
 
-namespace TaMi_Kassenclient
+namespace TaMi_Automatenclient
 {
     public class ZahlungForm : Form
     {

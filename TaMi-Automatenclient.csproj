@@ -6,8 +6,8 @@
     <Platform Condition=" '$(Platform)' == '' ">AnyCPU</Platform>
     <ProjectGuid>{FE24F5D5-BB21-49F3-8AF2-FA103F33E06C}</ProjectGuid>
     <OutputType>WinExe</OutputType>
-    <RootNamespace>TaMi_Kassenclient</RootNamespace>
-    <AssemblyName>TaMi-Kassenclient</AssemblyName>
+    <RootNamespace>TaMi_Automatenclient</RootNamespace>
+    <AssemblyName>TaMi Automatenclient</AssemblyName>
     <TargetFrameworkVersion>v4.8</TargetFrameworkVersion>
     <FileAlignment>512</FileAlignment>
     <AutoGenerateBindingRedirects>true</AutoGenerateBindingRedirects>
@@ -51,7 +51,10 @@
     <ApplicationIcon>Ressourcen\Einzahlautomat_Win11.ico</ApplicationIcon>
   </PropertyGroup>
   <PropertyGroup>
-    <StartupObject>TaMi_Kassenclient.Program</StartupObject>
+    <StartupObject>TaMi_Automatenclient.Program</StartupObject>
+  </PropertyGroup>
+  <PropertyGroup>
+    <NoWin32Manifest>true</NoWin32Manifest>
   </PropertyGroup>
   <ItemGroup>
     <Reference Include="System" />

@@ -5,7 +5,7 @@ using System.Linq;
 using System.Windows.Forms;
 using System.Drawing.Drawing2D;
 
-namespace TaMi_Kassenclient
+namespace TaMi_Automatenclient
 {
     public class AbrechnungsBedingungEditorForm : Form
     {

@@ -1,9 +1,9 @@
-Z:\2. Abteilungsleitung\IT\Programierung\Kassenclient Version 1.0\Version 1.0\bin\Debug\TaMi-Kassenclient.exe.config
-Z:\2. Abteilungsleitung\IT\Programierung\Kassenclient Version 1.0\Version 1.0\bin\Debug\TaMi-Kassenclient.exe
-Z:\2. Abteilungsleitung\IT\Programierung\Kassenclient Version 1.0\Version 1.0\bin\Debug\TaMi-Kassenclient.pdb
 Z:\2. Abteilungsleitung\IT\Programierung\Kassenclient Version 1.0\Version 1.0\obj\Debug\TaMi-Kassenclient.csproj.AssemblyReference.cache
-Z:\2. Abteilungsleitung\IT\Programierung\Kassenclient Version 1.0\Version 1.0\obj\Debug\TaMi_Kassenclient.Properties.Resources.resources
 Z:\2. Abteilungsleitung\IT\Programierung\Kassenclient Version 1.0\Version 1.0\obj\Debug\TaMi-Kassenclient.csproj.GenerateResource.cache
 Z:\2. Abteilungsleitung\IT\Programierung\Kassenclient Version 1.0\Version 1.0\obj\Debug\TaMi-Kassenclient.csproj.CoreCompileInputs.cache
-Z:\2. Abteilungsleitung\IT\Programierung\Kassenclient Version 1.0\Version 1.0\obj\Debug\TaMi-Kassenclient.exe
-Z:\2. Abteilungsleitung\IT\Programierung\Kassenclient Version 1.0\Version 1.0\obj\Debug\TaMi-Kassenclient.pdb
+Z:\2. Abteilungsleitung\IT\Programierung\Kassenclient Version 1.0\Version 1.0\bin\Debug\TaMi Automaten Client.exe.config
+Z:\2. Abteilungsleitung\IT\Programierung\Kassenclient Version 1.0\Version 1.0\bin\Debug\TaMi Automaten Client.exe
+Z:\2. Abteilungsleitung\IT\Programierung\Kassenclient Version 1.0\Version 1.0\bin\Debug\TaMi Automaten Client.pdb
+Z:\2. Abteilungsleitung\IT\Programierung\Kassenclient Version 1.0\Version 1.0\obj\Debug\TaMi_Automaten_Client.Properties.Resources.resources
+Z:\2. Abteilungsleitung\IT\Programierung\Kassenclient Version 1.0\Version 1.0\obj\Debug\TaMi Automaten Client.exe
+Z:\2. Abteilungsleitung\IT\Programierung\Kassenclient Version 1.0\Version 1.0\obj\Debug\TaMi Automaten Client.pdb

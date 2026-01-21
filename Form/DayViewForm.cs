@@ -10,9 +10,9 @@ using System.Data.SqlClient;
 using System.IO; // NEW
 using System.Text; // NEW
 using System.Collections.Generic; // NEW
-using TaMi_Kassenclient.Export; // NEW
+using TaMi_Automatenclient.Export; // NEW
 
-namespace TaMi_Kassenclient
+namespace TaMi_Automatenclient
 {
     public class DayViewForm : Form
     {
@@ -98,7 +98,7 @@ namespace TaMi_Kassenclient
 
             lblTitle = new Label
             {
-                Text = $"Kasse: {_kassenName} (FID: {_firmenId})",
+                Text = $"Einzahlungen: {_kassenName} (FID: {_firmenId})",
                 AutoSize = false,
                 TextAlign = ContentAlignment.MiddleLeft,
                 Font = new Font("Segoe UI Variable", 18F, FontStyle.Bold),
@@ -275,7 +275,7 @@ namespace TaMi_Kassenclient
             lvEintraege.Columns.Add("Kost1", 57, HorizontalAlignment.Left);
             lvEintraege.Columns.Add("Kost2", 61, HorizontalAlignment.Left);
             lvEintraege.Columns.Add("Konto", 82, HorizontalAlignment.Left);
-            lvEintraege.Columns.Add("Kassenbestand", 180, HorizontalAlignment.Right);
+            lvEintraege.Columns.Add("Bestand", 180, HorizontalAlignment.Right);
             lvEintraege.DoubleClick += LvEintraege_DoubleClick;
             // Spaltenbreiten aus INI laden
             TryLoadColumnWidths();
@@ -617,20 +617,18 @@ namespace TaMi_Kassenclient
         {
             try
             {
-                // bevorzugt gemeinsame INI des Systems
                 var path = AppSettings.IniPath;
                 if (!string.IsNullOrWhiteSpace(path) && File.Exists(path)) return path;
             }
             catch { }
-            // Fallback: lokale INI neben EXE
             try
             {
                 var exe = Application.ExecutablePath;
                 var dir = Path.GetDirectoryName(exe);
-                var ini = Path.Combine(dir ?? ".", "TaMi-Kassenclient.ini");
+                var ini = Path.Combine(dir ?? ".", "TaMi-Automatenclient.ini");
                 return ini;
             }
-            catch { return "TaMi-Kassenclient.ini"; }
+            catch { return "TaMi-Automatenclient.ini"; }
         }
 
         private string GetIniSectionKey()

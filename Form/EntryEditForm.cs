@@ -7,7 +7,7 @@ using System.Drawing.Drawing2D;
 using System.Threading.Tasks;
 using System.Data.SqlClient; // FhzId-Lookup für Schicht
 
-namespace TaMi_Kassenclient
+namespace TaMi_Automatenclient
 {
     public class EntryEditForm : Form
     {

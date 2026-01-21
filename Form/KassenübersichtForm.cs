@@ -1,4 +1,4 @@
-using System;
+ï»¿using System;
 using System.Data;
 using System.Drawing;
 using System.Linq;
@@ -7,9 +7,9 @@ using System.Threading.Tasks;
 using System.Windows.Forms;
 using System.Drawing.Drawing2D;
 
-namespace TaMi_Kassenclient
+namespace TaMi_Automatenclient
 {
-    public class KassenübersichtForm : Form
+    public class KassenÃ¼bersichtForm : Form
     {
         private Panel headerPanel;
         private Label lblTitle;
@@ -17,7 +17,7 @@ namespace TaMi_Kassenclient
         private Point _mouseDownLocation;
         private FlowLayoutPanel pnlKassen;
 
-        public KassenübersichtForm()
+        public KassenÃ¼bersichtForm()
         {
             this.Icon = Program.AppIcon;
             InitializeLayout();
@@ -51,7 +51,7 @@ namespace TaMi_Kassenclient
 
             lblTitle = new Label
             {
-                Text = "TaMi-Kassenclient – Kassenübersicht",
+                Text = "TaMi Automatenclient â€“ EinzahlÃ¼bersicht",
                 AutoSize = false,
                 TextAlign = ContentAlignment.MiddleLeft,
                 Font = new Font("Segoe UI Variable", 18F, FontStyle.Bold),
@@ -131,7 +131,7 @@ namespace TaMi_Kassenclient
                     foreach (var gruppe in gruppen)
                     {
                         string deviceName = gruppe.Select(r => r.Field<string>("AutomatenName")).FirstOrDefault();
-                        if (string.IsNullOrWhiteSpace(deviceName)) deviceName = "Gerät " + gruppe.Key;
+                        if (string.IsNullOrWhiteSpace(deviceName)) deviceName = "GerÃ¤t " + gruppe.Key;
 
                         var lblGroup = new Label
                         {
@@ -171,7 +171,7 @@ namespace TaMi_Kassenclient
                                 Tag = new { FirmenId = fid, DeviceID = deviceId, KassenName = manName }
                             };
                             btn.FlatAppearance.BorderSize = 0;
-                            btn.Text = $"{manName} – {deviceName}\r\nBestand: {kb:C2}";
+                            btn.Text = $"{manName} â€“ {deviceName}\r\nBestand: {kb:C2}";
 
                             btn.Click += (s, e) =>
                             {

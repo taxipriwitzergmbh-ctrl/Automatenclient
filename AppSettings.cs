@@ -1,15 +1,15 @@
-using System;
+﻿using System;
 using System.Collections.Generic;
 using System.IO;
 
-namespace TaMi_Kassenclient
+namespace TaMi_Automatenclient
 {
     public static class AppSettings
     {
         public static List<string> AutomatenNamen { get; private set; } = new List<string>();
-        public static string IniPath { get; set; } = @"C:\ProgramData\SuE-Software\SuE-TaMi Client SQL\Kassenclient.ini";
+        public static string IniPath { get; set; } = @"C:\ProgramData\SuE-Software\SuE-TaMi Client SQL\Automatenclient.ini";
 
-        // Liest ALLE "Name=" Eintr�ge aus [Device]
+        // Liest ALLE "Name=" Einträge aus [Device]
         public static List<string> LoadAutomatenNamenFromIni()
         {
             var result = new List<string>();
@@ -42,7 +42,6 @@ namespace TaMi_Kassenclient
                 }
             }
             catch { }
-
 
             AutomatenNamen = new List<string>(new HashSet<string>(result, StringComparer.OrdinalIgnoreCase));
             return AutomatenNamen;

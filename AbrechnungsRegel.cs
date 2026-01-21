@@ -2,7 +2,7 @@ using System;
 using System.Collections.Generic;
 using System.Linq;
 
-namespace TaMi_Kassenclient
+namespace TaMi_Automatenclient
 {
     // Modell einer Abrechnungs-Regel
     public class AbrechnungsRegel

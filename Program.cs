@@ -10,7 +10,7 @@ using System.Security.Principal;
 using System.Threading;
 using System.Windows.Forms;
 
-namespace TaMi_Kassenclient
+namespace TaMi_Automatenclient
 {
     internal static class Program
     {
@@ -232,7 +232,7 @@ namespace TaMi_Kassenclient
             {
                 if (ex == null) return;
                 var time = DateTime.Now;
-                string logDir = Path.Combine(Environment.GetFolderPath(Environment.SpecialFolder.CommonApplicationData), "SuE-Software", "TaMi-Kassenclient", "logs");
+                string logDir = Path.Combine(Environment.GetFolderPath(Environment.SpecialFolder.CommonApplicationData), "SuE-Software", "TaMi-Automatenclient", "logs");
                 Directory.CreateDirectory(logDir);
                 string logFile = Path.Combine(logDir, $"error_{time:yyyyMMdd_HHmmss}_{source}.log");
                 File.WriteAllText(logFile, ex.ToString());

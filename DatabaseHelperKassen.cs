@@ -5,7 +5,7 @@ using System.Data.SqlClient;
 using System.IO;
 using System.Threading.Tasks;
 
-namespace TaMi_Kassenclient
+namespace TaMi_Automatenclient
 {
     public sealed class DatabaseHelperKassen : IDisposable
     {

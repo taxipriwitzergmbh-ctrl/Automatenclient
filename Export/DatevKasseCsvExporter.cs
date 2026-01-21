@@ -5,7 +5,7 @@ using System.IO;
 using System.Text;
 using System.Threading.Tasks;
 
-namespace TaMi_Kassenclient.Export
+namespace TaMi_Automatenclient.Export
 {
     public enum DatevCsvFormat
     {

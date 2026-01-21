@@ -5,12 +5,12 @@ using System.Runtime.InteropServices;
 // Allgemeine Informationen über eine Assembly werden über die folgenden
 // Attribute gesteuert. Ändern Sie diese Attributwerte, um die Informationen zu ändern,
 // die einer Assembly zugeordnet sind.
-[assembly: AssemblyTitle("TaMi-Kassenclient")]
+[assembly: AssemblyTitle("TaMi Automaten-Client")]
 [assembly: AssemblyDescription("")]
 [assembly: AssemblyConfiguration("")]
-[assembly: AssemblyCompany("Taxi Priwitzer")]
-[assembly: AssemblyProduct("TaMi-Kassenclient")]
-[assembly: AssemblyCopyright("Copyright © Taxi Priwitzer 2025")]
+[assembly: AssemblyCompany("Priwitzer Dienstleistungs GmbH")]
+[assembly: AssemblyProduct("TaMi Automaten-Client")]
+[assembly: AssemblyCopyright("Copyright © Priwitzer Dienstleistungs GmbH 2025")]
 [assembly: AssemblyTrademark("")]
 [assembly: AssemblyCulture("")]
 

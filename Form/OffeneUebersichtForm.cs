@@ -1,4 +1,4 @@
-using System;
+ï»¿using System;
 using System.Data;
 using System.Drawing;
 using System.Drawing.Drawing2D;
@@ -7,7 +7,7 @@ using System.Windows.Forms;
 using SuE.Tools;
 using System.IO;
 
-namespace TaMi_Kassenclient
+namespace TaMi_Automatenclient
 {
     public class OffeneUebersichtForm : KassenclientBaseForm
     {
@@ -15,12 +15,12 @@ namespace TaMi_Kassenclient
         private DataGridView gvSchichten;
         private DataGridView gvZahlungen;
         private DataGridView gvGuthaben;
-        private readonly string _gridCfgPath = Path.Combine(Environment.GetFolderPath(Environment.SpecialFolder.CommonApplicationData), "SuE-Software", "SuE-TaMi Client SQL", "Kassenclient.GridLayout.xml");
-        private const string _gridCfgApp = "TaMi-Kassenclient";
+        private readonly string _gridCfgPath = Path.Combine(Environment.GetFolderPath(Environment.SpecialFolder.CommonApplicationData), "SuE-Software", "SuE-TaMi Client SQL", "Automaten-Client.GridLayout.xml");
+        private const string _gridCfgApp = "TaMi Automaten-Client";
 
         public OffeneUebersichtForm()
         {
-            SetupDefaultForm("OffeneUebersichtForm", "Übersicht offen", new Size(900, 640));
+            SetupDefaultForm("OffeneUebersichtForm", "Ãœbersicht offen", new Size(900, 640));
             AddHeaderPanel(this.Text, true, true, true);
             BuildUI();
         }
@@ -140,7 +140,7 @@ namespace TaMi_Kassenclient
                     ConfigurePaymentsGrid();
                     gvZahlungen.DataSource = view;
                     LoadGridLayout("Zahlungen", gvZahlungen);
-                    // Rechtsbündige Ausrichtung für Betrag/MwSt (nach Layout laden setzen)
+                    // RechtsbÃ¼ndige Ausrichtung fÃ¼r Betrag/MwSt (nach Layout laden setzen)
                     try
                     {
                         if (gvZahlungen.Columns.Contains("Betrag"))
@@ -163,7 +163,7 @@ namespace TaMi_Kassenclient
                     var dt = await db.GetAllPersonalGuthabenSaldenAsync();
                     gvGuthaben.DataSource = dt;
                     LoadGridLayout("Guthaben", gvGuthaben);
-                    // Rechtsbündige Ausrichtung für Beträge (nach Layout laden setzen)
+                    // RechtsbÃ¼ndige Ausrichtung fÃ¼r BetrÃ¤ge (nach Layout laden setzen)
                     try
                     {
                         if (gvGuthaben.Columns.Contains("Saldo"))
@@ -282,7 +282,7 @@ namespace TaMi_Kassenclient
                 if (name == "Betrag")
                 {
                     if (e.Value == null || e.Value == DBNull.Value) { e.Value = "-"; e.FormattingApplied = true; return; }
-                    decimal v; if (decimal.TryParse(Convert.ToString(e.Value), out v)) { e.Value = v.ToString("N2") + " €"; e.FormattingApplied = true; return; }
+                    decimal v; if (decimal.TryParse(Convert.ToString(e.Value), out v)) { e.Value = v.ToString("N2") + " â‚¬"; e.FormattingApplied = true; return; }
                 }
                 else if (name == "MwSt")
                 {
@@ -306,13 +306,13 @@ namespace TaMi_Kassenclient
                 if (string.Equals(name, "Saldo", StringComparison.OrdinalIgnoreCase) || string.Equals(name, "Betrag", StringComparison.OrdinalIgnoreCase))
                 {
                     if (e.Value == null || e.Value == DBNull.Value) { e.Value = "-"; e.FormattingApplied = true; return; }
-                    decimal v; if (decimal.TryParse(Convert.ToString(e.Value), out v)) { e.Value = v.ToString("N2") + " €"; e.FormattingApplied = true; return; }
+                    decimal v; if (decimal.TryParse(Convert.ToString(e.Value), out v)) { e.Value = v.ToString("N2") + " â‚¬"; e.FormattingApplied = true; return; }
                 }
             }
             catch { }
         }
 
-        // Formatierung: Beträge mit 2 Nachkommastellen, 0,00 als "-" anzeigen
+        // Formatierung: BetrÃ¤ge mit 2 Nachkommastellen, 0,00 als "-" anzeigen
         private void ApplySchichtenFormatting()
         {
             if (gvSchichten == null || gvSchichten.Columns.Count == 0) return;
@@ -342,7 +342,7 @@ namespace TaMi_Kassenclient
                     if (decimal.TryParse(Convert.ToString(e.Value), out v))
                     {
                         if (Math.Abs(v) < 0.0000001m) { e.Value = "-"; e.FormattingApplied = true; return; }
-                        e.Value = v.ToString("N2") + " €"; e.FormattingApplied = true; return;
+                        e.Value = v.ToString("N2") + " â‚¬"; e.FormattingApplied = true; return;
                     }
                 }
             }

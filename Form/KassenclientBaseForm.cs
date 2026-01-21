@@ -10,7 +10,7 @@ using System.Text;
 using System.Threading.Tasks;
 using System.Windows.Forms;
 
-namespace TaMi_Kassenclient
+namespace TaMi_Automatenclient
 {
     public class KassenclientBaseForm : Form
     {
