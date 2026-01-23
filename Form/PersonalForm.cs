@@ -549,15 +549,31 @@ namespace TaMi_Automatenclient
                 using (var db = new DatabaseHelperKassen())
                 {
                     var dt = await db.GetMandantenAsync();
-                    // Blank option (ID=0, empty text)
+                    // Spalten sicherstellen
                     if (!dt.Columns.Contains("ManID")) dt.Columns.Add("ManID", typeof(int));
                     if (!dt.Columns.Contains("ManName")) dt.Columns.Add("ManName", typeof(string));
+                   // Firmen ohne Kasse ausblenden: Flags Bit 512 gesetzt
+              //      try
+              //      {
+                //        if (dt.Columns.Contains("Flags"))
+              //          {
+                //            for (int i = dt.Rows.Count - 1; i >= 0; i--)
+                  //          {
+                    //            var r = dt.Rows[i];
+                      //          int flags = 0;
+                      //          try { if (r["Flags"] != DBNull.Value) flags = Convert.ToInt32(r["Flags"]); } catch { flags = 0; }
+                      //          if ((flags & 512) == 512)
+                       //             dt.Rows.RemoveAt(i);
+                       //     }
+                   //     }
+                 //   }
+                  //  catch { }
+                    // Blank option (ID=0, empty text)
                     var blank = dt.NewRow(); blank["ManID"] = 0; blank["ManName"] = string.Empty; dt.Rows.InsertAt(blank, 0);
                     _suppressEvents = true;
                     cboMandant.DisplayMember = "ManName";
                     cboMandant.ValueMember = "ManID";
                     cboMandant.DataSource = dt;
-                    // Default blank selected
                     if (cboMandant.Items.Count > 0) cboMandant.SelectedIndex = 0;
                     cboMandant.Enabled = true;
                 }
@@ -1243,7 +1259,83 @@ namespace TaMi_Automatenclient
             catch { }
         }
         private void GvOpenPayments_SelectionChanged(object sender,EventArgs e){ bool has= gvOpenPayments!=null && gvOpenPayments.CurrentRow!=null && gvOpenPayments.CurrentRow.DataBoundItem!=null; if(btnEditPayment!=null) btnEditPayment.Enabled=has; if(btnDeletePayment!=null) btnDeletePayment.Enabled=has; }
-        private void LoadSelectedPaymentIntoFields(){ if(gvOpenPayments==null|| gvOpenPayments.CurrentRow==null) return; var drv=gvOpenPayments.CurrentRow.DataBoundItem as DataRowView; if(drv==null) return; var row=drv.Row; if(row.Table.Columns.Contains("Buchungstext")) txtNewPayText.Text=Convert.ToString(row["Buchungstext"])??string.Empty; decimal b19=0,b7=0,b0=0; try{ if(row.Table.Columns.Contains("Betrag19")&& row["Betrag19"]!=DBNull.Value) b19=Convert.ToDecimal(row["Betrag19"]);}catch{} try{ if(row.Table.Columns.Contains("Betrag7")&& row["Betrag7"]!=DBNull.Value) b7=Convert.ToDecimal(row["Betrag7"]);}catch{} try{ if(row.Table.Columns.Contains("Betrag0")&& row["Betrag0"]!=DBNull.Value) b0=Convert.ToDecimal(row["Betrag0"]);}catch{} string mw=b19>0?"19": (b7>0?"7": (b0>0?"0":null)); if(mw!=null){ int ix=cboNewMwst.FindStringExact(mw); if(ix>=0) cboNewMwst.SelectedIndex=ix; nudNewAmount.Value= Math.Max(nudNewAmount.Minimum, Math.Min(nudNewAmount.Maximum, b19>0?b19:(b7>0?b7:b0))); } txtNewK1.Text = row.Table.Columns.Contains("Kost1")&& row["Kost1"]!=DBNull.Value? Convert.ToString(row["Kost1"]): string.Empty; txtNewK2.Text = row.Table.Columns.Contains("Kost2")&& row["Kost2"]!=DBNull.Value? Convert.ToString(row["Kost2"]): string.Empty; txtNewKonto.Text = row.Table.Columns.Contains("Konto")&& row["Konto"]!=DBNull.Value? Convert.ToString(row["Konto"]): string.Empty; }
+        private void LoadSelectedPaymentIntoFields()
+        {
+            if (gvOpenPayments == null || gvOpenPayments.CurrentRow == null) return;
+            var drv = gvOpenPayments.CurrentRow.DataBoundItem as DataRowView;
+            if (drv == null) return;
+            var row = drv.Row;
+
+            // Text
+            txtNewPayText.Text = row.Table.Columns.Contains("Buchungstext") && row["Buchungstext"] != DBNull.Value
+                ? Convert.ToString(row["Buchungstext"]) ?? string.Empty
+                : string.Empty;
+
+            // Betrag/MwSt aus der View verwenden
+            decimal betrag = 0m;
+            string mw = null;
+            try { if (row.Table.Columns.Contains("Betrag") && row["Betrag"] != DBNull.Value) betrag = Convert.ToDecimal(row["Betrag"]); } catch { }
+            try { if (row.Table.Columns.Contains("MwSt") && row["MwSt"] != DBNull.Value) mw = Convert.ToString(row["MwSt"]); } catch { }
+
+            if (!string.IsNullOrWhiteSpace(mw))
+            {
+                int ix = cboNewMwst.FindStringExact(mw);
+                if (ix >= 0) cboNewMwst.SelectedIndex = ix;
+            }
+            nudNewAmount.Value = Math.Max(nudNewAmount.Minimum, Math.Min(nudNewAmount.Maximum, betrag));
+
+            // Typ aus der View verwenden
+            string typ = null;
+            try { if (row.Table.Columns.Contains("Typ") && row["Typ"] != DBNull.Value) typ = Convert.ToString(row["Typ"]); } catch { }
+            if (!string.IsNullOrWhiteSpace(typ))
+            {
+                int tix = cboNewType.FindStringExact(typ);
+                if (tix >= 0) cboNewType.SelectedIndex = tix;
+            }
+
+            // Firma/Mandant setzen (bevorzugt über FirmenID)
+            try
+            {
+                if (cboMandant != null)
+                {
+                    bool set = false;
+                    if (row.Table.Columns.Contains("FirmenID") && row["FirmenID"] != DBNull.Value)
+                    {
+                        int fid = SafeInt(row["FirmenID"]);
+                        if (fid >= 0)
+                        {
+                            try { cboMandant.SelectedValue = fid; set = true; }
+                            catch
+                            {
+                                // Fallback: über Items iterieren
+                                for (int i = 0; i < cboMandant.Items.Count; i++)
+                                {
+                                    var drvMan = cboMandant.Items[i] as DataRowView;
+                                    if (drvMan != null && SafeInt(drvMan["ManID"]) == fid)
+                                    { cboMandant.SelectedIndex = i; set = true; break; }
+                                }
+                            }
+                        }
+                    }
+                    if (!set && row.Table.Columns.Contains("FirmenName") && row["FirmenName"] != DBNull.Value)
+                    {
+                        string fname = Convert.ToString(row["FirmenName"]) ?? string.Empty;
+                        if (!string.IsNullOrWhiteSpace(fname))
+                        {
+                            int ix = cboMandant.FindStringExact(fname);
+                            if (ix >= 0) { cboMandant.SelectedIndex = ix; set = true; }
+                        }
+                    }
+                    if (!set && cboMandant.Items.Count > 0) cboMandant.SelectedIndex = 0; // blank
+                }
+            }
+            catch { }
+
+            // Kontierungen
+            txtNewK1.Text = row.Table.Columns.Contains("Kost1") && row["Kost1"] != DBNull.Value ? Convert.ToString(row["Kost1"]) : string.Empty;
+            txtNewK2.Text = row.Table.Columns.Contains("Kost2") && row["Kost2"] != DBNull.Value ? Convert.ToString(row["Kost2"]) : string.Empty;
+            txtNewKonto.Text = row.Table.Columns.Contains("Konto") && row["Konto"] != DBNull.Value ? Convert.ToString(row["Konto"]) : string.Empty;
+        }
         private void TryTakeLastNfc(){ try{ string token= Clipboard.ContainsText()? (Clipboard.GetText()??string.Empty).Trim(): null; if(!string.IsNullOrWhiteSpace(token)) txtNfc.Text=token; else MessageBox.Show(this,"Kein NFC-Wert verfügbar.","Hinweis",MessageBoxButtons.OK,MessageBoxIcon.Information);} catch { } }
         private async Task SaveAsync(){ if(_currentPid<=0){ MessageBox.Show(this,"Bitte zuerst Personal laden.","Hinweis",MessageBoxButtons.OK,MessageBoxIcon.Information); return;} using(var db=new DatabaseHelperKassen()){ try{ await db.SetFahrercodeAsync(_currentPid,string.IsNullOrWhiteSpace(txtFahrercode.Text)?null:txtFahrercode.Text.Trim()); await db.SetNfcAsync(_currentPid,string.IsNullOrWhiteSpace(txtNfc.Text)?null:txtNfc.Text.Trim()); MessageBox.Show(this,"Gespeichert.","Info",MessageBoxButtons.OK,MessageBoxIcon.Information);} catch(Exception ex){ MessageBox.Show(this,"Fehler beim Speichern: "+ex.Message,"Fehler",MessageBoxButtons.OK,MessageBoxIcon.Error);} } }
         private async Task CreatePaymentWithPresetAsync()
