@@ -9,8 +9,8 @@ namespace TaMi_Automatenclient.Export
 {
     public enum DatevCsvFormat
     {
-        UnternehmenOnlineKasse, // Belegdatum;Belegnummer;Buchungstext;Umsatz (ohne Soll/Haben-Kennzeichen);Soll/Haben-Kennzeichen;Steuersatz;Kost1;Kost2;Gegenkonto (ohne BU-Schl�ssel);W�hrung
-        StandardVorzBetrag      // "W�hrung";"VorzBetrag";"RechNr";"BelegDatum";"Belegtext";"UStSatz";"BU";"Gegenkonto";"Kost1";"Kost2";"Kostmenge";"Skonto";"Nachricht"
+        UnternehmenOnlineKasse, // Belegdatum;Belegnummer;Buchungstext;Umsatz (ohne Soll/Haben-Kennzeichen);Soll/Haben-Kennzeichen;Steuersatz;Kost1;Kost2;Gegenkonto (ohne BU-Schlüssel);Währung
+        StandardVorzBetrag      // "Währung";"VorzBetrag";"RechNr";"BelegDatum";"Belegtext";"UStSatz";"BU";"Gegenkonto";"Kost1";"Kost2";"Kostmenge";"Skonto";"Nachricht"
     }
 
     public class DatevKasseCsvExporterOptions
@@ -19,11 +19,11 @@ namespace TaMi_Automatenclient.Export
         public string Delimiter { get; set; } = ";";
         public CultureInfo Culture { get; set; } = CultureInfo.GetCultureInfo("de-DE");
         public bool Utf8Bom { get; set; } = true;
-        // TT.MM.JJJJ (true) oder TTMMJJJJ (false) � f�r UnternehmenOnlineKasse
+        // TT.MM.JJJJ (true) oder TTMMJJJJ (false) - für UnternehmenOnlineKasse
         public bool UseDotDateFormat { get; set; } = true;
         public string Currency { get; set; } = "EUR";
         public DatevCsvFormat Format { get; set; } = DatevCsvFormat.UnternehmenOnlineKasse;
-        // F�r StandardVorzBetrag: BelegDatum-Format TTMM (true) oder TTMMJJJJ (false)
+        // Für StandardVorzBetrag: BelegDatum-Format TTMM (true) oder TTMMJJJJ (false)
         public bool UseDayMonthOnly { get; set; } = true;
         // Nachricht Standardwert
         public string DefaultNachricht { get; set; } = "Kasse Import Standardformat";
@@ -41,7 +41,7 @@ namespace TaMi_Automatenclient.Export
         public string Steuersatz { get; set; } // 0,7,19 (ohne %)
         public string Kostenstelle1 { get; set; } // Kost1
         public string Kostenstelle2 { get; set; } // Kost2
-        public string Gegenkonto { get; set; } // ohne BU-Schl�ssel
+        public string Gegenkonto { get; set; } // ohne BU-Schlüssel
         public string Waehrung { get; set; } = "EUR";
 
         // StandardVorzBetrag
@@ -76,15 +76,15 @@ namespace TaMi_Automatenclient.Export
                             "Steuersatz",
                             "Kost1",
                             "Kost2",
-                            "Gegenkonto (ohne BU-Schl�ssel)",
-                            "W�hrung"
+                            "Gegenkonto (ohne BU-Schlüssel)",
+                            "Währung"
                         }));
                     }
                     else // StandardVorzBetrag
                     {
                         await sw.WriteLineAsync(string.Join(options.Delimiter, new[]
                         {
-                            "W�hrung",
+                            "Währung",
                             "VorzBetrag",
                             "RechNr",
                             "BelegDatum",
@@ -128,12 +128,12 @@ namespace TaMi_Automatenclient.Export
                     }
                     else
                     {
-                        // BelegDatum im Standardformat: TTMM (oder TTMMJJJJ wenn gew�nscht)
+                        // BelegDatum im Standardformat: TTMM (oder TTMMJJJJ wenn gewünscht)
                         string belegdatum = options.UseDayMonthOnly
                             ? r.Belegdatum.ToString("ddMM", options.Culture)
                             : r.Belegdatum.ToString("ddMMyyyy", options.Culture);
 
-                        // VorzBetrag mit f�hrendem + oder -
+                        // VorzBetrag mit führendem + oder -
                         string sign = r.BetragSigned >= 0m ? "+" : "-";
                         string betrag = Math.Abs(r.BetragSigned).ToString("0.00", options.Culture);
                         string vorzBetrag = sign + betrag;
