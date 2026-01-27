@@ -31,8 +31,8 @@ namespace TaMi_Automatenclient
         private static string mAppPath;
         private static string mAppDataPath = "";
 
-        public static string tamiServerHost = "localhost";
-        public static int    tamiServerPort = 63500;
+        public static string tamiServerHost ;
+        public static int tamiServerPort ;
         public static string localTaMi_Database_Server = "\\SuE";
         public static string localTaMi_Database_Name = "SuE-TaMi";
         public static string localTaMi_Database_User = "TaMiCli";
@@ -279,6 +279,7 @@ namespace TaMi_Automatenclient
                 //Console.WriteLine(s);
 
                 //Prüfe Sektion "[NAME]"
+
                 if (szLine.StartsWith("[") && szLine.EndsWith("]")) { section = szLine.Substring(1, szLine.Length - 2).ToLower(); }
 
                 //[Server]
@@ -301,7 +302,7 @@ namespace TaMi_Automatenclient
 
     }
 
-    // Embedded AutoUpdater for TaMi Automatenclient
+    // Embedded AutoUpdater for TaMi Automatenclient with UAC elevation
     internal static class AutoUpdater
     {
         private const string UpdateUrl = "http://kassenautomat.priwitzer-dienstleistungsgmbh.de/Update_Automatenclient";
@@ -352,28 +353,32 @@ namespace TaMi_Automatenclient
 
                 var exePath = Application.ExecutablePath;
                 var appDir = Path.GetDirectoryName(exePath) ?? Environment.CurrentDirectory;
-                var newPath = Path.Combine(appDir, exeName + ".new");
-                try { if (File.Exists(newPath)) File.Delete(newPath); } catch { }
-                File.Copy(tmpPath, newPath, true);
-                SafeDelete(tmpPath);
 
-                var batPath = Path.Combine(appDir, "updater_" + Guid.NewGuid().ToString("N") + ".bat");
-                var bat = BuildUpdateBatch(exeName);
+                // Build updater batch in temp that copies from tmpPath -> exePath, elevating if needed
+                var batPath = Path.Combine(Path.GetTempPath(), "updater_" + Guid.NewGuid().ToString("N") + ".bat");
+                var bat = BuildUpdateBatch(tmpPath, exePath);
                 File.WriteAllText(batPath, bat, Encoding.ASCII);
+
+                var needsElevation = RequiresElevation(appDir);
 
                 try
                 {
                     var psi = new ProcessStartInfo
                     {
                         FileName = batPath,
-                        UseShellExecute = false,
-                        CreateNoWindow = true,
-                        WorkingDirectory = appDir,
+                        UseShellExecute = true,
+                        Verb = needsElevation ? "runas" : null,
+                        WorkingDirectory = Path.GetDirectoryName(batPath),
+                        WindowStyle = ProcessWindowStyle.Hidden
                     };
                     Process.Start(psi);
                 }
                 catch
                 {
+                    // If user cancels UAC, abort update
+                    try { File.Delete(batPath); } catch { }
+                    SafeDelete(tmpPath);
+                    return;
                 }
 
                 try { Environment.Exit(0); } catch { Application.Exit(); }
@@ -381,6 +386,20 @@ namespace TaMi_Automatenclient
             catch
             {
             }
+        }
+
+        private static bool RequiresElevation(string appDir)
+        {
+            try
+            {
+                var t = Path.Combine(appDir, ".__updtest_" + Guid.NewGuid().ToString("N") + ".tmp");
+                File.WriteAllText(t, "x");
+                File.Delete(t);
+                return false;
+            }
+            catch (UnauthorizedAccessException) { return true; }
+            catch (System.Security.SecurityException) { return true; }
+            catch { return false; }
         }
 
         private static Version GetCurrentVersion()
@@ -420,19 +439,20 @@ namespace TaMi_Automatenclient
             try { if (!string.IsNullOrEmpty(path) && File.Exists(path)) File.Delete(path); } catch { }
         }
 
-        private static string BuildUpdateBatch(string exeName)
+        private static string BuildUpdateBatch(string srcExe, string targetExe)
         {
+            // srcExe may be in %TEMP%, targetExe is the running app path
             var sb = new StringBuilder();
             sb.AppendLine("@echo off");
             sb.AppendLine("setlocal");
-            sb.AppendLine("set EXE=\"%~dp0" + exeName + "\"");
-            sb.AppendLine("set NEW=\"%~dp0" + exeName + ".new\"");
+            sb.AppendLine("set SRC=\"" + srcExe + "\"" );
+            sb.AppendLine("set EXE=\"" + targetExe + "\"" );
             sb.AppendLine(":repeat");
             sb.AppendLine("ping 127.0.0.1 -n 2 >nul");
-            sb.AppendLine("copy /y %NEW% %EXE% >nul");
+            sb.AppendLine("copy /y %SRC% %EXE% >nul");
             sb.AppendLine("if errorlevel 1 goto repeat");
-            sb.AppendLine("del /f /q %NEW% >nul 2>&1");
             sb.AppendLine("start \"\" %EXE%");
+            sb.AppendLine("del /f /q %SRC% >nul 2>&1");
             sb.AppendLine("del \"%~f0\" >nul 2>&1");
             sb.AppendLine("endlocal");
             return sb.ToString();
