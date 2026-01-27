@@ -302,10 +302,12 @@ namespace TaMi_Automatenclient
 
     }
 
-    // Embedded AutoUpdater for TaMi Automatenclient with UAC elevation
+    // Embedded AutoUpdater for TaMi Automatenclient (MSI/EXE) with UAC elevation
     internal static class AutoUpdater
     {
-        private const string UpdateUrl = "http://kassenautomat.priwitzer-dienstleistungsgmbh.de/Update_Automatenclient";
+        // Setze diese URL auf die konkrete Datei (MSI oder Setup.exe) auf deinem Webspace,
+        // z. B. "https://server/pfad/Setup1.msi" oder "https://server/pfad/setup.exe".
+        private const string UpdateUrl = "http://kassenautomat.priwitzer-dienstleistungsgmbh.de/Update_Automatenclient/Automatenclient_Setup.msi";
 
         public static void CheckAndPromptAtStartup()
         {
@@ -320,7 +322,8 @@ namespace TaMi_Automatenclient
                 string tmpPath = null;
                 try
                 {
-                    tmpPath = Path.Combine(Path.GetTempPath(), Guid.NewGuid().ToString("N") + ".exe");
+                    var ext = GuessExtensionFromUrl(remoteUrl);
+                    tmpPath = Path.Combine(Path.GetTempPath(), Guid.NewGuid().ToString("N") + ext);
                     using (var wc = new WebClient())
                     {
                         wc.DownloadFile(remoteUrl, tmpPath);
@@ -332,7 +335,8 @@ namespace TaMi_Automatenclient
                     return;
                 }
 
-                Version remoteVersion = GetFileVersion(tmpPath);
+                bool isMsi = IsMsiFile(tmpPath);
+                Version remoteVersion = isMsi ? GetMsiProductVersion(tmpPath) : GetFileVersion(tmpPath);
                 if (remoteVersion == null || remoteVersion <= currentVersion)
                 {
                     SafeDelete(tmpPath);
@@ -351,32 +355,32 @@ namespace TaMi_Automatenclient
                     return;
                 }
 
-                var exePath = Application.ExecutablePath;
-                var appDir = Path.GetDirectoryName(exePath) ?? Environment.CurrentDirectory;
-
-                // Build updater batch in temp that copies from tmpPath -> exePath, elevating if needed
-                var batPath = Path.Combine(Path.GetTempPath(), "updater_" + Guid.NewGuid().ToString("N") + ".bat");
-                var bat = BuildUpdateBatch(tmpPath, exePath);
-                File.WriteAllText(batPath, bat, Encoding.ASCII);
-
-                var needsElevation = RequiresElevation(appDir);
-
                 try
                 {
-                    var psi = new ProcessStartInfo
+                    if (isMsi)
                     {
-                        FileName = batPath,
-                        UseShellExecute = true,
-                        Verb = needsElevation ? "runas" : null,
-                        WorkingDirectory = Path.GetDirectoryName(batPath),
-                        WindowStyle = ProcessWindowStyle.Hidden
-                    };
-                    Process.Start(psi);
+                        var psi = new ProcessStartInfo
+                        {
+                            FileName = "msiexec.exe",
+                            Arguments = "/i \"" + tmpPath + "\" /passive /norestart",
+                            UseShellExecute = true,
+                            Verb = "runas"
+                        };
+                        Process.Start(psi);
+                    }
+                    else
+                    {
+                        var psi = new ProcessStartInfo
+                        {
+                            FileName = tmpPath,
+                            UseShellExecute = true,
+                            Verb = "runas"
+                        };
+                        Process.Start(psi);
+                    }
                 }
                 catch
                 {
-                    // If user cancels UAC, abort update
-                    try { File.Delete(batPath); } catch { }
                     SafeDelete(tmpPath);
                     return;
                 }
@@ -439,23 +443,44 @@ namespace TaMi_Automatenclient
             try { if (!string.IsNullOrEmpty(path) && File.Exists(path)) File.Delete(path); } catch { }
         }
 
-        private static string BuildUpdateBatch(string srcExe, string targetExe)
+        private static bool IsMsiFile(string path)
         {
-            // srcExe may be in %TEMP%, targetExe is the running app path
-            var sb = new StringBuilder();
-            sb.AppendLine("@echo off");
-            sb.AppendLine("setlocal");
-            sb.AppendLine("set SRC=\"" + srcExe + "\"" );
-            sb.AppendLine("set EXE=\"" + targetExe + "\"" );
-            sb.AppendLine(":repeat");
-            sb.AppendLine("ping 127.0.0.1 -n 2 >nul");
-            sb.AppendLine("copy /y %SRC% %EXE% >nul");
-            sb.AppendLine("if errorlevel 1 goto repeat");
-            sb.AppendLine("start \"\" %EXE%");
-            sb.AppendLine("del /f /q %SRC% >nul 2>&1");
-            sb.AppendLine("del \"%~f0\" >nul 2>&1");
-            sb.AppendLine("endlocal");
-            return sb.ToString();
+            try { return string.Equals(Path.GetExtension(path), ".msi", StringComparison.OrdinalIgnoreCase); } catch { return false; }
+        }
+
+        private static string GuessExtensionFromUrl(string url)
+        {
+            try
+            {
+                var uri = new Uri(url);
+                var ext = Path.GetExtension(uri.LocalPath);
+                if (!string.IsNullOrEmpty(ext)) return ext;
+            }
+            catch { }
+            return ".exe"; // Default
+        }
+
+        // Liest ProductVersion aus einer MSI-Datei über Windows Installer COM per Reflection
+        private static Version GetMsiProductVersion(string msiPath)
+        {
+            try
+            {
+                var t = Type.GetTypeFromProgID("WindowsInstaller.Installer");
+                if (t == null) return null;
+                var installer = Activator.CreateInstance(t);
+                var db = t.InvokeMember("OpenDatabase", System.Reflection.BindingFlags.InvokeMethod, null, installer, new object[] { msiPath, 0 });
+                var dbType = db.GetType();
+                var view = dbType.InvokeMember("OpenView", System.Reflection.BindingFlags.InvokeMethod, null, db, new object[] { "SELECT `Value` FROM `Property` WHERE `Property`='ProductVersion'" });
+                var viewType = view.GetType();
+                viewType.InvokeMember("Execute", System.Reflection.BindingFlags.InvokeMethod, null, view, new object[] { null });
+                var record = viewType.InvokeMember("Fetch", System.Reflection.BindingFlags.InvokeMethod, null, view, null);
+                if (record == null) return null;
+                var recType = record.GetType();
+                var verStr = recType.InvokeMember("StringData", System.Reflection.BindingFlags.GetProperty, null, record, new object[] { 1 }) as string;
+                Version v; if (Version.TryParse(verStr, out v)) return v;
+            }
+            catch { }
+            return null;
         }
     }
 }
