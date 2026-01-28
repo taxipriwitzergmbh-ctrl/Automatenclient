@@ -1,4 +1,4 @@
-using System;
+ï»¿using System;
 using System.Collections.Generic;
 using System.Drawing;
 using System.Linq;
@@ -45,7 +45,7 @@ namespace TaMi_Automatenclient
             BuildUi(); 
         }
 
-        // Lädt eine bestehende Regel in die UI
+        // Lï¿½dt eine bestehende Regel in die UI
         public void LoadFromRule(AbrechnungsRegel r)
         {
             if (r == null) return;
@@ -68,7 +68,7 @@ namespace TaMi_Automatenclient
             }
             catch { }
 
-            // Bedingungen zurücksetzen und neu aufbauen
+            // Bedingungen zurï¿½cksetzen und neu aufbauen
             try { pnlBedingungen.SuspendLayout(); } catch { }
             pnlBedingungen.Controls.Clear();
 
@@ -103,7 +103,7 @@ namespace TaMi_Automatenclient
             // 2) Aus Clauses
             if (r.Clauses != null)
             {
-                // Gruppen nicht zwingend visualisiert; linear hinzufügen
+                // Gruppen nicht zwingend visualisiert; linear hinzufï¿½gen
                 foreach (var c in r.Clauses)
                 {
                     string feld = c.Field ?? string.Empty;
@@ -120,7 +120,7 @@ namespace TaMi_Automatenclient
             }
             try { pnlBedingungen.ResumeLayout(); } catch { }
 
-            // Ergebnisse zurücksetzen und neu aufbauen
+            // Ergebnisse zurï¿½cksetzen und neu aufbauen
             try { pnlErgebnisse.SuspendLayout(); } catch { }
             pnlErgebnisse.Controls.Clear();
 
@@ -153,7 +153,7 @@ namespace TaMi_Automatenclient
         private void BuildUi()
         {
             Text = "Regel bearbeiten"; StartPosition = FormStartPosition.CenterParent; FormBorderStyle = FormBorderStyle.Sizable; 
-            // Größe an Arbeitsbereich anpassen, damit unten die Buttons sichtbar bleiben
+            // Grï¿½ï¿½e an Arbeitsbereich anpassen, damit unten die Buttons sichtbar bleiben
             var wa = Screen.PrimaryScreen.WorkingArea;
             int targetW = Math.Min(1200, Math.Max(900, wa.Width - 200));
             int targetH = Math.Min(1000, Math.Max(800, wa.Height - 200));
@@ -279,14 +279,22 @@ namespace TaMi_Automatenclient
                 var txt = row.Controls.OfType<TextBox>().FirstOrDefault();
                 if (combos.Count >= 2 && txt != null)
                 {
-                    Bedingungen.Add(new Kondition { Feld = combos[0].SelectedItem as string, Operator = combos[1].SelectedItem as string, Wert = txt.Text });
+                    var feld = combos[0].SelectedItem as string ?? string.Empty;
+                    var op = combos[1].SelectedItem as string ?? string.Empty;
+                    var val = txt.Text ?? string.Empty;
+                    // Placeholder nicht speichern
+                    if (txt.ForeColor == Color.DarkGray)
+                        val = string.Empty;
+                    Bedingungen.Add(new Kondition { Feld = feld, Operator = op, Wert = val });
                 }
             }
             foreach (Panel row in pnlErgebnisse.Controls.OfType<Panel>())
             {
                 var cbo = row.Controls.OfType<ComboBox>().First();
                 var txt = row.Controls.OfType<TextBox>().First();
-                Ergebnisse.Add(new Ergebnis { Feld = cbo.SelectedItem as string, Wert = txt.Text });
+                var feld = cbo.SelectedItem as string ?? string.Empty;
+                var wert = txt.Text ?? string.Empty;
+                Ergebnisse.Add(new Ergebnis { Feld = feld, Wert = wert });
             }
         }
     }

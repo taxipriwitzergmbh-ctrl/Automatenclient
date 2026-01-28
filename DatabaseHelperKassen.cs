@@ -1264,26 +1264,25 @@ SET Name=@Name, JoinKind=@Join, IsDefault=@Def, Priority=@Prio, ResultKost1=@K1,
 WHERE Id=@Id; SELECT @Id;";
                     cmd.Parameters.AddWithValue("@Id", r.Id);
                 }
-                cmd.Parameters.AddWithValue("@Name", (object)(r.Name ?? (object)DBNull.Value) ?? DBNull.Value);
-                cmd.Parameters.AddWithValue("@Join", (object)(r.JoinKind ?? (object)DBNull.Value) ?? DBNull.Value);
+                cmd.Parameters.AddWithValue("@Name", (r.Name ?? string.Empty).Trim());
+                cmd.Parameters.AddWithValue("@Join", (r.JoinKind ?? string.Empty).Trim());
                 cmd.Parameters.AddWithValue("@Def", r.IsDefault);
                 cmd.Parameters.AddWithValue("@Prio", r.Priority);
 
-                // Werte als String speichern (varchar(20)); numerische werden konvertiert, leere zu NULL
+                // Werte als String speichern (varchar(20)); numerische werden konvertiert, leere zu ""
                 string Normalize(object v)
                 {
-                    if (v == null) return null;
-                    var s = Convert.ToString(v);
-                    return string.IsNullOrWhiteSpace(s) ? null : s.Trim();
+                    var s = v == null ? string.Empty : Convert.ToString(v);
+                    return string.IsNullOrWhiteSpace(s) ? string.Empty : s.Trim();
                 }
                 var pK1 = Normalize(r.ResultKost1);
                 var pK2 = Normalize(r.ResultKost2);
                 var pKto = Normalize(r.ResultKonto);
-                cmd.Parameters.AddWithValue("@K1", (object)pK1 ?? DBNull.Value);
-                cmd.Parameters.AddWithValue("@K2", (object)pK2 ?? DBNull.Value);
-                cmd.Parameters.AddWithValue("@Kto", (object)pKto ?? DBNull.Value);
+                cmd.Parameters.AddWithValue("@K1", pK1);
+                cmd.Parameters.AddWithValue("@K2", pK2);
+                cmd.Parameters.AddWithValue("@Kto", pKto);
 
-                cmd.Parameters.AddWithValue("@Txt", (object)(r.ResultBuchungstext ?? (object)DBNull.Value) ?? DBNull.Value);
+                cmd.Parameters.AddWithValue("@Txt", (r.ResultBuchungstext ?? string.Empty));
                 var o = await cmd.ExecuteScalarAsync();
                 int ruleId = Convert.ToInt32(Convert.ToDecimal(o));
 
