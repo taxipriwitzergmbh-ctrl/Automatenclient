@@ -11,6 +11,7 @@ using System.IO; // NEW
 using System.Text; // NEW
 using System.Collections.Generic; // NEW
 using TaMi_Automatenclient.Export; // NEW
+using System.Drawing.Printing; // NEW
 
 namespace TaMi_Automatenclient
 {
@@ -57,6 +58,7 @@ namespace TaMi_Automatenclient
         private Panel footerPanel;
         private Button btnBearbeiten;
         private Button btnSplitten;
+        private Button btnBelegNachdruck; // NEW
         private Button btnExportCsv; // NEW
         private Button btnExportWizard; // NEW
 
@@ -353,10 +355,25 @@ namespace TaMi_Automatenclient
             btnSplitten.Click += BtnSplitten_Click;
             footerPanel.Controls.Add(btnSplitten);
 
+            btnBelegNachdruck = new Button
+            {
+                Text = "Beleg nachdrucken",
+                Left = 376,
+                Top = 12,
+                Width = 180,
+                Height = 40,
+                BackColor = Color.FromArgb(156, 39, 176),
+                ForeColor = Color.White,
+                FlatStyle = FlatStyle.Flat
+            };
+            btnBelegNachdruck.FlatAppearance.BorderSize = 0;
+            btnBelegNachdruck.Click += async (s, e) => await PrintReceiptPdfAsync();
+            footerPanel.Controls.Add(btnBelegNachdruck);
+
             btnExportCsv = new Button
             {
                 Text = "Aktueller Tag CSV Export",
-                Left = 376,
+                Left = 566,
                 Top = 12,
                 Width = 220,
                 Height = 40,
@@ -371,7 +388,7 @@ namespace TaMi_Automatenclient
             btnExportWizard = new Button
             {
                 Text = "Export…",
-                Left = 606,
+                Left = 796,
                 Top = 12,
                 Width = 160,
                 Height = 40,
@@ -395,6 +412,137 @@ namespace TaMi_Automatenclient
                 }
             };
             footerPanel.Controls.Add(btnExportWizard);
+        }
+
+        private async Task PrintReceiptPdfAsync()
+        {
+            if (lvEintraege.SelectedItems.Count == 0)
+            {
+                MessageBox.Show(this, "Bitte Eintrag auswählen.", "Info", MessageBoxButtons.OK, MessageBoxIcon.Information);
+                return;
+            }
+
+            var it = lvEintraege.SelectedItems[0];
+            var meta = it.Tag as EntryMeta;
+            if (meta == null || string.IsNullOrWhiteSpace(meta.Belegnummer))
+            {
+                MessageBox.Show(this, "Ausgewählter Eintrag enthält keine Belegnummer.", "Info", MessageBoxButtons.OK, MessageBoxIcon.Information);
+                return;
+            }
+            if (meta.IsOld)
+            {
+                MessageBox.Show(this, "Ersetzte (alte) Revisionen können nicht nachgedruckt werden.", "Info", MessageBoxButtons.OK, MessageBoxIcon.Information);
+                return;
+            }
+
+            DataRow row = null;
+            try
+            {
+                using (var db = new DatabaseHelperKassen())
+                {
+                    row = await db.GetEintragByBelegnummerAsync(meta.Belegnummer);
+                }
+            }
+            catch { row = null; }
+
+            var de = CultureInfo.GetCultureInfo("de-DE");
+            var typ = it.SubItems.Count > 2 ? it.SubItems[2].Text : string.Empty;
+            var text = it.SubItems.Count > 3 ? it.SubItems[3].Text : string.Empty;
+            var zeit = it.SubItems.Count > 1 ? it.SubItems[1].Text : dtpTag.Value.ToString("dd.MM.yyyy HH:mm", de);
+            var betragText = it.SubItems.Count > 4 ? it.SubItems[4].Text : string.Empty;
+            var mwstText = it.SubItems.Count > 5 ? it.SubItems[5].Text : string.Empty;
+
+            string schichtId = row != null && row.Table.Columns.Contains("SchichtId") && row["SchichtId"] != DBNull.Value ? Convert.ToString(row["SchichtId"]) : null;
+            object persIdObj = row != null && row.Table.Columns.Contains("PersId") ? row["PersId"] : null;
+            string fhzId = row != null && row.Table.Columns.Contains("FhzId") && row["FhzId"] != DBNull.Value ? Convert.ToString(row["FhzId"]) : null;
+
+            var info = await ResolveFahrerUndKennzeichenAsync(schichtId, persIdObj);
+
+            var sb = new StringBuilder();
+            sb.AppendLine("TaMi Automatenclient");
+            sb.AppendLine("------------------------------");
+            sb.AppendLine("Kasse: " + (_kassenName ?? string.Empty));
+            sb.AppendLine("FID: " + _firmenId.ToString());
+            sb.AppendLine("Gerät: " + (_automatenName ?? string.Empty));
+            sb.AppendLine("Datum: " + zeit);
+            sb.AppendLine("Art:   " + (typ ?? string.Empty));
+            sb.AppendLine("Beleg: " + (meta.Belegnummer ?? string.Empty));
+            if (!string.IsNullOrWhiteSpace(meta.KassenBelegnummer)) sb.AppendLine("KBNr:  " + meta.KassenBelegnummer);
+            if (!string.IsNullOrWhiteSpace(schichtId)) sb.AppendLine("Schicht: " + schichtId);
+            if (!string.IsNullOrWhiteSpace(fhzId)) sb.AppendLine("FhzId: " + fhzId);
+            if (!string.IsNullOrWhiteSpace(info.kennzeichen)) sb.AppendLine("KFZ:  " + info.kennzeichen);
+            if (!string.IsNullOrWhiteSpace(info.fahrer)) sb.AppendLine("Fahrer: " + info.fahrer);
+            sb.AppendLine("------------------------------");
+            sb.AppendLine("Buchungstext: " + (text ?? string.Empty));
+            sb.AppendLine();
+            sb.AppendLine("Betrag: " + (betragText ?? string.Empty) + "   MwSt: " + (mwstText ?? string.Empty));
+            sb.AppendLine("19%: " + meta.Betrag19.ToString("C2", de) + "   7%: " + meta.Betrag7.ToString("C2", de) + "   0%: " + meta.Betrag0.ToString("C2", de));
+            sb.AppendLine("------------------------------");
+            sb.AppendLine("Nachdruck" + (meta.IsFestgeschrieben ? " (festgeschrieben)" : string.Empty));
+
+            var receiptText = sb.ToString();
+
+            using (var sfd = new SaveFileDialog
+            {
+                Title = "Beleg als PDF speichern",
+                Filter = "PDF-Datei (*.pdf)|*.pdf",
+                FileName = $"Beleg_{meta.Belegnummer}_{dtpTag.Value:yyyy-MM-dd}.pdf",
+                OverwritePrompt = true
+            })
+            {
+                if (sfd.ShowDialog(this) != DialogResult.OK) return;
+
+                var doc = new PrintDocument();
+                doc.DocumentName = "Beleg " + meta.Belegnummer;
+
+                // Ziel: Microsoft Print to PDF; falls nicht vorhanden, Defaultprinter nutzen.
+                try { doc.PrinterSettings.PrinterName = "Microsoft Print to PDF"; } catch { }
+
+                // PDF-Ausgabedatei setzen (funktioniert bei Microsoft Print to PDF)
+                try
+                {
+                    doc.PrinterSettings.PrintToFile = true;
+                    doc.PrinterSettings.PrintFileName = sfd.FileName;
+                }
+                catch { }
+
+                try { doc.DefaultPageSettings.Margins = new Margins(40, 40, 40, 40); } catch { }
+
+                var font = new Font("Consolas", 10f, FontStyle.Regular);
+                doc.PrintPage += (s, e) =>
+                {
+                    float x = e.MarginBounds.Left;
+                    float y = e.MarginBounds.Top;
+                    float lineH = font.GetHeight(e.Graphics) + 2;
+                    var lines = receiptText.Replace("\r\n", "\n").Split('\n');
+                    foreach (var line in lines)
+                    {
+                        if (y + lineH > e.MarginBounds.Bottom)
+                        {
+                            e.HasMorePages = true;
+                            return;
+                        }
+                        e.Graphics.DrawString(line, font, Brushes.Black, x, y);
+                        y += lineH;
+                    }
+                    e.HasMorePages = false;
+                };
+
+                try
+                {
+                    doc.Print();
+                    MessageBox.Show(this, "PDF wurde erstellt.", "Erfolg", MessageBoxButtons.OK, MessageBoxIcon.Information);
+                }
+                catch (Exception ex)
+                {
+                    MessageBox.Show(this, "Fehler beim Drucken/PDF-Erstellen:\r\n" + ex.Message, "Fehler", MessageBoxButtons.OK, MessageBoxIcon.Error);
+                }
+                finally
+                {
+                    try { font.Dispose(); } catch { }
+                    try { doc.Dispose(); } catch { }
+                }
+            }
         }
 
         private void UpdateDateLabel()
