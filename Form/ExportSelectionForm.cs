@@ -6,28 +6,22 @@ using System.Globalization;
 using System.Linq;
 using System.Threading.Tasks;
 using System.Windows.Forms;
-using System.Drawing.Drawing2D;
-using System.Runtime.InteropServices;
 using TaMi_Automatenclient.Export;
+using TaMi_Automatenclient.UI.Layout;
 
 namespace TaMi_Automatenclient
 {
-    public class ExportSelectionForm : Form
+    public class ExportSelectionForm : KassenclientBaseForm
     {
         private readonly int _firmenId;
         private readonly string _kassenName;
         private readonly string _automatenName;
 
-        private Panel _headerPanel;
-        private Label _lblTitle;
-        private Button _btnClose;
-        private Point _mouseDownLocation;
-
         private DateTimePicker _dtFrom;
         private DateTimePicker _dtTo;
         private ComboBox _cmbTemplate;
-        private Button _btnCancel;
-        private Button _btnExport;
+        private ModernGradientButton _btnCancel;
+        private ModernGradientButton _btnExport;
 
         public ExportSelectionForm(int firmenId, string kassenName, string automatenName)
         {
@@ -35,67 +29,14 @@ namespace TaMi_Automatenclient
             _kassenName = kassenName;
             _automatenName = automatenName;
 
-            FormBorderStyle = FormBorderStyle.None;
+            SetupDefaultForm("ExportSelectionForm", "Export – Auswahl", new Size(640, 320));
             StartPosition = FormStartPosition.CenterParent;
-            ClientSize = new Size(640, 320);
-            BackColor = Color.White;
-            DoubleBuffered = true;
-            try { Region = Region.FromHrgn(CreateRoundRectRgn(0, 0, Width, Height, 16, 16)); } catch { }
-
-            BuildHeader();
+            ShowInTaskbar = false;
+            AddHeaderPanel(Text, true, false, true);
             BuildUi();
         }
 
-        private void BuildHeader()
-        {
-            _headerPanel = new Panel
-            {
-                Location = new Point(0, 0),
-                Size = new Size(ClientSize.Width, 56),
-                Anchor = AnchorStyles.Top | AnchorStyles.Left | AnchorStyles.Right
-            };
-            _headerPanel.Paint += HeaderPanel_Paint;
-            _headerPanel.MouseDown += (s, e) => { if (e.Button == MouseButtons.Left) _mouseDownLocation = e.Location; };
-            _headerPanel.MouseMove += (s, e) =>
-            {
-                if (e.Button == MouseButtons.Left)
-                {
-                    Left += e.X - _mouseDownLocation.X;
-                    Top += e.Y - _mouseDownLocation.Y;
-                }
-            };
-            Controls.Add(_headerPanel);
-
-            _lblTitle = new Label
-            {
-                Text = "Export – Auswahl",
-                AutoSize = false,
-                TextAlign = ContentAlignment.MiddleLeft,
-                Font = new Font("Segoe UI Variable", 16F, FontStyle.Bold),
-                ForeColor = Color.White,
-                Location = new Point(20, 0),
-                Size = new Size(460, 56),
-                BackColor = Color.Transparent
-            };
-            _headerPanel.Controls.Add(_lblTitle);
-
-            _btnClose = new Button
-            {
-                Text = "\u2715",
-                Font = new Font("Segoe UI Symbol", 16F, FontStyle.Bold),
-                ForeColor = Color.White,
-                BackColor = Color.Transparent,
-                FlatStyle = FlatStyle.Flat,
-                Size = new Size(44, 44),
-                Location = new Point(ClientSize.Width - 52, 6),
-                Anchor = AnchorStyles.Top | AnchorStyles.Right,
-                TabStop = false
-            };
-            _btnClose.FlatAppearance.BorderSize = 0;
-            _btnClose.FlatAppearance.MouseOverBackColor = Color.FromArgb(255, 80, 80);
-            _btnClose.Click += (s, e) => Close();
-            _headerPanel.Controls.Add(_btnClose);
-        }
+        
 
         private void BuildUi()
         {
@@ -158,30 +99,26 @@ namespace TaMi_Automatenclient
             _cmbTemplate.SelectedIndex = 0;
             Controls.Add(_cmbTemplate);
 
-            _btnCancel = MakeButton("Abbrechen", new Point(294, 232), new Size(140, 44), Color.FromArgb(158, 158, 158));
+            _btnCancel = MakeButton("Abbrechen", new Point(294, 232), new Size(140, 44), UiTheme.SecondaryStart, UiTheme.SecondaryEnd);
             _btnCancel.DialogResult = DialogResult.Cancel;
             Controls.Add(_btnCancel);
 
-            _btnExport = MakeButton("Ausführen", new Point(444, 232), new Size(140, 44), Color.FromArgb(33, 150, 243));
+            _btnExport = MakeButton("Ausführen", new Point(444, 232), new Size(140, 44), UiTheme.PrimaryStart, UiTheme.PrimaryEnd);
             _btnExport.Click += async (s, e) => await DoExportAsync();
             Controls.Add(_btnExport);
         }
 
-        private Button MakeButton(string text, Point location, Size size, Color backColor)
+        private ModernGradientButton MakeButton(string text, Point location, Size size, Color start, Color end)
         {
-            var b = new Button
+            var b = new ModernGradientButton
             {
                 Text = text,
                 Location = location,
                 Size = size,
-                BackColor = backColor,
-                ForeColor = Color.White,
-                FlatStyle = FlatStyle.Flat,
+                GradientStart = start,
+                GradientEnd = end,
                 Font = new Font("Segoe UI Variable", 12F, FontStyle.Bold)
             };
-            b.FlatAppearance.BorderSize = 0;
-            try { b.Region = Region.FromHrgn(CreateRoundRectRgn(0, 0, b.Width, b.Height, 10, 10)); } catch { }
-            b.FlatAppearance.MouseOverBackColor = Color.FromArgb(Math.Max(backColor.R - 10, 0), Math.Max(backColor.G - 10, 0), Math.Max(backColor.B - 10, 0));
             return b;
         }
 
@@ -596,18 +533,7 @@ namespace TaMi_Automatenclient
             await DatevKasseCsvExporter.ExportAsync(rows, path, opts);
         }
 
-        private void HeaderPanel_Paint(object sender, PaintEventArgs e)
-        {
-            using (var brush = new LinearGradientBrush(_headerPanel.ClientRectangle,
-                Color.FromArgb(33, 150, 243), Color.FromArgb(33, 203, 243), 0f))
-            {
-                e.Graphics.FillRectangle(brush, _headerPanel.ClientRectangle);
-            }
-        }
-
-        [DllImport("gdi32.dll", SetLastError = true)]
-        private static extern IntPtr CreateRoundRectRgn(int nLeftRect, int nTopRect, int nRightRect, int nBottomRect, int nWidthEllipse, int nHeightEllipse);
-
+        
         private class TemplateItem
         {
             public string Text { get; set; }

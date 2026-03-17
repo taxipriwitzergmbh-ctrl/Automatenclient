@@ -1,18 +1,19 @@
-using System;
+ï»¿using System;
 using System.Drawing;
 using System.Globalization;
 using System.Runtime.InteropServices;
 using System.Windows.Forms;
 using System.Drawing.Drawing2D;
 using System.Threading.Tasks;
+using TaMi_Automatenclient.UI.Layout;
 
 namespace TaMi_Automatenclient
 {
-    public class EntrySplitForm : Form
+    public class EntrySplitForm : KassenclientBaseForm
     {
-        private const int HeaderHeight = 60;
+        private const int HeaderHeight = UiTheme.HeaderHeight;
 
-        // Rückgaben
+        // Rï¿½ckgaben
         public decimal Betrag19 => nud19.Value;
         public decimal Betrag7  => nud7.Value;
         public decimal Betrag0  => nud0.Value;
@@ -42,9 +43,9 @@ namespace TaMi_Automatenclient
         private readonly decimal _start0;
 
         // Header/Footer
-        private Panel headerPanel, footerPanel;
-        private Label lblTitle, lblSumInfo;
-        private Button btnClose, btnSave, btnCancel;
+        private Panel footerPanel;
+        private Label lblSumInfo;
+        private ModernGradientButton btnSave, btnCancel;
 
         // Eingaben
         private NumericUpDown nud19, nud7, nud0;
@@ -55,9 +56,9 @@ namespace TaMi_Automatenclient
         // Kontextanzeige (optional) analog EntryEditForm
         private string _zeit, _schichtIdStr, _fahrerName, _kennzeichen, _belegnummer, _kassenBelegnummer;
         private Label _lblZeit, _lblSchichtId, _lblFahrer, _lblKennzeichen, _lblBelegnummer, _lblKassenBelegnummer;
-        private int _contextInfoHeight; // zusätzliche Höhe oberhalb der Eingabefelder
+        private int _contextInfoHeight; // zusï¿½tzliche Hï¿½he oberhalb der Eingabefelder
 
-        // Dirty-Flags pro MwSt-Teil, damit Benutzerwerte nicht überschrieben werden
+        // Dirty-Flags pro MwSt-Teil, damit Benutzerwerte nicht ï¿½berschrieben werden
         private bool _applyingRules;
         private bool _d19K1, _d19K2, _d19Kto, _d19Txt;
         private bool _d7K1, _d7K2, _d7Kto, _d7Txt;
@@ -72,8 +73,8 @@ namespace TaMi_Automatenclient
         {
         }
 
-        // Zusätzlicher Komfort-Konstruktor: Signatur analog EntryEditForm
-        // Dadurch können bestehende Aufrufer dieselben Parameter verwenden und die Kontextwerte erscheinen direkt.
+        // Zusï¿½tzlicher Komfort-Konstruktor: Signatur analog EntryEditForm
+        // Dadurch kï¿½nnen bestehende Aufrufer dieselben Parameter verwenden und die Kontextwerte erscheinen direkt.
         // NEU: optionale fhzId aufnehmen, damit fahrzeugbezogene Regeln greifen
         public EntrySplitForm(string zeit, string typ, string buchungstext, string betragGesamt,
             decimal v19, decimal v7, decimal v0,
@@ -86,7 +87,7 @@ namespace TaMi_Automatenclient
             : this(
                 // originalSumme
                 ParseMoneySafe(betragGesamt),
-                // vorhandene Beträge zuweisen: wenn keiner gesetzt ist, default auf Gesamt in 19%
+                // vorhandene Betrï¿½ge zuweisen: wenn keiner gesetzt ist, default auf Gesamt in 19%
                 v19 != 0m ? v19 : 0m,
                 v7  != 0m ? v7  : 0m,
                 v0  != 0m ? v0  : 0m,
@@ -99,7 +100,7 @@ namespace TaMi_Automatenclient
                 // Firmenkontext
                 firmenId,
                 typ ?? string.Empty,
-                // FHZ aus Aufrufer (ermöglicht fahrzeugbezogene Regeln)
+                // FHZ aus Aufrufer (ermï¿½glicht fahrzeugbezogene Regeln)
                 fhzId,
                 // Kontextlabels
                 zeit,
@@ -109,7 +110,7 @@ namespace TaMi_Automatenclient
                 belegnummer,
                 kassenBelegnummer)
         {
-            // Falls keine Einzelbeträge übergeben wurden, alle 0: setze 19% auf Gesamt
+            // Falls keine Einzelbetrï¿½ge ï¿½bergeben wurden, alle 0: setze 19% auf Gesamt
             if (v19 == 0m && v7 == 0m && v0 == 0m)
             {
                 try
@@ -123,7 +124,7 @@ namespace TaMi_Automatenclient
             }
         }
 
-        // Neuer überladener Konstruktor mit Kontextfeldern analog EntryEditForm
+        // Neuer ï¿½berladener Konstruktor mit Kontextfeldern analog EntryEditForm
         public EntrySplitForm(decimal originalSumme, decimal vorhand19, decimal vorhand7, decimal vorhand0,
             int? startK1, int? startK2, int? startKto, string standardText,
             int firmenId, string typ, int? fhzId,
@@ -157,7 +158,7 @@ namespace TaMi_Automatenclient
             nud7.Value  = _start7;
             nud0.Value  = _start0;
 
-            // Basisgruppe bestimmen: die mit dem größten |Startwert| (bei 0 -> 19)
+            // Basisgruppe bestimmen: die mit dem grï¿½ï¿½ten |Startwert| (bei 0 -> 19)
             _baseGroup = "19";
             try
             {
@@ -176,55 +177,24 @@ namespace TaMi_Automatenclient
             if (startK2.HasValue) { txt19_K2.Text = txt7_K2.Text = txt0_K2.Text = startK2.Value.ToString(CultureInfo.InvariantCulture); }
             if (startKto.HasValue){ txt19_Kto.Text= txt7_Kto.Text= txt0_Kto.Text= startKto.Value.ToString(CultureInfo.InvariantCulture); }
 
-            // Header garantiert nach vorn
-            headerPanel.BringToFront();
-            btnClose.BringToFront();
-            try { Controls.SetChildIndex(headerPanel, 0); } catch { }
-
-            // Beim Öffnen passende Regeln anwenden (pro MwSt-Teil) und vorhandene Werte überschreiben
+            // Beim ï¿½ffnen passende Regeln anwenden (pro MwSt-Teil) und vorhandene Werte ï¿½berschreiben
             Shown += async (s, e) => await ApplyRulesForAllVatsAsync(forceOverwrite: true);
 
             UpdateSumInfo();
         }
 
-        protected override void OnPaint(PaintEventArgs e)
-        {
-            base.OnPaint(e);
-            var rect = new Rectangle(0, 0, ClientSize.Width, HeaderHeight);
-            using (var brush = new LinearGradientBrush(rect, Color.FromArgb(33, 150, 243), Color.FromArgb(33, 203, 243), 0f))
-            {
-                e.Graphics.FillRectangle(brush, rect);
-            }
-        }
-
-        protected override void OnResize(EventArgs e)
-        {
-            base.OnResize(e);
-            Invalidate(new Rectangle(0, 0, ClientSize.Width, HeaderHeight));
-        }
-
         private void BuildChrome()
         {
-            FormBorderStyle = FormBorderStyle.None;
             StartPosition = FormStartPosition.CenterParent;
-            ClientSize = new Size(900, 520);
-            BackColor = Color.White;
-            Font = new Font("Segoe UI Variable", 10F);
-            DoubleBuffered = true;
-            try { Region = Region.FromHrgn(CreateRoundRectRgn(0, 0, Width, Height, 16, 16)); } catch { }
-
-            headerPanel = new Panel { Left = 0, Top = 0, Width = ClientSize.Width, Height = HeaderHeight, Anchor = AnchorStyles.Top | AnchorStyles.Left | AnchorStyles.Right, Dock = DockStyle.Top, BackColor = Color.Transparent };
-            lblTitle = new Label { Text = "Buchung aufteilen", Left = 20, Top = 0, Width = 600, Height = HeaderHeight, ForeColor = Color.White, Font = new Font("Segoe UI Variable", 16F, FontStyle.Bold), TextAlign = ContentAlignment.MiddleLeft, BackColor = Color.Transparent };
-            btnClose = new Button { Text = "\u2715", Left = headerPanel.Width - 52, Top = 8, Width = 44, Height = 44, Anchor = AnchorStyles.Top | AnchorStyles.Right, FlatStyle = FlatStyle.Flat, ForeColor = Color.White, BackColor = Color.Transparent, TabStop = false };
-            btnClose.FlatAppearance.BorderSize = 0; btnClose.FlatAppearance.MouseOverBackColor = Color.FromArgb(255, 80, 80);
-            btnClose.Click += (s, e) => Close();
-            headerPanel.Controls.Add(lblTitle); headerPanel.Controls.Add(btnClose); Controls.Add(headerPanel);
+            SetupDefaultForm("EntrySplitForm", "Buchung aufteilen", new Size(900, 520));
+            ShowInTaskbar = false;
+            AddHeaderPanel(Text, true, false, true);
 
             footerPanel = new Panel { Left = 0, Top = ClientSize.Height - 64, Width = ClientSize.Width, Height = 64, Anchor = AnchorStyles.Left | AnchorStyles.Right | AnchorStyles.Bottom, BackColor = Color.FromArgb(245, 248, 255) };
-            btnSave = new Button { Text = "Speichern", Width = 160, Height = 40, Left = footerPanel.Width - 340, Top = 12, Anchor = AnchorStyles.Right | AnchorStyles.Top, BackColor = Color.FromArgb(33, 150, 243), ForeColor = Color.White, FlatStyle = FlatStyle.Flat };
-            btnSave.FlatAppearance.BorderSize = 0; btnSave.Enabled = false; btnSave.Click += (s, e) => { DialogResult = DialogResult.OK; };
-            btnCancel = new Button { Text = "Abbrechen", Width = 160, Height = 40, Left = footerPanel.Width - 170, Top = 12, Anchor = AnchorStyles.Right | AnchorStyles.Top, BackColor = Color.Gainsboro, ForeColor = Color.Black, FlatStyle = FlatStyle.Flat };
-            btnCancel.FlatAppearance.BorderSize = 0; btnCancel.Click += (s, e) => { DialogResult = DialogResult.Cancel; };
+            btnSave = new ModernGradientButton { Text = "Speichern", Width = 160, Height = 44, Left = footerPanel.Width - 340, Top = 10, Anchor = AnchorStyles.Right | AnchorStyles.Top, GradientStart = UiTheme.PrimaryStart, GradientEnd = UiTheme.PrimaryEnd, Font = new Font("Segoe UI Variable", 12F, FontStyle.Bold) };
+            btnSave.Enabled = false; btnSave.Click += (s, e) => { DialogResult = DialogResult.OK; };
+            btnCancel = new ModernGradientButton { Text = "Abbrechen", Width = 160, Height = 44, Left = footerPanel.Width - 170, Top = 10, Anchor = AnchorStyles.Right | AnchorStyles.Top, GradientStart = UiTheme.SecondaryStart, GradientEnd = UiTheme.SecondaryEnd, Font = new Font("Segoe UI Variable", 12F, FontStyle.Bold) };
+            btnCancel.Click += (s, e) => { DialogResult = DialogResult.Cancel; };
             footerPanel.Controls.AddRange(new Control[] { btnSave, btnCancel }); Controls.Add(footerPanel);
         }
 
@@ -264,7 +234,7 @@ namespace TaMi_Automatenclient
             lblSumInfo = new Label { Left = leftAmt, Top = top + 50, Width = 600, Height = 24, ForeColor = Color.DimGray };
             Controls.Add(lblSumInfo);
 
-            // Dirty-Flags setzen, wenn der Benutzer die Felder ändert
+            // Dirty-Flags setzen, wenn der Benutzer die Felder ï¿½ndert
             txt19_K1.TextChanged += (s, e) => { if (!_applyingRules) _d19K1 = true; };
             txt19_K2.TextChanged += (s, e) => { if (!_applyingRules) _d19K2 = true; };
             txt19_Kto.TextChanged += (s, e) => { if (!_applyingRules) _d19Kto = true; };
@@ -300,7 +270,7 @@ namespace TaMi_Automatenclient
             };
         }
 
-        // Baut optionale Kontextinformation analog EntryEditForm über dem Inhalt
+        // Baut optionale Kontextinformation analog EntryEditForm ï¿½ber dem Inhalt
         private void BuildContextInfo()
         {
             _contextInfoHeight = 0;
@@ -329,10 +299,10 @@ namespace TaMi_Automatenclient
             _lblKassenBelegnummer = new Label { Text = _kassenBelegnummer ?? string.Empty, Left = left + labelW + 10, Top = top, Width = 280 }; top += gapY;
             Controls.Add(_lblKassenBelegnummer);
 
-            _contextInfoHeight = (top - (HeaderHeight + 8)) + 10; // Höhe des Blocks merken
+            _contextInfoHeight = (top - (HeaderHeight + 8)) + 10; // Hï¿½he des Blocks merken
         }
 
-        // Öffentliche Methode zum Setzen/Aktualisieren des Kontextes nach der Instanziierung
+        // ï¿½ffentliche Methode zum Setzen/Aktualisieren des Kontextes nach der Instanziierung
         public void SetContext(string zeit, string schichtId, string fahrerName, string kennzeichen, string belegnummer, string kassenBelegnummer)
         {
             _zeit = zeit ?? string.Empty;
@@ -372,7 +342,7 @@ namespace TaMi_Automatenclient
         private TextBox CreateTextBox(int left, int top) => new TextBox { Left = left, Top = top, Width = 340 };
 
         // Rechnet IMMER die Basisgruppe aus: Base = OriginalSumme - (Summe der anderen beiden).
-        // Damit wird stets „vom Ursprung abgezogen/aufgeschlagen“, positiv wie negativ.
+        // Damit wird stets ï¿½vom Ursprung abgezogen/aufgeschlagenï¿½, positiv wie negativ.
         private void AdjustBaseAfterChange(string changed)
         {
             if (_updating) return;
@@ -434,7 +404,7 @@ namespace TaMi_Automatenclient
                 if (group == "19")
                 {
                     var amt = Betrag19;
-                    if (amt <= 0m) amt = 0.01m; // Minimalwert, damit Regeln mit "> 0" matchen (nur für Matching)
+                    if (amt <= 0m) amt = 0.01m; // Minimalwert, damit Regeln mit "> 0" matchen (nur fï¿½r Matching)
                     b19 = amt;
                 }
                 else if (group == "7")
@@ -500,7 +470,6 @@ namespace TaMi_Automatenclient
             return Math.Min(100000000M, Math.Max(-100000000M, decimal.Round(v, 2)));
         }
 
-        [DllImport("gdi32.dll", SetLastError = true)]
-        private static extern IntPtr CreateRoundRectRgn(int nLeftRect, int nTopRect, int nRightRect, int nBottomRect, int nWidthEllipse, int nHeightEllipse);
+        
     }
 }

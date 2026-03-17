@@ -19,10 +19,10 @@ namespace TaMi_Automatenclient
         private static extern IntPtr CreateRoundRectRgn(int nLeftRect, int nTopRect, int nRightRect, int nBottomRect, int nWidthEllipse, int nHeightEllipse);
 
 
-        public static readonly Color HeaderAccent1 = Color.FromArgb(33, 150, 243),  //Color.FromArgb(33, 150, 243),
-                                     HeaderAccent2 = Color.FromArgb(25, 118, 210); //Color.FromArgb(33, 203, 243);
+        public static readonly Color HeaderAccent1 = UiTheme.PrimaryStart,
+                                     HeaderAccent2 = UiTheme.PrimaryEnd;
 
-        public static readonly Color BackcolorNeutral = Color.FromArgb(33, 150, 243);
+        public static readonly Color BackcolorNeutral = UiTheme.PrimaryStart;
 
         public static readonly Font HeaderTextFont = new Font("Segoe UI Variable", 16F, FontStyle.Bold),
                                     HeaderButtonFont = new Font("Segoe UI Symbol", 14F, FontStyle.Bold),
@@ -97,6 +97,13 @@ namespace TaMi_Automatenclient
                 Title = title,
                 ShowMinimize = minimizeButton
             };
+
+            try
+            {
+                _modernHeader.Dock = DockStyle.Top;
+                _modernHeader.Height = UiTheme.HeaderHeight;
+            }
+            catch { }
 
             if (!canMoveForm)
             {

@@ -6,6 +6,7 @@ using System.Threading.Tasks;
 using System.Windows.Forms;
 using SuE.Tools;
 using System.IO;
+using TaMi_Automatenclient.UI.Layout;
 
 namespace TaMi_Automatenclient
 {
@@ -30,9 +31,9 @@ namespace TaMi_Automatenclient
             tabs = new TabControl
             {
                 Left = 12,
-                Top = 60,
+                Top = UiTheme.HeaderHeight + 12,
                 Width = this.ClientSize.Width - 24,
-                Height = this.ClientSize.Height - 72,
+                Height = this.ClientSize.Height - (UiTheme.HeaderHeight + 24),
                 Anchor = AnchorStyles.Top | AnchorStyles.Bottom | AnchorStyles.Left | AnchorStyles.Right
             };
 

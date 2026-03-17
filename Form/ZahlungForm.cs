@@ -1,4 +1,4 @@
-using System;
+ï»¿using System;
 using System.Data;
 using System.Drawing;
 using System.Threading.Tasks;
@@ -6,16 +6,14 @@ using System.Windows.Forms;
 using System.Drawing.Drawing2D;
 using System.Data.SqlClient;
 using System.Collections.Generic;
+using TaMi_Automatenclient.UI.Layout;
 
 namespace TaMi_Automatenclient
 {
-    public class ZahlungForm : Form
+    public class ZahlungForm : KassenclientBaseForm
     {
         // UI Felder
-        private Panel headerPanel; 
-        private Button btnClose; 
-        private Label lblTitle; 
-        private Point _mouseDownLocation;
+        private const int HeaderHeight = UiTheme.HeaderHeight;
         private ComboBox cboMitarbeiter; 
         private TextBox txtPid; 
         private ComboBox cboTyp; 
@@ -24,15 +22,15 @@ namespace TaMi_Automatenclient
         private TextBox txtText; 
         private TextBox txtK1, txtK2, txtKto; 
         private NumericUpDown nudAmount; 
-        private Button btnAnlegen; 
-        private Button btnSaveChanges; 
-        private Button btnStorno; 
+        private ModernGradientButton btnAnlegen; 
+        private ModernGradientButton btnSaveChanges; 
+        private ModernGradientButton btnStorno; 
         private Label lblInfo; 
         private Label lblSelName; 
         private DataGridView dgvOpen; 
         private Label lblOpenCaption; 
         private ComboBox cboPreset; 
-        private Button btnCreatePreset;
+        private ModernGradientButton btnCreatePreset;
 
         // Status
         private bool _personalLoaded; 
@@ -53,12 +51,14 @@ namespace TaMi_Automatenclient
 
         private class PresetListItem { public string Text { get; set; } public DataRow Row { get; set; } public override string ToString() => Text; }
 
-        private static readonly Color Accent = Color.FromArgb(33,150,243); 
-        private static readonly Color AccentDark = Color.FromArgb(25,118,210);
+        private static readonly Color Accent = UiTheme.PrimaryStart;
+        private static readonly Color AccentDark = UiTheme.PrimaryEnd;
 
         public ZahlungForm()
         {
-            this.Icon = Program.AppIcon;
+            SetupDefaultForm("ZahlungForm", "Neue Zahlung", new Size(940, 700));
+            StartPosition = FormStartPosition.CenterParent;
+            AddHeaderPanel("Zahlung erfassen", true, false, true);
             BuildUI();
         }
 
@@ -88,27 +88,14 @@ namespace TaMi_Automatenclient
 
         private void BuildUI()
         {
-            // Breite erhöht (vorher 760)
-            FormBorderStyle = FormBorderStyle.None;
-            StartPosition = FormStartPosition.CenterParent;
-            ShowInTaskbar = false;
-            Text = "Neue Zahlung";
-            ClientSize = new Size(940, 700);
+            // Breite erhï¿½ht (vorher 760)
             DoubleBuffered = true;
             KeyPreview = true;
             KeyDown += ZahlungForm_KeyDown;
 
             SuspendLayout();
 
-            headerPanel = new Panel { Location = new Point(0,0), Size = new Size(ClientSize.Width,60), Anchor = AnchorStyles.Top|AnchorStyles.Left|AnchorStyles.Right };
-            headerPanel.Paint += (s,e)=> { using(var lg=new LinearGradientBrush(headerPanel.ClientRectangle,Accent,AccentDark,0f)) e.Graphics.FillRectangle(lg,headerPanel.ClientRectangle); using(var pen=new Pen(Color.FromArgb(13,71,161))) e.Graphics.DrawLine(pen,0,headerPanel.Height-1,headerPanel.Width,headerPanel.Height-1); };
-            headerPanel.MouseDown += (s,e)=> { if(e.Button==MouseButtons.Left) _mouseDownLocation=e.Location; };
-            headerPanel.MouseMove += (s,e)=> { if(e.Button==MouseButtons.Left){ Left += e.X - _mouseDownLocation.X; Top += e.Y - _mouseDownLocation.Y; } };
-            Controls.Add(headerPanel);
-            lblTitle = new Label { Text="Zahlung erfassen", AutoSize=false, Font=new Font("Segoe UI",18F,FontStyle.Bold), ForeColor=Color.White, Location=new Point(24,0), Size=new Size(480,60), TextAlign=ContentAlignment.MiddleLeft, BackColor=Color.Transparent}; headerPanel.Controls.Add(lblTitle);
-            btnClose = new Button { Text="\u2715", Font=new Font("Segoe UI Symbol",18F,FontStyle.Bold), ForeColor=Color.White, BackColor=Color.Transparent, FlatStyle=FlatStyle.Flat, Size=new Size(48,48), Location=new Point(ClientSize.Width-56,6), Anchor=AnchorStyles.Top|AnchorStyles.Right, TabStop=false }; btnClose.FlatAppearance.BorderSize=0; btnClose.FlatAppearance.MouseOverBackColor=Color.FromArgb(255,80,80); btnClose.Click += (s,e)=> Close(); headerPanel.Controls.Add(btnClose);
-
-            var content = new Panel { Left=0, Top=headerPanel.Bottom, Width=ClientSize.Width, Height=ClientSize.Height-60, Anchor=AnchorStyles.Top|AnchorStyles.Left|AnchorStyles.Right|AnchorStyles.Bottom, BackColor=Color.White };
+            var content = new Panel { Left=0, Top=HeaderHeight, Width=ClientSize.Width, Height=ClientSize.Height-HeaderHeight, Anchor=AnchorStyles.Top|AnchorStyles.Left|AnchorStyles.Right|AnchorStyles.Bottom, BackColor=Color.White };
             Controls.Add(content);
             int y=20; int labelW=110;
             content.Controls.Add(new Label{ Text="Personalnr:", Left=24, Top=y+6, Width=labelW });
@@ -125,7 +112,7 @@ namespace TaMi_Automatenclient
                 {
                     txtPid.Text = drv["PID"].ToString();
                     bool ges=false; try{ if(drv.Row.Table.Columns.Contains("Gesperrt") && drv["Gesperrt"]!=DBNull.Value) ges=Convert.ToBoolean(drv["Gesperrt"]);}catch{}
-                    _currentSelectedGesperrt=ges; lblSelName.Text = ges?"Mitarbeiter gesperrt: "+drv["Name"]:"Ausgewählt: "+drv["Name"];
+                    _currentSelectedGesperrt=ges; lblSelName.Text = ges?"Mitarbeiter gesperrt: "+drv["Name"]:"Ausgewï¿½hlt: "+drv["Name"];
                     await LoadOpenPaymentsAsync();
                 }
             };
@@ -136,16 +123,16 @@ namespace TaMi_Automatenclient
             cboPreset.DropDown += async (s,e)=> { if(!_presetsLoaded){ try{ Cursor.Current=Cursors.WaitCursor; await LoadAccountingPresetsAsync(); } finally { Cursor.Current=Cursors.Default; } } };
             cboPreset.SelectedIndexChanged += (s,e)=> { if(_suppressPresetEvents || !_presetsLoaded) return; ApplyPresetToFields(); };
             content.Controls.Add(cboPreset);
-            btnCreatePreset = new Button { Text="+", Left=cboPreset.Right+8, Top=y+31, Width=40, Height=30, BackColor=Accent, ForeColor=Color.White, FlatStyle=FlatStyle.Flat };
-            btnCreatePreset.FlatAppearance.BorderSize=0; btnCreatePreset.Click += (s,e)=> ShowPresetOverlay(); content.Controls.Add(btnCreatePreset);
+            btnCreatePreset = new ModernGradientButton { Text="+", Left=cboPreset.Right+8, Top=y+31, Width=44, Height=32, GradientStart=UiTheme.PrimaryStart, GradientEnd=UiTheme.PrimaryEnd, Font=new Font("Segoe UI Variable", 12F, FontStyle.Bold) };
+            btnCreatePreset.Click += (s,e)=> ShowPresetOverlay(); content.Controls.Add(btnCreatePreset);
             content.Controls.Add(new Label{ Text="Typ:", Left=24, Top=y+80+6, Width=labelW });
             cboTyp = new ComboBox { Left=24+labelW, Top=y+80, Width=160, DropDownStyle=ComboBoxStyle.DropDownList };
-            cboTyp.Items.AddRange(new object[]{"Bitte auswählen","Einzahlung","Auszahlung"}); cboTyp.SelectedIndex=0; content.Controls.Add(cboTyp);
+            cboTyp.Items.AddRange(new object[]{"Bitte auswï¿½hlen","Einzahlung","Auszahlung"}); cboTyp.SelectedIndex=0; content.Controls.Add(cboTyp);
             content.Controls.Add(new Label{ Text="MwSt:", Left=cboTyp.Right+20, Top=y+80+6, Width=50 });
             cboMwst = new ComboBox { Left=cboTyp.Right+20+50, Top=y+80, Width=80, DropDownStyle=ComboBoxStyle.DropDownList };
-            cboMwst.Items.AddRange(new object[]{"Bitte auswählen","19","7","0"}); cboMwst.SelectedIndex=0; content.Controls.Add(cboMwst);
+            cboMwst.Items.AddRange(new object[]{"Bitte auswï¿½hlen","19","7","0"}); cboMwst.SelectedIndex=0; content.Controls.Add(cboMwst);
 
-            // NEU: Betrag vor Firma und größere Breiten
+            // NEU: Betrag vor Firma und grï¿½ï¿½ere Breiten
             int betragLabelLeft = cboMwst.Right + 30;
             content.Controls.Add(new Label{ Text="Betrag:", Left=betragLabelLeft, Top=y+80+6, Width=55 });
             nudAmount = new NumericUpDown { Left=betragLabelLeft + 55, Top=y+80, Width=100, DecimalPlaces=2, Maximum=1000000, Minimum=-1000000, Increment=0.10M }; // schmaler
@@ -168,12 +155,12 @@ namespace TaMi_Automatenclient
             txtK2 = new TextBox { Left=lblK2.Right+4, Top=y, Width=100 }; content.Controls.Add(txtK2);
             var lblKto = new Label { Text="Konto:", Left=txtK2.Right+spacing, Top=y+6, Width=60 }; content.Controls.Add(lblKto);
             txtKto = new TextBox { Left=lblKto.Right+4, Top=y, Width=110 }; content.Controls.Add(txtKto); y+=56;
-            btnAnlegen = new Button { Text="Zahlung anlegen", Left=24+labelW, Top=y, Width=220, Height=44, BackColor=Color.FromArgb(46,125,50), ForeColor=Color.White, FlatStyle=FlatStyle.Flat, Font=new Font("Segoe UI",11F,FontStyle.Bold) };
-            btnAnlegen.FlatAppearance.BorderSize=0; btnAnlegen.Click += async (s,e)=> await CreatePaymentAsync(); content.Controls.Add(btnAnlegen);
-            btnSaveChanges = new Button { Text="Änderung speichern", Left=btnAnlegen.Right+12, Top=y, Width=220, Height=44, BackColor=Color.FromArgb(3,155,229), ForeColor=Color.White, FlatStyle=FlatStyle.Flat, Font=new Font("Segoe UI",11F,FontStyle.Bold), Enabled=false };
-            btnSaveChanges.FlatAppearance.BorderSize=0; btnSaveChanges.Click += async (s,e)=> await SaveEditedPaymentAsync(); content.Controls.Add(btnSaveChanges);
-            btnStorno = new Button { Text="Stornieren", Left=btnSaveChanges.Right+12, Top=y, Width=160, Height=44, BackColor=Color.FromArgb(229,57,53), ForeColor=Color.White, FlatStyle=FlatStyle.Flat, Font=new Font("Segoe UI",11F,FontStyle.Bold) };
-            btnStorno.FlatAppearance.BorderSize=0; btnStorno.Enabled=false; btnStorno.Click += async (s,e)=> await StorniereAuswahlAsync(); content.Controls.Add(btnStorno); y+=60;
+            btnAnlegen = new ModernGradientButton { Text="Zahlung anlegen", Left=24+labelW, Top=y, Width=220, Height=44, GradientStart=UiTheme.SuccessStart, GradientEnd=UiTheme.SuccessEnd, Font=new Font("Segoe UI Variable",11F,FontStyle.Bold) };
+            btnAnlegen.Click += async (s,e)=> await CreatePaymentAsync(); content.Controls.Add(btnAnlegen);
+            btnSaveChanges = new ModernGradientButton { Text="Ã„nderung speichern", Left=btnAnlegen.Right+12, Top=y, Width=220, Height=44, GradientStart=UiTheme.PrimaryStart, GradientEnd=UiTheme.PrimaryEnd, Font=new Font("Segoe UI Variable",11F,FontStyle.Bold), Enabled=false };
+            btnSaveChanges.Click += async (s,e)=> await SaveEditedPaymentAsync(); content.Controls.Add(btnSaveChanges);
+            btnStorno = new ModernGradientButton { Text="Stornieren", Left=btnSaveChanges.Right+12, Top=y, Width=160, Height=44, GradientStart=UiTheme.DangerStart, GradientEnd=UiTheme.DangerEnd, Font=new Font("Segoe UI Variable",11F,FontStyle.Bold) };
+            btnStorno.Enabled=false; btnStorno.Click += async (s,e)=> await StorniereAuswahlAsync(); content.Controls.Add(btnStorno); y+=60;
             lblOpenCaption = new Label { Text="Offene Zahlungen:", Left=24, Top=y, Width=content.Width-48, Font=new Font("Segoe UI",9.5f) }; content.Controls.Add(lblOpenCaption); y+=22;
             dgvOpen = new DataGridView { Left=24, Top=y, Width=content.Width-48, Height=5*26+28, ReadOnly=true, AllowUserToAddRows=false, AllowUserToDeleteRows=false, AllowUserToResizeRows=false, RowHeadersVisible=false, SelectionMode=DataGridViewSelectionMode.FullRowSelect, MultiSelect=false, BackgroundColor=Color.White, BorderStyle=BorderStyle.FixedSingle, AutoGenerateColumns=false, Anchor=AnchorStyles.Top|AnchorStyles.Left|AnchorStyles.Right };
             // Hervorhebung komplette Zeile in Blau
@@ -226,7 +213,7 @@ namespace TaMi_Automatenclient
                 using(var db=new DatabaseHelperKassen())
                 {
                     var dt=await db.LoadZahlungsVorlagenAsync();
-                    _suppressPresetEvents=true; cboPreset.Items.Clear(); cboPreset.Items.Add(new PresetListItem{ Text="Vorlage auswählen", Row=null});
+                    _suppressPresetEvents=true; cboPreset.Items.Clear(); cboPreset.Items.Add(new PresetListItem{ Text="Vorlage auswï¿½hlen", Row=null});
                     foreach(DataRow r in dt.Rows){ string name=Convert.ToString(r["VorlagenName"]); if(string.IsNullOrWhiteSpace(name)) continue; cboPreset.Items.Add(new PresetListItem{ Text=name, Row=r}); }
                     cboPreset.SelectedIndex=0; _presetsLoaded=true;
                 }
@@ -244,7 +231,7 @@ namespace TaMi_Automatenclient
                     var dt=await db.GetMandantenAsync();
                     if(!dt.Columns.Contains("ManID")) dt.Columns.Add("ManID",typeof(int));
                     if(!dt.Columns.Contains("ManName")) dt.Columns.Add("ManName",typeof(string));
-                    var ph=dt.NewRow(); ph["ManID"]=0; ph["ManName"]="Bitte auswählen"; dt.Rows.InsertAt(ph,0);
+                    var ph=dt.NewRow(); ph["ManID"]=0; ph["ManName"]="Bitte auswï¿½hlen"; dt.Rows.InsertAt(ph,0);
                     cboFirma.DisplayMember="ManName"; cboFirma.ValueMember="ManID"; cboFirma.DataSource=dt; cboFirma.SelectedIndex=0; _mandantenLoaded=true;
                 }
             }
@@ -288,12 +275,12 @@ namespace TaMi_Automatenclient
         private bool ValidateEntry(bool editing, out string msg)
         {
             if(_currentSelectedGesperrt){ msg="Mitarbeiter gesperrt."; return false; }
-            if(!int.TryParse(txtPid.Text.Trim(), out var pid) || pid<=0){ msg="Personalnummer ungültig."; return false; }
-            if(cboTyp.SelectedIndex<=0){ msg="Bitte Typ auswählen."; return false; }
-            if(cboMwst.SelectedIndex<=0){ msg="Bitte MwSt auswählen."; return false; }
-            if(cboFirma.SelectedIndex<=0){ msg="Bitte Firma auswählen."; return false; }
+            if(!int.TryParse(txtPid.Text.Trim(), out var pid) || pid<=0){ msg="Personalnummer ungï¿½ltig."; return false; }
+            if(cboTyp.SelectedIndex<=0){ msg="Bitte Typ auswï¿½hlen."; return false; }
+            if(cboMwst.SelectedIndex<=0){ msg="Bitte MwSt auswï¿½hlen."; return false; }
+            if(cboFirma.SelectedIndex<=0){ msg="Bitte Firma auswï¿½hlen."; return false; }
             if(string.IsNullOrWhiteSpace(txtText.Text)){ msg="Buchungstext fehlt."; return false; }
-            if(editing && !_editBeleg.HasValue){ msg="Keine Zahlung gewählt."; return false; }
+            if(editing && !_editBeleg.HasValue){ msg="Keine Zahlung gewï¿½hlt."; return false; }
             msg=null; return true;
         }
 
@@ -328,19 +315,19 @@ namespace TaMi_Automatenclient
             btnSaveChanges.Enabled = _editBeleg.HasValue;
         }
 
-        // --- Änderungen speichern ---
+        // --- ï¿½nderungen speichern ---
         private async Task SaveEditedPaymentAsync()
         {
             if(!ValidateEntry(true, out var msg)){ if(msg!=null) MessageBox.Show(this,msg,"Hinweis",MessageBoxButtons.OK,MessageBoxIcon.Information); return; }
             if(!_editBeleg.HasValue) return; string typText=cboTyp.SelectedItem as string; string typCode=MapTypTextToCode(typText); string mwst=cboMwst.SelectedItem as string; decimal amount=nudAmount.Value; decimal b19=0,b7=0,b0=0; if(mwst=="19") b19=amount; else if(mwst=="7") b7=amount; else b0=amount; int? k1=int.TryParse(txtK1.Text,out var vk1)?(int?)vk1:null; int? k2=int.TryParse(txtK2.Text,out var vk2)?(int?)vk2:null; int? kto=int.TryParse(txtKto.Text,out var vkto)?(int?)vkto:null; int fid=0; try{ fid=Convert.ToInt32(cboFirma.SelectedValue);}catch{}
-            try{ using(var db=new DatabaseHelperKassen()){ int n=await db.UpdateOffeneZahlungAsync(_editBeleg.Value, typCode, txtText.Text.Trim(), b19,b7,b0, k1,k2,kto); if(n<=0){ MessageBox.Show(this,"Änderung nicht möglich (evtl. verbucht).","Hinweis",MessageBoxButtons.OK,MessageBoxIcon.Information); return; } } lblInfo.Text="Änderungen gespeichert."; _editBeleg=null; btnSaveChanges.Enabled=false; await LoadOpenPaymentsAsync(); }
+            try{ using(var db=new DatabaseHelperKassen()){ int n=await db.UpdateOffeneZahlungAsync(_editBeleg.Value, typCode, txtText.Text.Trim(), b19,b7,b0, k1,k2,kto); if(n<=0){ MessageBox.Show(this,"ï¿½nderung nicht mï¿½glich (evtl. verbucht).","Hinweis",MessageBoxButtons.OK,MessageBoxIcon.Information); return; } } lblInfo.Text="ï¿½nderungen gespeichert."; _editBeleg=null; btnSaveChanges.Enabled=false; await LoadOpenPaymentsAsync(); }
             catch(Exception ex){ MessageBox.Show(this,"Fehler beim Speichern: "+ex.Message,"Fehler",MessageBoxButtons.OK,MessageBoxIcon.Error);} }
 
         // --- Storno ---
         private async Task StorniereAuswahlAsync()
         {
-            if(dgvOpen?.CurrentRow==null) return; var row=(dgvOpen.CurrentRow.DataBoundItem as DataRowView)?.Row; if(row==null) return; if(!row.Table.Columns.Contains("Belegnummer")) return; int beleg=0; try{ beleg=Convert.ToInt32(row["Belegnummer"]);}catch{} if(beleg<=0) return; if(MessageBox.Show(this,$"Zahlung {beleg} wirklich stornieren?","Bestätigung",MessageBoxButtons.YesNo,MessageBoxIcon.Question)!=DialogResult.Yes) return;
-            try{ using(var db=new DatabaseHelperKassen()) { int n=await db.StorniereOffeneZahlungAsync(beleg); if(n<=0){ MessageBox.Show(this,"Storno nicht möglich (evtl. verbucht).","Hinweis",MessageBoxButtons.OK,MessageBoxIcon.Information); return; } } await LoadOpenPaymentsAsync(); }
+            if(dgvOpen?.CurrentRow==null) return; var row=(dgvOpen.CurrentRow.DataBoundItem as DataRowView)?.Row; if(row==null) return; if(!row.Table.Columns.Contains("Belegnummer")) return; int beleg=0; try{ beleg=Convert.ToInt32(row["Belegnummer"]);}catch{} if(beleg<=0) return; if(MessageBox.Show(this,$"Zahlung {beleg} wirklich stornieren?","Bestï¿½tigung",MessageBoxButtons.YesNo,MessageBoxIcon.Question)!=DialogResult.Yes) return;
+            try{ using(var db=new DatabaseHelperKassen()) { int n=await db.StorniereOffeneZahlungAsync(beleg); if(n<=0){ MessageBox.Show(this,"Storno nicht mï¿½glich (evtl. verbucht).","Hinweis",MessageBoxButtons.OK,MessageBoxIcon.Information); return; } } await LoadOpenPaymentsAsync(); }
             catch(Exception ex){ MessageBox.Show(this,"Fehler beim Stornieren: "+ex.Message,"Fehler",MessageBoxButtons.OK,MessageBoxIcon.Error);} }
 
         // --- Grid ---
@@ -399,7 +386,7 @@ namespace TaMi_Automatenclient
                     {
                         if(Convert.ToInt32(cboMitarbeiter.SelectedValue ?? -1)!=pid) cboMitarbeiter.SelectedValue=pid;
                         bool ges=false; try{ if(r.Table.Columns.Contains("Gesperrt") && r["Gesperrt"]!=DBNull.Value) ges=Convert.ToBoolean(r["Gesperrt"]);}catch{}
-                        _currentSelectedGesperrt=ges; lblSelName.Text = ges?"Mitarbeiter gesperrt: "+r["Name"]:"Ausgewählt: "+r["Name"];
+                        _currentSelectedGesperrt=ges; lblSelName.Text = ges?"Mitarbeiter gesperrt: "+r["Name"]:"Ausgewï¿½hlt: "+r["Name"];
                         await LoadOpenPaymentsAsync(); return;
                     }
                 }
@@ -409,7 +396,7 @@ namespace TaMi_Automatenclient
                 var p = await db.GetPersonalInfoAsync(pid);
                 if(p!=null)
                 {
-                    _currentSelectedGesperrt=false; lblSelName.Text=$"Ausgewählt: {p.Name} {p.Vorname}";
+                    _currentSelectedGesperrt=false; lblSelName.Text=$"Ausgewï¿½hlt: {p.Name} {p.Vorname}";
                 }
                 else
                 {
@@ -475,7 +462,7 @@ namespace TaMi_Automatenclient
 
             var btnNeu = new Button { Text = "Neu", Left = 24, Width = 80, Height = 34, Top = body.Height - 46, Anchor = AnchorStyles.Left | AnchorStyles.Bottom, BackColor = Accent, ForeColor = Color.White, FlatStyle = FlatStyle.Flat };
             btnNeu.FlatAppearance.BorderSize = 0;
-            var btnDelete = new Button { Text = "Löschen", Left = btnNeu.Right + 8, Width = 90, Height = 34, Top = body.Height - 46, Anchor = AnchorStyles.Left | AnchorStyles.Bottom, BackColor = Color.FromArgb(229, 57, 53), ForeColor = Color.White, FlatStyle = FlatStyle.Flat };
+            var btnDelete = new Button { Text = "Lï¿½schen", Left = btnNeu.Right + 8, Width = 90, Height = 34, Top = body.Height - 46, Anchor = AnchorStyles.Left | AnchorStyles.Bottom, BackColor = Color.FromArgb(229, 57, 53), ForeColor = Color.White, FlatStyle = FlatStyle.Flat };
             btnDelete.FlatAppearance.BorderSize = 0; body.Controls.Add(btnNeu); body.Controls.Add(btnDelete);
 
             int baseX = 270; int wLabel = 70; int curY = 14; int spacing = 30;
@@ -562,12 +549,12 @@ namespace TaMi_Automatenclient
             btnDelete.Click += async (s, e) =>
             {
                 if (!(lst.SelectedItem is PresetListItem ciDel) || editBeleg == null) return;
-                if (MessageBox.Show(dlg, "Vorlage wirklich löschen?", "Bestätigung", MessageBoxButtons.YesNo, MessageBoxIcon.Question) != DialogResult.Yes) return;
+                if (MessageBox.Show(dlg, "Vorlage wirklich lï¿½schen?", "Bestï¿½tigung", MessageBoxButtons.YesNo, MessageBoxIcon.Question) != DialogResult.Yes) return;
                 try
                 {
                     using (var db = new DatabaseHelperKassen()) await db.UpdateZahlungsVorlageAsync(editBeleg.Value, "Einzahlung", "Vorlage", string.Empty, null, null, null, "19", 0);
                 }
-                catch (Exception ex) { MessageBox.Show(dlg, "Löschen fehlgeschlagen: " + ex.Message, "Fehler", MessageBoxButtons.OK, MessageBoxIcon.Error); return; }
+                catch (Exception ex) { MessageBox.Show(dlg, "Lï¿½schen fehlgeschlagen: " + ex.Message, "Fehler", MessageBoxButtons.OK, MessageBoxIcon.Error); return; }
                 await loadListAsync(); clearFields();
             };
             tbName.TextChanged += (s, e) => btnSave.Enabled = !string.IsNullOrWhiteSpace(tbName.Text);
@@ -599,7 +586,7 @@ namespace TaMi_Automatenclient
             dlg.Dispose();
         }
 
-        // Hilfsmethoden für Typ-Mapping (minimalinvasiv)
+        // Hilfsmethoden fï¿½r Typ-Mapping (minimalinvasiv)
         private static string MapTypTextToCode(string text)
         {
             if (string.IsNullOrWhiteSpace(text)) return string.Empty;
@@ -607,7 +594,7 @@ namespace TaMi_Automatenclient
             {
                 case "einzahlung": return "2";
                 case "auszahlung": return "3";
-                // ggf. weitere Typen später:
+                // ggf. weitere Typen spï¿½ter:
                 case "anfangsbestand": return "1";
                 case "schichtabrechnung": return "4";
                 case "personalguthaben": return "5";

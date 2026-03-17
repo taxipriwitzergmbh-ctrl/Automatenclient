@@ -1,15 +1,16 @@
-using System;
+ï»¿using System;
 using System.Drawing;
 using System.Globalization;
 using System.Runtime.InteropServices;
 using System.Windows.Forms;
 using System.Drawing.Drawing2D;
 using System.Threading.Tasks;
-using System.Data.SqlClient; // FhzId-Lookup für Schicht
+using System.Data.SqlClient; // FhzId-Lookup fï¿½r Schicht
+using TaMi_Automatenclient.UI.Layout;
 
 namespace TaMi_Automatenclient
 {
-    public class EntryEditForm : Form
+    public class EntryEditForm : KassenclientBaseForm
     {
         public string Buchungstext { get; private set; }
         public int? Kost1 { get; private set; }
@@ -20,12 +21,7 @@ namespace TaMi_Automatenclient
         public decimal Betrag0 { get; private set; }
         public bool DirectSaved { get; private set; }
 
-        private const int HeaderHeight = 60;
-
-        private Panel _header;
-        private Button _btnClose;
-        private Label _lblTitle;
-        private Point _mouseDownLocation;
+        private const int HeaderHeight = UiTheme.HeaderHeight;
 
         private Label _lblZeit, _lblSchichtId, _lblFahrer, _lblKennzeichen, _lblGesamt;
         private Label _lblBelegnummer, _lblKassenBelegnummer;
@@ -33,7 +29,7 @@ namespace TaMi_Automatenclient
         private ComboBox _cboMwst;
 
         private Panel _footer;
-        private Button _btnSave, _btnCancel;
+        private ModernGradientButton _btnSave, _btnCancel;
 
         private readonly decimal _total;
         private readonly int _firmenId;
@@ -41,11 +37,11 @@ namespace TaMi_Automatenclient
         private readonly string _belegnummer;
         private readonly string _kassenBelegnummer;
 
-        // Zusatz: Schicht/Fahrzeug-Kontext für Rules
+        // Zusatz: Schicht/Fahrzeug-Kontext fï¿½r Rules
         private int? _schichtId;
         private int? _fhzId; // wird lazy geladen
 
-        // Flags zum Steuern der Regelüberschreibung und zur Erkennung von Benutzereingaben
+        // Flags zum Steuern der Regelï¿½berschreibung und zur Erkennung von Benutzereingaben
         private bool _applyingRules;
         private bool _dirtyK1, _dirtyK2, _dirtyKto, _dirtyTxt;
 
@@ -69,30 +65,18 @@ namespace TaMi_Automatenclient
             _typ = typ ?? string.Empty;
             _belegnummer = belegnummer ?? string.Empty;
             _kassenBelegnummer = kassenBelegnummer ?? string.Empty;
-            // SchichtId ggf. merken (für FhzId-Auflösung)
+            // SchichtId ggf. merken (fï¿½r FhzId-Auflï¿½sung)
             if (int.TryParse((schichtId ?? string.Empty).Trim(), out var sid) && sid > 0) _schichtId = sid; else _schichtId = null;
 
             Text = "Buchung bearbeiten";
+            SetupDefaultForm("EntryEditForm", Text, new Size(820, 480));
             StartPosition = FormStartPosition.CenterParent;
-            FormBorderStyle = FormBorderStyle.None;
-            DoubleBuffered = true;
-            SetStyle(ControlStyles.AllPaintingInWmPaint | ControlStyles.UserPaint | ControlStyles.OptimizedDoubleBuffer | ControlStyles.ResizeRedraw, true);
-            UpdateStyles();
+            ShowInTaskbar = false;
             MaximizeBox = false;
             MinimizeBox = false;
-            ClientSize = new Size(820, 480);
-            BackColor = Color.White;
-            Font = new Font("Segoe UI Variable", 10F, FontStyle.Regular);
-
-            try { Region = Region.FromHrgn(CreateRoundRectRgn(0, 0, Width, Height, 16, 16)); } catch { }
-
-            BuildHeader();
+            AddHeaderPanel(Text, true, false, true);
             BuildContent(zeit, schichtId, fahrerName, kennzeichen, buchungstext, vorhandenKost1, vorhandenKost2, vorhandenKonto);
             BuildFooter();
-
-            _header.BringToFront();
-            _btnClose.BringToFront();
-            try { Controls.SetChildIndex(_header, 0); } catch { }
 
             AcceptButton = _btnSave;
             CancelButton = _btnCancel;
@@ -101,7 +85,7 @@ namespace TaMi_Automatenclient
             {
                 if (e.Control && e.KeyCode == Keys.A)
                 {
-                    // Direktes Bearbeiten in der Datenbank ausführen
+                    // Direktes Bearbeiten in der Datenbank ausfï¿½hren
                     if (TryCommit())
                     {
                         try
@@ -136,33 +120,7 @@ namespace TaMi_Automatenclient
             _ = LoadContextAndApplyRulesAsync();
         }
 
-        protected override void OnPaintBackground(PaintEventArgs e)
-        {
-            // Fülle gesamten Hintergrund weiß
-            e.Graphics.Clear(Color.White);
-            // Male Header-Gradient im Hintergrund, damit er durchgehend unter allen Controls liegt
-            var rect = new Rectangle(0, 0, ClientSize.Width, HeaderHeight);
-            using (var brush = new LinearGradientBrush(rect, Color.FromArgb(33, 150, 243), Color.FromArgb(33, 203, 243), 0f))
-            {
-                e.Graphics.FillRectangle(brush, rect);
-            }
-        }
-
-        private void BuildHeader()
-        {
-            _header = new Panel { Left = 0, Top = 0, Width = ClientSize.Width, Height = HeaderHeight, Anchor = AnchorStyles.Top | AnchorStyles.Left | AnchorStyles.Right, Dock = DockStyle.Top, BackColor = Color.Transparent };
-            _header.MouseDown += (s, e) => { if (e.Button == MouseButtons.Left) _mouseDownLocation = e.Location; };
-            _header.MouseMove += (s, e) => { if (e.Button == MouseButtons.Left) { Left += e.X - _mouseDownLocation.X; Top += e.Y - _mouseDownLocation.Y; } };
-            Controls.Add(_header);
-
-            _lblTitle = new Label { Text = "Buchung bearbeiten", AutoSize = false, TextAlign = ContentAlignment.MiddleLeft, Font = new Font("Segoe UI Variable", 16F, FontStyle.Bold), ForeColor = Color.White, Left = 20, Top = 0, Width = 600, Height = HeaderHeight, BackColor = Color.Transparent };
-            _header.Controls.Add(_lblTitle);
-
-            _btnClose = new Button { Text = "\u2715", Font = new Font("Segoe UI Symbol", 16F, FontStyle.Bold), ForeColor = Color.White, BackColor = Color.Transparent, FlatStyle = FlatStyle.Flat, Width = 44, Height = 44, Left = _header.Width - 52, Top = 8, Anchor = AnchorStyles.Top | AnchorStyles.Right, TabStop = false };
-            _btnClose.FlatAppearance.BorderSize = 0; _btnClose.FlatAppearance.MouseOverBackColor = Color.FromArgb(255, 80, 80);
-            _btnClose.Click += (s, e) => Close();
-            _header.Controls.Add(_btnClose);
-        }
+        
 
         private void BuildContent(string zeit, string schichtId, string fahrerName, string kennzeichen, string buchungstext, string vorhandenKost1, string vorhandenKost2, string vorhandenKonto)
         {
@@ -213,7 +171,7 @@ namespace TaMi_Automatenclient
             _txtKonto = new TextBox { Left = left + labelW + 10, Top = top - 4, Width = 140, Text = vorhandenKonto ?? string.Empty, TabIndex = 3 };
             Controls.Add(_txtKonto); top += gapY;
 
-            // Dirty-Flags setzen, aber nur wenn der Nutzer tippt (nicht während ApplyRulesAsync)
+            // Dirty-Flags setzen, aber nur wenn der Nutzer tippt (nicht wï¿½hrend ApplyRulesAsync)
             _txtBuchungstext.TextChanged += (s, e) => { if (!_applyingRules) _dirtyTxt = true; };
             _txtKost1.TextChanged += (s, e) => { if (!_applyingRules) _dirtyK1 = true; };
             _txtKost2.TextChanged += (s, e) => { if (!_applyingRules) _dirtyK2 = true; };
@@ -238,16 +196,14 @@ namespace TaMi_Automatenclient
             _footer = new Panel { Left = 0, Top = ClientSize.Height - 64, Width = ClientSize.Width, Height = 64, Anchor = AnchorStyles.Left | AnchorStyles.Right | AnchorStyles.Bottom, BackColor = Color.FromArgb(245, 248, 255) };
             Controls.Add(_footer);
 
-            _btnSave = new Button { Text = "Speichern", Width = 140, Height = 36, Left = _footer.Width - 300, Top = 14, Anchor = AnchorStyles.Right | AnchorStyles.Top, FlatStyle = FlatStyle.Flat, BackColor = Color.FromArgb(33, 150, 243), ForeColor = Color.White };
-            _btnSave.FlatAppearance.BorderSize = 0;
-            _btnCancel = new Button { Text = "Abbrechen", Width = 140, Height = 36, Left = _footer.Width - 150, Top = 14, Anchor = AnchorStyles.Right | AnchorStyles.Top, FlatStyle = FlatStyle.Flat, BackColor = Color.Gainsboro, ForeColor = Color.Black };
-            _btnCancel.FlatAppearance.BorderSize = 0;
+            _btnSave = new ModernGradientButton { Text = "Speichern", Width = 160, Height = 44, Left = _footer.Width - 340, Top = 10, Anchor = AnchorStyles.Right | AnchorStyles.Top, GradientStart = UiTheme.PrimaryStart, GradientEnd = UiTheme.PrimaryEnd, Font = new Font("Segoe UI Variable", 12F, FontStyle.Bold) };
+            _btnCancel = new ModernGradientButton { Text = "Abbrechen", Width = 160, Height = 44, Left = _footer.Width - 170, Top = 10, Anchor = AnchorStyles.Right | AnchorStyles.Top, GradientStart = UiTheme.SecondaryStart, GradientEnd = UiTheme.SecondaryEnd, Font = new Font("Segoe UI Variable", 12F, FontStyle.Bold) };
             _btnSave.Click += (s, e) => { if (!TryCommit()) return; DialogResult = DialogResult.OK; };
             _btnCancel.Click += (s, e) => { DialogResult = DialogResult.Cancel; };
             _footer.Controls.AddRange(new Control[] { _btnSave, _btnCancel });
         }
 
-        // Lädt ggf. FhzId und wendet danach Regeln an
+        // Lï¿½dt ggf. FhzId und wendet danach Regeln an
         private async Task LoadContextAndApplyRulesAsync()
         {
             await EnsureFhzIdLoadedAsync();
@@ -288,7 +244,7 @@ namespace TaMi_Automatenclient
                     FirmenId = _firmenId,
                     Typ = _typ,
                     PersId = null,
-                    FhzId = _fhzId, // wichtig für FHZ-basierte Regeln
+                    FhzId = _fhzId, // wichtig fï¿½r FHZ-basierte Regeln
                     Betrag19 = this.Betrag19,
                     Betrag7 = this.Betrag7,
                     Betrag0 = this.Betrag0
@@ -300,8 +256,8 @@ namespace TaMi_Automatenclient
                 int? currentKto = TryParseInt(_txtKonto.Text);
                 string currentTxt = _txtBuchungstext.Text ?? string.Empty;
 
-                // Für forceOverwrite die Eingangswerte für die Regelberechnung auf leer setzen,
-                // damit RulesEngine neue Werte liefert (sie überschreibt nur bei null/leer)
+                // Fï¿½r forceOverwrite die Eingangswerte fï¿½r die Regelberechnung auf leer setzen,
+                // damit RulesEngine neue Werte liefert (sie ï¿½berschreibt nur bei null/leer)
                 int? k1 = forceOverwrite ? (int?)null : currentK1;
                 int? k2 = forceOverwrite ? (int?)null : currentK2;
                 int? kto = forceOverwrite ? (int?)null : currentKto;
@@ -309,7 +265,7 @@ namespace TaMi_Automatenclient
 
                 RulesEngine.ApplyForEdit(rules, ctx, ref k1, ref k2, ref kto, ref txt);
 
-                // Übernahme in UI: bei forceOverwrite bevorzugt neue Regelwerte; wenn keine Regel liefert, bleibt alter Wert
+                // ï¿½bernahme in UI: bei forceOverwrite bevorzugt neue Regelwerte; wenn keine Regel liefert, bleibt alter Wert
                 if (forceOverwrite)
                 {
                     if (k1.HasValue) _txtKost1.Text = k1.Value.ToString();
@@ -360,7 +316,6 @@ namespace TaMi_Automatenclient
             return decimal.TryParse(s, NumberStyles.Any, CultureInfo.CurrentCulture, out var v) ? v : 0m;
         }
 
-        [DllImport("gdi32.dll", SetLastError = true)]
-        private static extern IntPtr CreateRoundRectRgn(int nLeftRect, int nTopRect, int nRightRect, int nBottomRect, int nWidthEllipse, int nHeightEllipse);
+        
     }
 }

@@ -8,16 +8,13 @@ using System.Threading.Tasks;
 using System.Collections.Generic;
 using System.Globalization;
 using System.ComponentModel;
+using TaMi_Automatenclient.UI.Layout;
 
 namespace TaMi_Automatenclient
 {
-    public class PersonalForm : Form
+    public class PersonalForm : KassenclientBaseForm
     {
-        private Panel headerPanel;
-        private Button btnClose;
-        private Button btnMinimize;
-        private Label lblTitle;
-        private Point _mouseDownLocation;
+        private const int HeaderHeight = UiTheme.HeaderHeight;
 
         // Linke Seite gruppiert
         private GroupBox grpMitarbeiter;
@@ -29,11 +26,11 @@ namespace TaMi_Automatenclient
         private Label lblVorname;   // Wertanzeige
         private TextBox txtNfc;
         private TextBox txtFahrercode;
-        private Button btnSave;
-        private Button btnClearNfc;
-        private Button btnShowHideCode;
-        private Button btnClearCode;
-        private Button btnNfcUebernehmen;
+        private ModernGradientButton btnSave;
+        private ModernGradientButton btnClearNfc;
+        private ModernGradientButton btnShowHideCode;
+        private ModernGradientButton btnClearCode;
+        private ModernGradientButton btnNfcUebernehmen;
         private int _currentPid = 0;
         private bool _suppressEvents = false; // Neu: verhindert Initial-Handler
 
@@ -63,16 +60,13 @@ namespace TaMi_Automatenclient
         private NumericUpDown nudNewAmount;
         private NumericUpDown nudNew19, nudNew7, nudNew0; // intern (versteckt)
         private TextBox txtNewK1, txtNewK2, txtNewKonto;
-        private Button btnCreatePayment;
-        private Button btnCreatePreset; // NEU
+        private ModernGradientButton btnCreatePayment;
+        private ModernGradientButton btnCreatePreset; // NEU
 
         // Aktionen für offene Zahlungen
-        private Button btnEditPayment;
-        private Button btnDeletePayment;
+        private ModernGradientButton btnEditPayment;
+        private ModernGradientButton btnDeletePayment;
         private bool _rightBuilt = false;
-
-        [DllImport("gdi32.dll", SetLastError = true)]
-        private static extern IntPtr CreateRoundRectRgn(int nLeftRect, int nTopRect, int nRightRect, int nBottomRect, int nWidthEllipse, int nHeightEllipse);
 
         [DllImport("user32.dll")]
         private static extern IntPtr SendMessage(IntPtr hWnd, int msg, IntPtr wParam, IntPtr lParam);
@@ -94,9 +88,8 @@ namespace TaMi_Automatenclient
 
         public PersonalForm()
         {
-            this.Icon = Program.AppIcon;
-            // Stutter minimieren: DoubleBuffering-Styles direkt aktivieren
-            try { SetStyle(ControlStyles.AllPaintingInWmPaint | ControlStyles.OptimizedDoubleBuffer | ControlStyles.UserPaint | ControlStyles.ResizeRedraw, true); UpdateStyles(); } catch { }
+            SetupDefaultForm("PersonalForm", "Personal", new Size(1320, 1040));
+            AddHeaderPanel(Text, true, true, true);
             BuildUI();
         }
 
@@ -120,42 +113,13 @@ namespace TaMi_Automatenclient
             SuspendLayout();
             try
             {
-                FormBorderStyle = FormBorderStyle.None;
                 StartPosition = FormStartPosition.CenterScreen;
-                ShowInTaskbar = false;
-                ClientSize = new Size(1320, 1040);
                 AutoScroll = true;
                 BackColor = Color.White;
                 DoubleBuffered = true;
                 KeyPreview = true;
                 this.KeyDown += PersonalForm_KeyDown;
                 this.KeyPress += PersonalForm_KeyPress;
-
-                headerPanel = new Panel { Location = new Point(0, 0), Size = new Size(ClientSize.Width, 64), Anchor = AnchorStyles.Top | AnchorStyles.Left | AnchorStyles.Right };
-                headerPanel.Paint += HeaderPanel_Paint;
-                headerPanel.MouseDown += HeaderPanel_MouseDown;
-                headerPanel.MouseMove += HeaderPanel_MouseMove;
-                headerPanel.SuspendLayout();
-                Controls.Add(headerPanel);
-
-                lblTitle = new Label { Text = "Personal", AutoSize = false, TextAlign = ContentAlignment.MiddleLeft, Font = new Font("Segoe UI", 18F, FontStyle.Bold), ForeColor = Color.White, Location = new Point(24, 0), Size = new Size(400, 64), BackColor = Color.Transparent };
-                headerPanel.Controls.Add(lblTitle);
-
-                btnClose = new Button { Text = "\u2715", Font = new Font("Segoe UI Symbol", 16F, FontStyle.Bold), ForeColor = Color.White, BackColor = Color.Transparent, FlatStyle = FlatStyle.Flat, Size = new Size(48, 48), Location = new Point(ClientSize.Width - 56, 8), TabStop = false, Anchor = AnchorStyles.Top | AnchorStyles.Right };
-                btnClose.FlatAppearance.BorderSize = 0;
-                btnClose.FlatAppearance.MouseOverBackColor = Color.FromArgb(255, 80, 80);
-                btnClose.Click += (s, e) => Close();
-                headerPanel.Controls.Add(btnClose);
-
-                btnMinimize = new Button { Text = "–", Font = new Font("Segoe UI", 16F, FontStyle.Bold), ForeColor = Color.White, BackColor = Color.Transparent, FlatStyle = FlatStyle.Flat, Size = new Size(48, 48), Location = new Point(ClientSize.Width - 112, 8), TabStop = false, Anchor = AnchorStyles.Top | AnchorStyles.Right };
-                btnMinimize.FlatAppearance.BorderSize = 0;
-                btnMinimize.FlatAppearance.MouseOverBackColor = Color.FromArgb(33, 150, 243, 80);
-                btnMinimize.Click += (s, e) => WindowState = FormWindowState.Minimized;
-                headerPanel.Controls.Add(btnMinimize);
-                headerPanel.ResumeLayout();
-
-                // Rundung später in OnShown setzen (vermeidet schwarzes Flackern beim Erzeugen)
-                // try { Region = Region.FromHrgn(CreateRoundRectRgn(0, 0, Width, Height, 20, 20)); } catch { }
 
                 // Linke Seite: strukturierte Gruppen (schnell)
                 BuildLeftGroups();
@@ -176,7 +140,7 @@ namespace TaMi_Automatenclient
         private void BuildRightGroups()
         {
             // Rechte Seite: Gruppen ganz nach oben unter Header
-            int rightTop = headerPanel.Bottom + 12;
+            int rightTop = HeaderHeight + 12;
             grpOpenShifts = new GroupBox { Text = "Offene Schichten", Location = new Point(540, rightTop), Size = new Size(ClientSize.Width - 564, 300), Anchor = AnchorStyles.Top | AnchorStyles.Left | AnchorStyles.Right };
             grpOpenShifts.SuspendLayout();
             gvOpenShifts = new DataGridView { Location = new Point(10, 24), Size = new Size(grpOpenShifts.Width - 20, grpOpenShifts.Height - 34), ReadOnly = true, AllowUserToAddRows = false, AllowUserToDeleteRows = false, AutoSizeColumnsMode = DataGridViewAutoSizeColumnsMode.Fill, Anchor = AnchorStyles.Top | AnchorStyles.Left | AnchorStyles.Right };
@@ -202,10 +166,10 @@ namespace TaMi_Automatenclient
             Controls.Add(grpOpenPayments);
 
             // Edit/Löschen Buttons unter dem Grid für Offene Zahlungen
-            btnEditPayment = new Button { Text = "Auswahl ändern", Location = new Point(540, 0), Size = new Size(140, 28), BackColor = Color.FromArgb(3,155,229), ForeColor = Color.White, FlatStyle = FlatStyle.Flat };
-            btnEditPayment.FlatAppearance.BorderSize = 0; btnEditPayment.Click += async (s, e) => await EditSelectedPaymentAsync();
-            btnDeletePayment = new Button { Text = "Auswahl löschen", Location = new Point(688, 0), Size = new Size(140, 28), BackColor = Color.FromArgb(229,57,53), ForeColor = Color.White, FlatStyle = FlatStyle.Flat };
-            btnDeletePayment.FlatAppearance.BorderSize = 0; btnDeletePayment.Click += async (s, e) => await DeleteSelectedPaymentAsync();
+            btnEditPayment = new ModernGradientButton { Text = "Auswahl ändern", Location = new Point(540, 0), Size = new Size(160, 36), GradientStart = UiTheme.PrimaryStart, GradientEnd = UiTheme.PrimaryEnd, Font = new Font("Segoe UI Variable", 10F, FontStyle.Bold) };
+            btnEditPayment.Click += async (s, e) => await EditSelectedPaymentAsync();
+            btnDeletePayment = new ModernGradientButton { Text = "Auswahl löschen", Location = new Point(708, 0), Size = new Size(160, 36), GradientStart = UiTheme.DangerStart, GradientEnd = UiTheme.DangerEnd, Font = new Font("Segoe UI Variable", 10F, FontStyle.Bold) };
+            btnDeletePayment.Click += async (s, e) => await DeleteSelectedPaymentAsync();
             btnEditPayment.Enabled = false;
             btnDeletePayment.Enabled = false;
             Controls.Add(btnEditPayment);
@@ -319,8 +283,7 @@ namespace TaMi_Automatenclient
                 int labelW = 120; int fieldX = 140; int rowH = 34; int startY;
 
                 // Sicherheit: headerPanel kann (bei Designer-/Init-Race) noch null sein
-                int headerBottom = 0;
-                try { headerBottom = headerPanel != null ? headerPanel.Bottom : 0; } catch { headerBottom = 0; }
+                int headerBottom = HeaderHeight;
 
                 // Gruppe Mitarbeiter
                 if (grpMitarbeiter == null)
@@ -335,8 +298,7 @@ namespace TaMi_Automatenclient
                 grpMitarbeiter.Controls.Add(lblPid);
                 txtPid = new TextBox { Location = new Point(fieldX, startY), Width = 160, Font = new Font("Segoe UI", 14F), TextAlign = HorizontalAlignment.Center, MaxLength = 8 };
                 grpMitarbeiter.Controls.Add(txtPid);
-                var btnLoad = new Button { Text = "Laden", Location = new Point(fieldX + 170, startY - 2), Size = new Size(96, 32), BackColor = Color.FromArgb(33,150,243), ForeColor = Color.White, FlatStyle = FlatStyle.Flat, Font = new Font("Segoe UI", 10F, FontStyle.Bold) };
-                btnLoad.FlatAppearance.BorderSize = 0;
+                var btnLoad = new ModernGradientButton { Text = "Laden", Location = new Point(fieldX + 170, startY - 2), Size = new Size(120, 36), GradientStart = UiTheme.PrimaryStart, GradientEnd = UiTheme.PrimaryEnd, Font = new Font("Segoe UI Variable", 10F, FontStyle.Bold) };
                 btnLoad.Click += async (s,e) => await LoadPersonalAsync();
                 grpMitarbeiter.Controls.Add(btnLoad);
 
@@ -395,10 +357,10 @@ namespace TaMi_Automatenclient
                 // NFC Feld an Fahrercode-Höhe anpassen (Font 14, zentriert)
                 txtNfc = new TextBox { Location = new Point(fieldX, startY - 1), Width = 200, Font = new Font("Segoe UI", 14F), TextAlign = HorizontalAlignment.Center };
                 grpStammdaten.Controls.Add(txtNfc);
-                btnClearNfc = new Button { Text = "X", Size = new Size(34, 30), BackColor = Color.FromArgb(229,57,53), ForeColor = Color.White, FlatStyle = FlatStyle.Flat, Font = new Font("Segoe UI", 9F, FontStyle.Bold), Location = new Point(fieldX + 206, startY - 1) };
-                btnClearNfc.FlatAppearance.BorderSize = 0; btnClearNfc.Click += (s,e) => txtNfc.Text = string.Empty; grpStammdaten.Controls.Add(btnClearNfc);
-                btnNfcUebernehmen = new Button { Text = "NFC", Size = new Size(90, 30), BackColor = Color.FromArgb(33,150,243), ForeColor = Color.White, FlatStyle = FlatStyle.Flat, Font = new Font("Segoe UI", 9F, FontStyle.Bold), Location = new Point(fieldX + 245, startY - 1) };
-                btnNfcUebernehmen.FlatAppearance.BorderSize = 0; btnNfcUebernehmen.Click += (s,e) => TryTakeLastNfc(); grpStammdaten.Controls.Add(btnNfcUebernehmen);
+                btnClearNfc = new ModernGradientButton { Text = "X", Size = new Size(40, 32), GradientStart = UiTheme.DangerStart, GradientEnd = UiTheme.DangerEnd, Font = new Font("Segoe UI Variable", 10F, FontStyle.Bold), Location = new Point(fieldX + 206, startY - 2) };
+                btnClearNfc.Click += (s,e) => txtNfc.Text = string.Empty; grpStammdaten.Controls.Add(btnClearNfc);
+                btnNfcUebernehmen = new ModernGradientButton { Text = "NFC", Size = new Size(90, 32), GradientStart = UiTheme.PrimaryStart, GradientEnd = UiTheme.PrimaryEnd, Font = new Font("Segoe UI Variable", 10F, FontStyle.Bold), Location = new Point(fieldX + 252, startY - 2) };
+                btnNfcUebernehmen.Click += (s,e) => TryTakeLastNfc(); grpStammdaten.Controls.Add(btnNfcUebernehmen);
 
                 startY += rowH;
                 var lblFcode = new Label { Text = "Fahrercode:", Location = new Point(12, startY + 6), AutoSize = true, Width = labelW };
@@ -407,21 +369,19 @@ namespace TaMi_Automatenclient
                 txtFahrercode = new TextBox { Location = new Point(fieldX, startY), Width = 200, Font = new Font("Segoe UI", 14F), TextAlign = HorizontalAlignment.Center, UseSystemPasswordChar = true, MaxLength = 8 };
                 grpStammdaten.Controls.Add(txtFahrercode);
                 // Symbol Button (View/Lock) mit Segoe MDL2 Assets statt Emoji
-                btnShowHideCode = new Button { Text = "\uE052", Location = new Point(fieldX + 206, startY - 1), Size = new Size(34, 30), FlatStyle = FlatStyle.Flat, BackColor = Color.FromArgb(245, 247, 250), Font = new Font("Segoe MDL2 Assets", 14F), UseVisualStyleBackColor = false }; // \uE052 = View
-                btnShowHideCode.FlatAppearance.BorderSize = 0;
+                btnShowHideCode = new ModernGradientButton { Text = "\uE052", Location = new Point(fieldX + 206, startY - 2), Size = new Size(40, 32), GradientStart = UiTheme.SecondaryStart, GradientEnd = UiTheme.SecondaryEnd, Font = new Font("Segoe MDL2 Assets", 14F, FontStyle.Regular) }; // \uE052 = View
                 btnShowHideCode.Click += (s,e) => {
                     txtFahrercode.UseSystemPasswordChar = !txtFahrercode.UseSystemPasswordChar;
                     // \uE052 View, \uE72E Lock
                     btnShowHideCode.Text = txtFahrercode.UseSystemPasswordChar ? "\uE052" : "\uE72E";
                 };
                 grpStammdaten.Controls.Add(btnShowHideCode);
-                btnClearCode = new Button { Text = "Löschen", Location = new Point(btnShowHideCode.Right + 6, startY - 1), Size = new Size(88, 30), FlatStyle = FlatStyle.Flat, BackColor = Color.FromArgb(229,57,53), ForeColor = Color.White, Font = new Font("Segoe UI", 9.5F, FontStyle.Bold) };
-                btnClearCode.FlatAppearance.BorderSize = 0; btnClearCode.Click += (s,e) => txtFahrercode.Text = string.Empty; grpStammdaten.Controls.Add(btnClearCode);
+                btnClearCode = new ModernGradientButton { Text = "Löschen", Location = new Point(btnShowHideCode.Right + 6, startY - 2), Size = new Size(90, 32), GradientStart = UiTheme.DangerStart, GradientEnd = UiTheme.DangerEnd, Font = new Font("Segoe UI Variable", 9.5F, FontStyle.Bold) };
+                btnClearCode.Click += (s,e) => txtFahrercode.Text = string.Empty; grpStammdaten.Controls.Add(btnClearCode);
 
                 startY += rowH + 6;
                 // Speichern Button verkleinert & zentriert
-                btnSave = new Button { Text = "Speichern", Size = new Size(160, 36), BackColor = Color.FromArgb(33,150,243), ForeColor = Color.White, FlatStyle = FlatStyle.Flat, Font = new Font("Segoe UI", 11F, FontStyle.Bold) };
-                btnSave.FlatAppearance.BorderSize = 0;
+                btnSave = new ModernGradientButton { Text = "Speichern", Size = new Size(160, 40), GradientStart = UiTheme.PrimaryStart, GradientEnd = UiTheme.PrimaryEnd, Font = new Font("Segoe UI Variable", 11F, FontStyle.Bold) };
                 btnSave.Location = new Point((grpStammdaten.ClientSize.Width - btnSave.Width)/2, startY);
                 btnSave.Click += async (s,e) => await SaveAsync();
                 grpStammdaten.Controls.Add(btnSave);
@@ -450,8 +410,8 @@ namespace TaMi_Automatenclient
                 catch { }
 
                 // Button 'Vorlage anlegen' rechts neben Vorlage-Dropdown platzieren
-                btnCreatePreset = new Button { Text = "Vorlage anlegen", Location = new Point(120 + 220 + 8, nzY - 1), Size = new Size(120, 26), BackColor = Color.FromArgb(3, 155, 229), ForeColor = Color.White, FlatStyle = FlatStyle.Flat };
-                btnCreatePreset.FlatAppearance.BorderSize = 0; btnCreatePreset.Click += (s, e) => ShowPresetOverlay();
+                btnCreatePreset = new ModernGradientButton { Text = "Vorlage anlegen", Location = new Point(120 + 220 + 8, nzY - 2), Size = new Size(140, 32), GradientStart = UiTheme.SecondaryStart, GradientEnd = UiTheme.SecondaryEnd, Font = new Font("Segoe UI Variable", 9.5F, FontStyle.Bold) };
+                btnCreatePreset.Click += (s, e) => ShowPresetOverlay();
                 grpNewPayment.Controls.Add(btnCreatePreset);
 
                 // NEU: Mandant/Kasse Dropdown zwischen Vorlage und Typ
@@ -499,8 +459,8 @@ namespace TaMi_Automatenclient
                 grpNewPayment.Controls.AddRange(new Control[] { lblK1, txtNewK1, lblK2, txtNewK2, lblKto, txtNewKonto });
 
                 nzY += 32;
-                btnCreatePayment = new Button { Text = "Zahlung anlegen", Location = new Point(120, nzY), Size = new Size(160, 28), BackColor = Color.FromArgb(46, 125, 50), ForeColor = Color.White, FlatStyle = FlatStyle.Flat };
-                btnCreatePayment.FlatAppearance.BorderSize = 0; btnCreatePayment.Click += async (s, e) => await CreatePaymentWithPresetAsync();
+                btnCreatePayment = new ModernGradientButton { Text = "Zahlung anlegen", Location = new Point(120, nzY), Size = new Size(170, 36), GradientStart = UiTheme.SuccessStart, GradientEnd = UiTheme.SuccessEnd, Font = new Font("Segoe UI Variable", 10F, FontStyle.Bold) };
+                btnCreatePayment.Click += async (s, e) => await CreatePaymentWithPresetAsync();
                 grpNewPayment.Controls.Add(btnCreatePayment);
 
                 // MWSt-Auswahl befüllen (falls noch nicht)
@@ -667,10 +627,9 @@ namespace TaMi_Automatenclient
             var lst = new ListBox { Left = 24, Top = txtSearch.Bottom + 6, Width = 220, Height = 300, Anchor = AnchorStyles.Top | AnchorStyles.Left | AnchorStyles.Bottom, BorderStyle = BorderStyle.FixedSingle };
             body.Controls.Add(txtSearch); body.Controls.Add(lst);
 
-            var btnNeu = new Button { Text = "Neu", Left = 24, Width = 80, Height = 34, Top = body.Height - 46, Anchor = AnchorStyles.Left | AnchorStyles.Bottom, BackColor = Color.FromArgb(33,150,243), ForeColor = Color.White, FlatStyle = FlatStyle.Flat };
-            btnNeu.FlatAppearance.BorderSize = 0;
-            var btnDelete = new Button { Text = "Löschen", Left = btnNeu.Right + 8, Width = 90, Height = 34, Top = body.Height - 46, Anchor = AnchorStyles.Left | AnchorStyles.Bottom, BackColor = Color.FromArgb(229,57,53), ForeColor = Color.White, FlatStyle = FlatStyle.Flat };
-            btnDelete.FlatAppearance.BorderSize = 0; body.Controls.Add(btnNeu); body.Controls.Add(btnDelete);
+            var btnNeu = new ModernGradientButton { Text = "Neu", Left = 24, Width = 90, Height = 36, Top = body.Height - 48, Anchor = AnchorStyles.Left | AnchorStyles.Bottom, GradientStart = UiTheme.PrimaryStart, GradientEnd = UiTheme.PrimaryEnd, Font = new Font("Segoe UI Variable", 10F, FontStyle.Bold) };
+            var btnDelete = new ModernGradientButton { Text = "Löschen", Left = btnNeu.Right + 8, Width = 110, Height = 36, Top = body.Height - 48, Anchor = AnchorStyles.Left | AnchorStyles.Bottom, GradientStart = UiTheme.DangerStart, GradientEnd = UiTheme.DangerEnd, Font = new Font("Segoe UI Variable", 10F, FontStyle.Bold) };
+            body.Controls.Add(btnNeu); body.Controls.Add(btnDelete);
 
             int baseX = 260; int wLabel = 60; int curY = 14; int spacing = 30;
             Func<string, Label> makeLbl = t => new Label { Text = t, Left = baseX, Top = curY + 4, Width = wLabel, ForeColor = Color.FromArgb(55,71,79) };
@@ -684,10 +643,10 @@ namespace TaMi_Automatenclient
             body.Controls.Add(makeLbl("Firma:")); body.Controls.Add(cbFirma); curY += spacing;
             var tbK1 = new TextBox { Left = baseX + wLabel + 4, Top = curY, Width = 70 }; var lblK2 = new Label { Text = "Kost2:", Left = tbK1.Right + 14, Top = curY + 4, Width = 45, ForeColor = Color.FromArgb(55,71,79) }; var tbK2 = new TextBox { Left = lblK2.Right + 4, Top = curY, Width = 70 }; var lblKto = new Label { Text = "Konto:", Left = tbK2.Right + 14, Top = curY + 4, Width = 50, ForeColor = Color.FromArgb(55,71,79) }; var tbKto = new TextBox { Left = lblKto.Right + 4, Top = curY, Width = 80 }; body.Controls.Add(makeLbl("Kost1:")); body.Controls.Add(tbK1); body.Controls.Add(lblK2); body.Controls.Add(tbK2); body.Controls.Add(lblKto); body.Controls.Add(tbKto); curY += spacing + 6;
 
-            var btnCancel = new Button { Text = "Abbrechen", Left = baseX + wLabel + 4, Top = body.Height - 46, Width = 140, Height = 40, Anchor = AnchorStyles.Right | AnchorStyles.Bottom, BackColor = Color.Gainsboro, FlatStyle = FlatStyle.Flat };
-            btnCancel.FlatAppearance.BorderSize = 0; btnCancel.Click += (s, e) => { dlg.DialogResult = DialogResult.Cancel; dlg.Close(); };
-            btnSave = new Button { Text = "Speichern", Left = btnCancel.Right + 12, Top = body.Height - 46, Width = 160, Height = 40, Anchor = AnchorStyles.Right | AnchorStyles.Bottom, BackColor = Color.FromArgb(46,125,50), ForeColor = Color.White, FlatStyle = FlatStyle.Flat, Enabled = false };
-            btnSave.FlatAppearance.BorderSize = 0; body.Controls.Add(btnCancel); body.Controls.Add(btnSave);
+            var btnCancel = new ModernGradientButton { Text = "Abbrechen", Left = baseX + wLabel + 4, Top = body.Height - 48, Width = 150, Height = 40, Anchor = AnchorStyles.Right | AnchorStyles.Bottom, GradientStart = UiTheme.SecondaryStart, GradientEnd = UiTheme.SecondaryEnd, Font = new Font("Segoe UI Variable", 10F, FontStyle.Bold) };
+            btnCancel.Click += (s, e) => { dlg.DialogResult = DialogResult.Cancel; dlg.Close(); };
+            btnSave = new ModernGradientButton { Text = "Speichern", Left = btnCancel.Right + 12, Top = body.Height - 48, Width = 170, Height = 40, Anchor = AnchorStyles.Right | AnchorStyles.Bottom, GradientStart = UiTheme.SuccessStart, GradientEnd = UiTheme.SuccessEnd, Font = new Font("Segoe UI Variable", 10F, FontStyle.Bold), Enabled = false };
+            body.Controls.Add(btnCancel); body.Controls.Add(btnSave);
 
             int? editBeleg = null; var allItems = new List<ComboItem>();
             Action applyFilter = () => { string f = (txtSearch.Text == searchPlaceholder ? string.Empty : txtSearch.Text).Trim().ToLowerInvariant(); lst.BeginUpdate(); lst.Items.Clear(); foreach (var item in allItems) if (f.Length == 0 || item.Text.ToLowerInvariant().Contains(f)) lst.Items.Add(item); lst.EndUpdate(); };
@@ -818,16 +777,7 @@ namespace TaMi_Automatenclient
             }
         }
 
-        private void HeaderPanel_Paint(object sender, PaintEventArgs e)
-        {
-            var rect = headerPanel.ClientRectangle;
-            using (var brush = new LinearGradientBrush(rect, Color.FromArgb(25, 118, 210), Color.FromArgb(21, 101, 192), 0f))
-            { e.Graphics.FillRectangle(brush, rect); }
-            using (var pen = new Pen(Color.FromArgb(13, 71, 161), 1))
-            { e.Graphics.DrawLine(pen, 0, rect.Bottom - 1, rect.Right, rect.Bottom - 1); }
-        }
-        private void HeaderPanel_MouseDown(object sender, MouseEventArgs e) { if (e.Button == MouseButtons.Left) _mouseDownLocation = e.Location; }
-        private void HeaderPanel_MouseMove(object sender, MouseEventArgs e) { if (e.Button == MouseButtons.Left) { Left += e.X - _mouseDownLocation.X; Top += e.Y - _mouseDownLocation.Y; } }
+        
 
         private async System.Threading.Tasks.Task LoadPersonalAsync()
         {
