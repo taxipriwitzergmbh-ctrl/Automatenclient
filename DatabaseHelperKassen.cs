@@ -845,7 +845,7 @@ ORDER BY ManName ASC, x.DeviceID ASC;";
             var dayEnd = new DateTime(tag.Year, tag.Month, tag.Day, 23, 59, 59);
             using (var cmd = _connection.CreateCommand())
             {
-                cmd.CommandText = $"SELECT TOP 1 Kassenbestand FROM {_tblKassenbuch} WITH (NOLOCK) WHERE ManID = @FID AND DeviceID = @Dev AND ErfasstAm <= @DayEnd ORDER BY ErfasstAm DESC;";
+                cmd.CommandText = $"SELECT TOP 1 Kassenbestand FROM {_tblKassenbuch} WITH (NOLOCK) WHERE ManID = @FID AND DeviceID = @Dev AND ErfasstAm <= @DayEnd ORDER BY ErfasstAm DESC, Belegnummer DESC;";
                 cmd.Parameters.AddWithValue("@FID", firmenId);
                 cmd.Parameters.AddWithValue("@Dev", deviceId);
                 cmd.Parameters.AddWithValue("@DayEnd", dayEnd);

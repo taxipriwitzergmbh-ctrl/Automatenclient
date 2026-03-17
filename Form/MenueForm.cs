@@ -18,6 +18,7 @@ namespace TaMi_Automatenclient
         private Button btnPersonal;
         private Button btnZahlungen;
         private Button btnOffene;
+        private Button btnUpdateHints; // NEW
         private Label lblBuildInfo;
 
         private static readonly Color Accent = Color.FromArgb(33, 150, 243);
@@ -38,11 +39,13 @@ namespace TaMi_Automatenclient
                 if (LoginForm.ShowLogin(this) == null)
                     this.Close();
             }
+
+            try { ReleaseNotes.CheckAndShowAtStartup(this); } catch { }
         }
 
         private void BuildUI()
         {
-            this.SetupDefaultForm("MenueForm", "Automaten-Client", new Size(500, 500));
+            this.SetupDefaultForm("MenueForm", "Automaten-Client", new Size(500, 580));
             ShowInTaskbar = true;
 
             this.btnKassenbuch = new Button();
@@ -50,6 +53,7 @@ namespace TaMi_Automatenclient
             this.btnPersonal = new Button();
             this.btnZahlungen = new Button();
             this.btnOffene = new Button();
+            this.btnUpdateHints = new Button();
             this.lblBuildInfo = new Label();
 
             this.SuspendLayout();
@@ -80,6 +84,16 @@ namespace TaMi_Automatenclient
             this.btnOffene.TabIndex = 4;
             this.btnOffene.Click += (s, e) => { using (var f = new OffeneUebersichtForm()) f.ShowDialog(this); };
 
+            StylePrimaryButton(this.btnUpdateHints, "Update", new Point(x, y + (h + padY) * 5), new Size(w, h));
+            this.btnUpdateHints.TabIndex = 5;
+            this.btnUpdateHints.BackColor = Color.FromArgb(0, 122, 204);
+            this.btnUpdateHints.FlatAppearance.MouseOverBackColor = Color.FromArgb(0, 102, 184);
+            this.btnUpdateHints.Click += (s, e) =>
+            {
+                try { Program.CheckForUpdateNow(this); } catch { }
+                try { Program.ShowUpdateHints(this); } catch { }
+            };
+
             this.AddHeaderPanel(this.Text, true, true, true);
 
             this.Controls.Add(this.btnKassenbuch);
@@ -87,6 +101,7 @@ namespace TaMi_Automatenclient
             this.Controls.Add(this.btnPersonal);
             this.Controls.Add(this.btnZahlungen);
             this.Controls.Add(this.btnOffene);
+            this.Controls.Add(this.btnUpdateHints);
 
             try
             {

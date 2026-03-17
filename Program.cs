@@ -12,6 +12,7 @@ using System.Windows.Forms;
 using System.Net; // added for AutoUpdater
 using System.Reflection; // added for AutoUpdater
 using System.Text; // added for AutoUpdater
+using System.Threading.Tasks; // NEW for release notes
 
 namespace TaMi_Automatenclient
 {
@@ -300,6 +301,257 @@ namespace TaMi_Automatenclient
             }
         }
 
+        public static void ShowUpdateHints(Form owner)
+        {
+            try { Task.Run(() => ReleaseNotes.ShowReleaseNotesAsync(owner, forceShow: true)); } catch { }
+        }
+
+        public static void CheckForUpdateNow(Form owner)
+        {
+            try { Task.Run(() => AutoUpdater.CheckAndPromptAtStartup()); } catch { }
+        }
+
+        public static Task<bool?> CheckForUpdateAvailableAsync()
+        {
+            try { return AutoUpdater.CheckForUpdateAvailableAsync(); }
+            catch { return Task.FromResult<bool?>(null); }
+        }
+
+    }
+
+    internal static class ReleaseNotes
+    {
+        private const string ReleaseNotesUrl = "http://kassenautomat.priwitzer-dienstleistungsgmbh.de/Update_Automatenclient/releasenotes.txt";
+
+        public static void CheckAndShowAtStartup(Form owner)
+        {
+            try { Task.Run(() => ShowReleaseNotesAsync(owner, forceShow: false)); } catch { }
+        }
+
+        public static async Task ShowReleaseNotesAsync(Form owner, bool forceShow)
+        {
+            try
+            {
+                var current = GetCurrentAppVersion();
+                var last = ReadLastSeenVersion();
+
+                bool shouldShow = forceShow;
+                if (!shouldShow)
+                {
+                    if (last == null) shouldShow = true;
+                    else if (current > last) shouldShow = true;
+                }
+
+                if (!shouldShow) return;
+
+                var notes = await TryDownloadReleaseNotesAsync().ConfigureAwait(false);
+                if (string.IsNullOrWhiteSpace(notes))
+                    notes = "Keine Updatehinweise gefunden (releasenotes.txt).";
+
+                ShowReleaseNotesOnUi(owner, notes);
+
+                if (!forceShow)
+                    WriteLastSeenVersion(current);
+            }
+            catch { }
+        }
+
+        private static Version GetCurrentAppVersion()
+        {
+            try { return Assembly.GetExecutingAssembly().GetName().Version ?? new Version(0, 0, 0, 0); }
+            catch { return new Version(0, 0, 0, 0); }
+        }
+
+        private static Version ReadLastSeenVersion()
+        {
+            try
+            {
+                var s = (AppSettings.ReadIniValue("APP", "LastSeenVersion", "") ?? string.Empty).Trim();
+                Version v; return Version.TryParse(s, out v) ? v : null;
+            }
+            catch { return null; }
+        }
+
+        private static void WriteLastSeenVersion(Version v)
+        {
+            try
+            {
+                if (v == null) return;
+                AppSettings.WriteIniValue("APP", "LastSeenVersion", v.ToString());
+            }
+            catch { }
+        }
+
+        private static async Task<string> TryDownloadReleaseNotesAsync()
+        {
+            try
+            {
+                using (var wc = new WebClient())
+                {
+                    wc.Proxy = WebRequest.DefaultWebProxy;
+                    wc.Encoding = Encoding.UTF8;
+                    return await wc.DownloadStringTaskAsync(ReleaseNotesUrl).ConfigureAwait(false);
+                }
+            }
+            catch { return null; }
+        }
+
+        private static void ShowReleaseNotesOnUi(Form owner, string notes)
+        {
+            try
+            {
+                Action show = () =>
+                {
+                    try
+                    {
+                        using (var dlg = new Form())
+                        {
+                            dlg.Text = "Update";
+                            dlg.StartPosition = owner != null ? FormStartPosition.CenterParent : FormStartPosition.CenterScreen;
+                            dlg.Size = new Size(920, 680);
+                            dlg.MinimizeBox = false;
+                            dlg.MaximizeBox = false;
+                            dlg.BackColor = Color.White;
+                            try { dlg.Font = new Font("Segoe UI Variable", 10f); } catch { dlg.Font = new Font("Segoe UI", 10f); }
+
+                            var header = new Panel { Dock = DockStyle.Top, Height = 64, BackColor = Color.FromArgb(245, 248, 255) };
+                            var lblTitle = new Label
+                            {
+                                AutoSize = false,
+                                Dock = DockStyle.Fill,
+                                TextAlign = ContentAlignment.MiddleLeft,
+                                Text = "Update – Hinweise",
+                                Padding = new Padding(20, 0, 20, 0),
+                                Font = new Font(dlg.Font.FontFamily, 16f, FontStyle.Bold),
+                                ForeColor = Color.FromArgb(33, 150, 243)
+                            };
+                            header.Controls.Add(lblTitle);
+
+                            var lblStatus = new Label
+                            {
+                                AutoSize = false,
+                                Dock = DockStyle.Right,
+                                Width = 320,
+                                TextAlign = ContentAlignment.MiddleRight,
+                                Padding = new Padding(10, 0, 20, 0),
+                                Font = new Font(dlg.Font.FontFamily, 10.5f, FontStyle.Bold),
+                                ForeColor = Color.FromArgb(90, 90, 90),
+                                Text = "Prüfe…"
+                            };
+                            header.Controls.Add(lblStatus);
+
+                            var contentHost = new Panel { Dock = DockStyle.Fill, Padding = new Padding(18, 14, 18, 14), BackColor = Color.White };
+
+                            var tb = new TextBox
+                            {
+                                Multiline = true,
+                                ReadOnly = true,
+                                ScrollBars = ScrollBars.Vertical,
+                                Dock = DockStyle.Fill,
+                                BorderStyle = BorderStyle.FixedSingle,
+                                BackColor = Color.White,
+                                ForeColor = Color.FromArgb(30, 30, 30),
+                                Font = new Font("Consolas", 10f),
+                                Text = notes ?? string.Empty
+                            };
+                            contentHost.Controls.Add(tb);
+
+                            var footer = new Panel { Dock = DockStyle.Bottom, Height = 64, BackColor = Color.White };
+
+                            var btnUpdate = new Button
+                            {
+                                Text = "Update verfügbar",
+                                Visible = false,
+                                Width = 170,
+                                Height = 40,
+                                Anchor = AnchorStyles.Right | AnchorStyles.Top,
+                                FlatStyle = FlatStyle.Flat,
+                                BackColor = Color.FromArgb(46, 125, 50),
+                                ForeColor = Color.White,
+                                Left = dlg.ClientSize.Width - 160 - 170 - 12,
+                                Top = 12
+                            };
+                            btnUpdate.FlatAppearance.BorderSize = 0;
+                            btnUpdate.Click += (s3, e3) =>
+                            {
+                                try { Program.CheckForUpdateNow(dlg); } catch { }
+                            };
+                            footer.Controls.Add(btnUpdate);
+
+                            var btn = new Button
+                            {
+                                Text = "OK",
+                                DialogResult = DialogResult.OK,
+                                Width = 140,
+                                Height = 40,
+                                Anchor = AnchorStyles.Right | AnchorStyles.Top,
+                                FlatStyle = FlatStyle.Flat,
+                                BackColor = Color.FromArgb(33, 150, 243),
+                                ForeColor = Color.White,
+                                Left = dlg.ClientSize.Width - 160,
+                                Top = 12
+                            };
+                            btn.FlatAppearance.BorderSize = 0;
+                            footer.Controls.Add(btn);
+
+                            dlg.Controls.Add(contentHost);
+                            dlg.Controls.Add(footer);
+                            dlg.Controls.Add(header);
+                            dlg.AcceptButton = btn;
+
+                            dlg.Resize += (s2, e2) =>
+                            {
+                                try { btn.Left = dlg.ClientSize.Width - btn.Width - 20; } catch { }
+                                try { btnUpdate.Left = btn.Left - btnUpdate.Width - 12; } catch { }
+                            };
+                            try { btn.Left = dlg.ClientSize.Width - btn.Width - 20; } catch { }
+                            try { btnUpdate.Left = btn.Left - btnUpdate.Width - 12; } catch { }
+
+                            try
+                            {
+                                Task.Run(async () =>
+                                {
+                                    var hasUpdate = await Program.CheckForUpdateAvailableAsync().ConfigureAwait(false);
+                                    try
+                                    {
+                                        dlg.BeginInvoke((Action)(() =>
+                                        {
+                                            if (hasUpdate == true)
+                                            {
+                                                lblStatus.Text = "Update verfügbar";
+                                                lblStatus.ForeColor = Color.FromArgb(46, 125, 50);
+                                                btnUpdate.Visible = true;
+                                            }
+                                            else if (hasUpdate == false)
+                                            {
+                                                lblStatus.Text = "Sie sind aktuell – besser wird es heute nicht mehr.";
+                                                lblStatus.ForeColor = Color.FromArgb(90, 90, 90);
+                                                btnUpdate.Visible = false;
+                                            }
+                                            else
+                                            {
+                                                lblStatus.Text = "Prüfung nicht möglich";
+                                                lblStatus.ForeColor = Color.FromArgb(229, 57, 53);
+                                                btnUpdate.Visible = false;
+                                            }
+                                        }));
+                                    }
+                                    catch { }
+                                });
+                            }
+                            catch { }
+
+                            if (owner != null) dlg.ShowDialog(owner); else dlg.ShowDialog();
+                        }
+                    }
+                    catch { }
+                };
+
+                if (owner != null && owner.InvokeRequired) owner.BeginInvoke(show);
+                else show();
+            }
+            catch { }
+        }
     }
 
     // Embedded AutoUpdater for TaMi Automatenclient (MSI/EXE) with UAC elevation
@@ -308,6 +560,44 @@ namespace TaMi_Automatenclient
         // Setze diese URL auf die konkrete Datei (MSI oder Setup.exe) auf deinem Webspace,
         // z. B. "https://server/pfad/Setup1.msi" oder "https://server/pfad/setup.exe".
         private const string UpdateUrl = "http://kassenautomat.priwitzer-dienstleistungsgmbh.de/Update_Automatenclient/Automatenclient_Setup.msi";
+
+        public static async Task<bool?> CheckForUpdateAvailableAsync()
+        {
+            try
+            {
+                var exeName = Path.GetFileName(Application.ExecutablePath) ?? string.Empty;
+                if (string.IsNullOrEmpty(exeName)) return null;
+
+                var currentVersion = GetCurrentVersion();
+                var remoteUrl = BuildRemoteUrl(UpdateUrl, exeName);
+
+                string tmpPath = null;
+                try
+                {
+                    var ext = GuessExtensionFromUrl(remoteUrl);
+                    tmpPath = Path.Combine(Path.GetTempPath(), Guid.NewGuid().ToString("N") + ext);
+                    using (var wc = new WebClient())
+                    {
+                        await wc.DownloadFileTaskAsync(remoteUrl, tmpPath).ConfigureAwait(false);
+                    }
+                }
+                catch
+                {
+                    SafeDelete(tmpPath);
+                    return null;
+                }
+
+                bool isMsi = IsMsiFile(tmpPath);
+                Version remoteVersion = isMsi ? GetMsiProductVersion(tmpPath) : GetFileVersion(tmpPath);
+                SafeDelete(tmpPath);
+                if (remoteVersion == null) return null;
+                return remoteVersion > currentVersion;
+            }
+            catch
+            {
+                return null;
+            }
+        }
 
         public static void CheckAndPromptAtStartup()
         {
