@@ -12,10 +12,11 @@ using System.Text; // NEW
 using System.Collections.Generic; // NEW
 using TaMi_Automatenclient.Export; // NEW
 using System.Drawing.Printing; // NEW
+using TaMi_Automatenclient.UI.Layout;
 
 namespace TaMi_Automatenclient
 {
-    public class DayViewForm : Form
+    public class DayViewForm : KassenclientBaseForm
     {
         private class EntryMeta
         {
@@ -35,19 +36,14 @@ namespace TaMi_Automatenclient
         private readonly string _kassenName;
         private readonly string _automatenName;
 
-        private Panel headerPanel;
-        private Button btnClose;
-        private Label lblTitle;
-        private Point _mouseDownLocation;
-
         private DateTimePicker dtpTag;
-        private Button btnPrev;
-        private Button btnNext;
-        private Button btnToday;
-        private Button btnCalendar; // NEW
+        private ModernGradientButton btnPrev;
+        private ModernGradientButton btnNext;
+        private ModernGradientButton btnToday;
+        private ModernGradientButton btnCalendar; // NEW
         private MonthCalendar _monthCalendar; // NEW
         private Label lblDatum;
-        private Button btnLockDay;
+        private ModernGradientButton btnLockDay;
         private bool _dayLocked;
 
         private Label lblAnfang;
@@ -56,11 +52,11 @@ namespace TaMi_Automatenclient
         private ListView lvEintraege;
 
         private Panel footerPanel;
-        private Button btnBearbeiten;
-        private Button btnSplitten;
-        private Button btnBelegNachdruck; // NEW
-        private Button btnExportCsv; // NEW
-        private Button btnExportWizard; // NEW
+        private ModernGradientButton btnBearbeiten;
+        private ModernGradientButton btnSplitten;
+        private ModernGradientButton btnBelegNachdruck; // NEW
+        private ModernGradientButton btnExportCsv; // NEW
+        private ModernGradientButton btnExportWizard; // NEW
 
         public DayViewForm(int firmenId, string kassenName, string automatenName)
         {
@@ -74,81 +70,31 @@ namespace TaMi_Automatenclient
 
         private void InitializeLayout()
         {
-            FormBorderStyle = FormBorderStyle.None;
             StartPosition = FormStartPosition.CenterParent;
-            ClientSize = new Size(1800, 900);
-            BackColor = Color.White;
-            DoubleBuffered = true;
+            var title = $"Einzahlungen: {_kassenName} (FID: {_firmenId})";
+            SetupDefaultForm("DayViewForm", title, new Size(1800, 900));
+            ShowInTaskbar = false;
+            AddHeaderPanel(Text, true, true, true);
 
-            headerPanel = new Panel
-            {
-                Location = new Point(0, 0),
-                Size = new Size(ClientSize.Width, 60),
-                Anchor = AnchorStyles.Top | AnchorStyles.Left | AnchorStyles.Right,
-            };
-            headerPanel.Paint += HeaderPanel_Paint;
-            headerPanel.MouseDown += (s, e) => { if (e.Button == MouseButtons.Left) _mouseDownLocation = e.Location; };
-            headerPanel.MouseMove += (s, e) =>
-            {
-                if (e.Button == MouseButtons.Left)
-                {
-                    Left += e.X - _mouseDownLocation.X;
-                    Top += e.Y - _mouseDownLocation.Y;
-                }
-            };
-            Controls.Add(headerPanel);
-
-            lblTitle = new Label
-            {
-                Text = $"Einzahlungen: {_kassenName} (FID: {_firmenId})",
-                AutoSize = false,
-                TextAlign = ContentAlignment.MiddleLeft,
-                Font = new Font("Segoe UI Variable", 18F, FontStyle.Bold),
-                ForeColor = Color.White,
-                Location = new Point(24, 0),
-                Size = new Size(1200, 60),
-                BackColor = Color.Transparent
-            };
-            headerPanel.Controls.Add(lblTitle);
-
-            btnClose = new Button
-            {
-                Text = "\u2715",
-                Font = new Font("Segoe UI Symbol", 18F, FontStyle.Bold),
-                ForeColor = Color.White,
-                BackColor = Color.Transparent,
-                FlatStyle = FlatStyle.Flat,
-                Size = new Size(48, 48),
-                Location = new Point(ClientSize.Width - 56, 6),
-                Anchor = AnchorStyles.Top | AnchorStyles.Right,
-                TabStop = false
-            };
-            btnClose.FlatAppearance.BorderSize = 0;
-            btnClose.FlatAppearance.MouseOverBackColor = Color.FromArgb(255, 80, 80);
-            btnClose.Click += (s, e) => Close();
-            headerPanel.Controls.Add(btnClose);
-
-            btnLockDay = new Button
+            btnLockDay = new ModernGradientButton
             {
                 Text = "Tag festschreiben",
-                Location = new Point(ClientSize.Width - 220, 12),
-                Size = new Size(150, 36),
-                Anchor = AnchorStyles.Top | AnchorStyles.Right,
-                BackColor = Color.FromArgb(0, 172, 193),
-                ForeColor = Color.White,
-                FlatStyle = FlatStyle.Flat
+                Size = new Size(170, 44),
+                GradientStart = UiTheme.SecondaryStart,
+                GradientEnd = UiTheme.SecondaryEnd,
+                Anchor = AnchorStyles.Top | AnchorStyles.Right
             };
-            btnLockDay.FlatAppearance.BorderSize = 0;
             btnLockDay.Click += async (s, e) => await DoLockDayAsync();
-            headerPanel.Controls.Add(btnLockDay);
+            Controls.Add(btnLockDay);
 
-            try { Region = Region.FromHrgn(CreateRoundRectRgn(0, 0, Width, Height, 18, 18)); } catch { }
+            Resize += (s, e) => PositionHeaderButtons();
+            PositionHeaderButtons();
 
             dtpTag = new DateTimePicker
             {
                 Format = DateTimePickerFormat.Custom,
                 CustomFormat = "dddd, dd.MM.yyyy",
-                Location = new Point(24, 80),
+                Location = new Point(24, UiTheme.HeaderHeight + 20),
                 Size = new Size(320, 32),
                 Font = new Font("Segoe UI Variable", 12F),
                 Value = DateTime.Today,
@@ -160,7 +106,7 @@ namespace TaMi_Automatenclient
             lblDatum = new Label
             {
                 Text = "",
-                Location = new Point(24, 82),
+                Location = new Point(24, UiTheme.HeaderHeight + 22),
                 Size = new Size(288, 28),
                 Font = new Font("Segoe UI Variable", 12F, FontStyle.Bold),
                 AutoEllipsis = true
@@ -169,16 +115,15 @@ namespace TaMi_Automatenclient
             UpdateDateLabel();
 
             // NEW: Calendar button (left of navigation arrows)
-            btnCalendar = new Button
+            btnCalendar = new ModernGradientButton
             {
                 Text = "📅",
-                Location = new Point(320, 78),
-                Size = new Size(36, 36),
-                FlatStyle = FlatStyle.Flat,
-                BackColor = Color.FromArgb(33, 150, 243),
-                ForeColor = Color.White
+                Location = new Point(320, UiTheme.HeaderHeight + 16),
+                Size = new Size(44, 40),
+                GradientStart = UiTheme.PrimaryStart,
+                GradientEnd = UiTheme.PrimaryEnd,
+                Font = new Font("Segoe UI Symbol", 12F, FontStyle.Bold)
             };
-            btnCalendar.FlatAppearance.BorderSize = 0;
             btnCalendar.Click += (s, e) => ToggleCalendar();
             Controls.Add(btnCalendar);
             try { btnCalendar.BringToFront(); } catch { }
@@ -200,49 +145,46 @@ namespace TaMi_Automatenclient
             };
             Controls.Add(_monthCalendar);
 
-            btnPrev = new Button
+            btnPrev = new ModernGradientButton
             {
                 Text = "<",
-                Location = new Point(360, 78),
-                Size = new Size(40, 36),
-                FlatStyle = FlatStyle.Flat,
-                BackColor = Color.FromArgb(33, 150, 243),
-                ForeColor = Color.White
+                Location = new Point(368, UiTheme.HeaderHeight + 16),
+                Size = new Size(44, 40),
+                GradientStart = UiTheme.PrimaryStart,
+                GradientEnd = UiTheme.PrimaryEnd,
+                Font = new Font("Segoe UI Variable", 12F, FontStyle.Bold)
             };
-            btnPrev.FlatAppearance.BorderSize = 0;
             btnPrev.Click += (s, e) => { dtpTag.Value = dtpTag.Value.AddDays(-1); };
             Controls.Add(btnPrev);
 
-            btnNext = new Button
+            btnNext = new ModernGradientButton
             {
                 Text = ">",
-                Location = new Point(406, 78),
-                Size = new Size(40, 36),
-                FlatStyle = FlatStyle.Flat,
-                BackColor = Color.FromArgb(33, 150, 243),
-                ForeColor = Color.White
+                Location = new Point(416, UiTheme.HeaderHeight + 16),
+                Size = new Size(44, 40),
+                GradientStart = UiTheme.PrimaryStart,
+                GradientEnd = UiTheme.PrimaryEnd,
+                Font = new Font("Segoe UI Variable", 12F, FontStyle.Bold)
             };
-            btnNext.FlatAppearance.BorderSize = 0;
             btnNext.Click += (s, e) => { dtpTag.Value = dtpTag.Value.AddDays(1); };
             Controls.Add(btnNext);
 
-            btnToday = new Button
+            btnToday = new ModernGradientButton
             {
                 Text = "Heute",
-                Location = new Point(456, 78),
-                Size = new Size(80, 36),
-                FlatStyle = FlatStyle.Flat,
-                BackColor = Color.FromArgb(76, 175, 80),
-                ForeColor = Color.White
+                Location = new Point(468, UiTheme.HeaderHeight + 16),
+                Size = new Size(100, 40),
+                GradientStart = UiTheme.SuccessStart,
+                GradientEnd = UiTheme.SuccessEnd,
+                Font = new Font("Segoe UI Variable", 11F, FontStyle.Bold)
             };
-            btnToday.FlatAppearance.BorderSize = 0;
             btnToday.Click += (s, e) => { dtpTag.Value = DateTime.Today; };
             Controls.Add(btnToday);
 
             lblAnfang = new Label
             {
                 Text = "Anfangsbestand: 0,00 €",
-                Location = new Point(24, 130),
+                Location = new Point(24, UiTheme.HeaderHeight + 70),
                 Size = new Size(600, 32),
                 Font = new Font("Segoe UI Variable", 16F, FontStyle.Bold)
             };
@@ -251,7 +193,7 @@ namespace TaMi_Automatenclient
             lblEnde = new Label
             {
                 Text = "Endbestand: 0,00 €",
-                Location = new Point(24, 170),
+                Location = new Point(24, UiTheme.HeaderHeight + 110),
                 Size = new Size(600, 32),
                 Font = new Font("Segoe UI Variable", 16F, FontStyle.Bold)
             };
@@ -262,7 +204,7 @@ namespace TaMi_Automatenclient
                 View = View.Details,
                 FullRowSelect = true,
                 GridLines = true,
-                Location = new Point(24, 220),
+                Location = new Point(24, UiTheme.HeaderHeight + 160),
                 Size = new Size(1720, 600),
                 Anchor = AnchorStyles.Top | AnchorStyles.Bottom | AnchorStyles.Left | AnchorStyles.Right,
                 Font = new Font("Segoe UI Variable", 12F, FontStyle.Regular)
@@ -289,6 +231,18 @@ namespace TaMi_Automatenclient
             Shown += async (s, e) => await RefreshDayAsync();
             // Beim Schließen speichern
             FormClosing += (s, e) => TrySaveColumnWidths();
+        }
+
+        private void PositionHeaderButtons()
+        {
+            try
+            {
+                if (btnLockDay == null) return;
+                btnLockDay.Left = Math.Max(8, ClientSize.Width - btnLockDay.Width - 160);
+                btnLockDay.Top = 8;
+                btnLockDay.BringToFront();
+            }
+            catch { }
         }
 
         private void ToggleCalendar()
@@ -325,78 +279,73 @@ namespace TaMi_Automatenclient
             };
             Controls.Add(footerPanel);
 
-            btnBearbeiten = new Button
+            btnBearbeiten = new ModernGradientButton
             {
                 Text = "Bearbeiten",
                 Left = 24,
                 Top = 12,
                 Width = 160,
                 Height = 40,
-                BackColor = Color.FromArgb(33, 150, 243),
-                ForeColor = Color.White,
-                FlatStyle = FlatStyle.Flat
+                GradientStart = UiTheme.PrimaryStart,
+                GradientEnd = UiTheme.PrimaryEnd,
+                Font = new Font("Segoe UI Variable", 11F, FontStyle.Bold)
             };
-            btnBearbeiten.FlatAppearance.BorderSize = 0;
             btnBearbeiten.Click += BtnBearbeiten_Click;
             footerPanel.Controls.Add(btnBearbeiten);
 
-            btnSplitten = new Button
+            btnSplitten = new ModernGradientButton
             {
                 Text = "Splitten",
                 Left = 200,
                 Top = 12,
                 Width = 160,
                 Height = 40,
-                BackColor = Color.FromArgb(0, 172, 193),
-                ForeColor = Color.White,
-                FlatStyle = FlatStyle.Flat
+                GradientStart = UiTheme.SecondaryStart,
+                GradientEnd = UiTheme.SecondaryEnd,
+                Font = new Font("Segoe UI Variable", 11F, FontStyle.Bold)
             };
-            btnSplitten.FlatAppearance.BorderSize = 0;
             btnSplitten.Click += BtnSplitten_Click;
             footerPanel.Controls.Add(btnSplitten);
 
-            btnBelegNachdruck = new Button
+            btnBelegNachdruck = new ModernGradientButton
             {
                 Text = "Beleg nachdrucken",
                 Left = 376,
                 Top = 12,
                 Width = 180,
                 Height = 40,
-                BackColor = Color.FromArgb(156, 39, 176),
-                ForeColor = Color.White,
-                FlatStyle = FlatStyle.Flat
+                GradientStart = UiTheme.PrimaryEnd,
+                GradientEnd = UiTheme.SecondaryEnd,
+                Font = new Font("Segoe UI Variable", 11F, FontStyle.Bold)
             };
-            btnBelegNachdruck.FlatAppearance.BorderSize = 0;
             btnBelegNachdruck.Click += async (s, e) => await PrintReceiptPdfAsync();
             footerPanel.Controls.Add(btnBelegNachdruck);
 
-            btnExportCsv = new Button
+            btnExportCsv = new ModernGradientButton
             {
                 Text = "Aktueller Tag CSV Export",
                 Left = 566,
                 Top = 12,
                 Width = 220,
                 Height = 40,
-                BackColor = Color.FromArgb(76, 175, 80),
-                ForeColor = Color.White,
-                FlatStyle = FlatStyle.Flat
+                GradientStart = UiTheme.SuccessStart,
+                GradientEnd = UiTheme.SuccessEnd,
+                Font = new Font("Segoe UI Variable", 11F, FontStyle.Bold)
             };
-            btnExportCsv.FlatAppearance.BorderSize = 0;
             btnExportCsv.Click += async (s, e) => await ExportCsvAsync();
             footerPanel.Controls.Add(btnExportCsv);
 
-            btnExportWizard = new Button
+            btnExportWizard = new ModernGradientButton
             {
                 Text = "Export…",
                 Left = 796,
                 Top = 12,
                 Width = 160,
                 Height = 40,
-                BackColor = Color.FromArgb(255, 152, 0),
-                ForeColor = Color.White,
-                FlatStyle = FlatStyle.Flat
+                GradientStart = UiTheme.DangerStart,
+                GradientEnd = UiTheme.DangerEnd,
+                Font = new Font("Segoe UI Variable", 11F, FontStyle.Bold)
             };
-            btnExportWizard.FlatAppearance.BorderSize = 0;
             btnExportWizard.Click += (s, e) =>
             {
                 try
@@ -848,14 +797,7 @@ namespace TaMi_Automatenclient
             catch { }
         }
 
-        private void HeaderPanel_Paint(object sender, PaintEventArgs e)
-        {
-            using (var brush = new LinearGradientBrush(headerPanel.ClientRectangle,
-                Color.FromArgb(33, 150, 243), Color.FromArgb(33, 203, 243), 0f))
-            {
-                e.Graphics.FillRectangle(brush, headerPanel.ClientRectangle);
-            }
-        }
+        
 
         private async void LvEintraege_DoubleClick(object sender, EventArgs e)
         {
@@ -1142,7 +1084,6 @@ namespace TaMi_Automatenclient
             catch { return string.Empty; }
         }
 
-        [DllImport("gdi32.dll", SetLastError = true)]
-        private static extern IntPtr CreateRoundRectRgn(int nLeftRect, int nTopRect, int nRightRect, int nBottomRect, int nWidthEllipse, int nHeightEllipse);
+        
     }
 }

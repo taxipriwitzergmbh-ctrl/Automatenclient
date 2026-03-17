@@ -6,15 +6,12 @@ using System.Runtime.InteropServices;
 using System.Threading.Tasks;
 using System.Windows.Forms;
 using System.Drawing.Drawing2D;
+using TaMi_Automatenclient.UI.Layout;
 
 namespace TaMi_Automatenclient
 {
-    public class KassenübersichtForm : Form
+    public class KassenübersichtForm : KassenclientBaseForm
     {
-        private Panel headerPanel;
-        private Label lblTitle;
-        private Button btnClose;
-        private Point _mouseDownLocation;
         private FlowLayoutPanel pnlKassen;
 
         public KassenübersichtForm()
@@ -25,65 +22,13 @@ namespace TaMi_Automatenclient
 
         private void InitializeLayout()
         {
-            FormBorderStyle = FormBorderStyle.None;
-            StartPosition = FormStartPosition.CenterScreen;
-            ClientSize = new Size(1180, 720);
-            BackColor = Color.White;
-            DoubleBuffered = true;
-
-            headerPanel = new Panel
-            {
-                Location = new Point(0, 0),
-                Size = new Size(ClientSize.Width, 60),
-                Anchor = AnchorStyles.Top | AnchorStyles.Left | AnchorStyles.Right
-            };
-            headerPanel.Paint += HeaderPanel_Paint;
-            headerPanel.MouseDown += (s, e) => { if (e.Button == MouseButtons.Left) _mouseDownLocation = e.Location; };
-            headerPanel.MouseMove += (s, e) =>
-            {
-                if (e.Button == MouseButtons.Left)
-                {
-                    Left += e.X - _mouseDownLocation.X;
-                    Top += e.Y - _mouseDownLocation.Y;
-                }
-            };
-            Controls.Add(headerPanel);
-
-            lblTitle = new Label
-            {
-                Text = "TaMi Automatenclient – Einzahlübersicht",
-                AutoSize = false,
-                TextAlign = ContentAlignment.MiddleLeft,
-                Font = new Font("Segoe UI Variable", 18F, FontStyle.Bold),
-                ForeColor = Color.White,
-                Location = new Point(24, 0),
-                Size = new Size(720, 60),
-                BackColor = Color.Transparent
-            };
-            headerPanel.Controls.Add(lblTitle);
-
-            btnClose = new Button
-            {
-                Text = "\u2715",
-                Font = new Font("Segoe UI Symbol", 18F, FontStyle.Bold),
-                ForeColor = Color.White,
-                BackColor = Color.Transparent,
-                FlatStyle = FlatStyle.Flat,
-                Size = new Size(48, 48),
-                Location = new Point(ClientSize.Width - 56, 6),
-                Anchor = AnchorStyles.Top | AnchorStyles.Right,
-                TabStop = false
-            };
-            btnClose.FlatAppearance.BorderSize = 0;
-            btnClose.FlatAppearance.MouseOverBackColor = Color.FromArgb(255, 80, 80);
-            btnClose.Click += (s, e) => Close();
-            headerPanel.Controls.Add(btnClose);
-
-            try { Region = Region.FromHrgn(CreateRoundRectRgn(0, 0, Width, Height, 24, 24)); } catch { }
+            SetupDefaultForm("KassenuebersichtForm", "TaMi Automatenclient – Einzahlübersicht", new Size(1180, 720));
+            ShowInTaskbar = false;
+            AddHeaderPanel(Text, true, true, true);
 
             pnlKassen = new FlowLayoutPanel
             {
-                Location = new Point(20, 80),
+                Location = new Point(20, UiTheme.HeaderHeight + 20),
                 Size = new Size(1120, 600),
                 Anchor = AnchorStyles.Top | AnchorStyles.Bottom | AnchorStyles.Left | AnchorStyles.Right,
                 AutoScroll = true,
@@ -158,19 +103,17 @@ namespace TaMi_Automatenclient
                             string manName = row.Field<string>("ManName") ?? ("ID " + fid);
                             decimal kb = row["Kassenbestand"] == DBNull.Value ? 0m : Convert.ToDecimal(row["Kassenbestand"]);
 
-                            var btn = new Button
+                            var btn = new ModernGradientButton
                             {
                                 Width = 300,
                                 Height = 90,
                                 Margin = new Padding(8),
-                                FlatStyle = FlatStyle.Flat,
-                                BackColor = Color.FromArgb(33, 150, 243),
-                                ForeColor = Color.White,
                                 Font = new Font("Segoe UI Variable", 12F, FontStyle.Bold),
+                                GradientStart = UiTheme.PrimaryStart,
+                                GradientEnd = UiTheme.PrimaryEnd,
                                 TextAlign = ContentAlignment.MiddleLeft,
                                 Tag = new { FirmenId = fid, DeviceID = deviceId, KassenName = manName }
                             };
-                            btn.FlatAppearance.BorderSize = 0;
                             btn.Text = $"{manName} – {deviceName}\r\nBestand: {kb:C2}";
 
                             btn.Click += (s, e) =>
@@ -196,16 +139,6 @@ namespace TaMi_Automatenclient
             }
         }
 
-        private void HeaderPanel_Paint(object sender, PaintEventArgs e)
-        {
-            using (var brush = new LinearGradientBrush(headerPanel.ClientRectangle,
-                Color.FromArgb(33, 150, 243), Color.FromArgb(33, 203, 243), 0f))
-            {
-                e.Graphics.FillRectangle(brush, headerPanel.ClientRectangle);
-            }
-        }
-
-        [DllImport("gdi32.dll", SetLastError = true)]
-        private static extern IntPtr CreateRoundRectRgn(int nLeftRect, int nTopRect, int nRightRect, int nBottomRect, int nWidthEllipse, int nHeightEllipse);
+        
     }
 }
