@@ -8,16 +8,17 @@ using System.Drawing.Drawing2D;
 using System.Linq;
 using System.Threading.Tasks;
 using System.Windows.Forms;
+using TaMi_Automatenclient.UI.Layout;
 
 namespace TaMi_Automatenclient
 {
-    public partial class AbrechnungBedingungenForm : Form
+    public partial class AbrechnungBedingungenForm : KassenclientBaseForm
     {
-        private const int HeaderHeight = 60;
-        private static readonly Color Accent = Color.FromArgb(33,150,243);
-        private static readonly Color Accent2 = Color.FromArgb(33,203,243);
+        private const int HeaderHeight = UiTheme.HeaderHeight;
+        private static readonly Color Accent = UiTheme.PrimaryStart;
+        private static readonly Color Accent2 = UiTheme.PrimaryEnd;
 
-        private Panel header; private Label lblTitle; private Button btnClose; private Panel content; private SplitContainer split; private ListView lvRegeln; private Button btnNeu, btnBearbeiten, btnDuplizieren, btnLoeschen, btnSpeichernAlle;
+        private Panel content; private SplitContainer split; private ListView lvRegeln; private ModernGradientButton btnNeu, btnBearbeiten, btnDuplizieren, btnLoeschen, btnSpeichernAlle;
         private BindingList<AbrechnungsRegel> _regeln = new BindingList<AbrechnungsRegel>();
 
         public AbrechnungBedingungenForm() 
@@ -31,33 +32,26 @@ namespace TaMi_Automatenclient
             base.OnShown(e); 
             try 
             { 
-                PositionCloseButton(); 
                 await LoadRulesAsync(); 
             } 
             catch { } 
         }
 
-        protected override void OnPaintBackground(PaintEventArgs e) 
-        { 
-            e.Graphics.Clear(Color.White); 
-            var rect = new Rectangle(0,0,ClientSize.Width,HeaderHeight);
-
-            using (var br = new LinearGradientBrush(rect, Accent, Accent2, 0f))
-            {
-                e.Graphics.FillRectangle(br, rect);
-            }
-        }
+        
 
         private void BuildUi()
         {
-            FormBorderStyle = FormBorderStyle.None; StartPosition = FormStartPosition.CenterParent; var wa = Screen.PrimaryScreen.WorkingArea; int targetW = Math.Min(1600, Math.Max(1280, wa.Width - 60)); int targetH = Math.Min(900, Math.Max(760, wa.Height - 60)); ClientSize = new Size(targetW,targetH); BackColor = Color.White; Font = new Font("Segoe UI Variable",10F); DoubleBuffered = true;
-            content = new Panel { Dock = DockStyle.Fill, Padding = new Padding(8), BackColor = Color.White }; Controls.Add(content);
-            header = new Panel { Dock = DockStyle.Top, Height = HeaderHeight, BackColor = Color.Transparent };
-            lblTitle = new Label { Text = "Abrechnungsbedingungen", Left = 20, Top = 0, Width = 600, Height = HeaderHeight, ForeColor = Color.White, Font = new Font("Segoe UI Variable",16F,FontStyle.Bold), TextAlign = ContentAlignment.MiddleLeft, BackColor = Color.Transparent };
-            btnClose = new Button { Text = "?", Width = 44, Height = 44, Top = 8, Anchor = AnchorStyles.Top | AnchorStyles.Right, FlatStyle = FlatStyle.Flat, ForeColor = Color.White, BackColor = Color.Transparent, TabStop = false };
-            btnClose.FlatAppearance.BorderSize=0; btnClose.FlatAppearance.MouseOverBackColor = Color.FromArgb(255,80,80); btnClose.Click += (s,e)=>Close();
-            header.SizeChanged += (s,e)=> PositionCloseButton();
-            header.Controls.Add(lblTitle); header.Controls.Add(btnClose); Controls.Add(header);
+            StartPosition = FormStartPosition.CenterParent;
+            var wa = Screen.PrimaryScreen.WorkingArea;
+            int targetW = Math.Min(1600, Math.Max(1280, wa.Width - 60));
+            int targetH = Math.Min(900, Math.Max(760, wa.Height - 60));
+
+            SetupDefaultForm("AbrechnungBedingungenForm", "Abrechnungsbedingungen", new Size(targetW, targetH));
+            ShowInTaskbar = false;
+            AddHeaderPanel(Text, true, true, true);
+
+            content = new Panel { Dock = DockStyle.Fill, Padding = new Padding(8, HeaderHeight + 8, 8, 8), BackColor = Color.White };
+            Controls.Add(content);
             split = new SplitContainer { Dock = DockStyle.Fill, SplitterDistance = 460, Padding = new Padding(0) }; content.Controls.Add(split); try { split.Panel2Collapsed = true; split.IsSplitterFixed = true; split.SplitterWidth = 1; } catch { }
             split.Panel1.Padding = new Padding(0,0,0,12);
             lvRegeln = new ListView { Dock = DockStyle.Fill, View = View.Details, FullRowSelect = true, GridLines = true, HideSelection = false };
@@ -68,8 +62,12 @@ namespace TaMi_Automatenclient
             lvRegeln.Columns.Add("Ergebnis",300);
             lvRegeln.Resize += (s,e)=>AdjustListColumns();
             split.Panel1.Controls.Add(lvRegeln);
-            var pnlBtns = new FlowLayoutPanel { Dock = DockStyle.Bottom, Height = 64, FlowDirection = FlowDirection.LeftToRight, Padding = new Padding(8)};
-            btnNeu = MakeBtn("Neu", Accent); btnBearbeiten = MakeBtn("Bearbeiten", Color.FromArgb(0,172,193)); btnDuplizieren = MakeBtn("Duplizieren", Color.FromArgb(3,155,229)); btnLoeschen = MakeBtn("Löschen", Color.IndianRed); btnSpeichernAlle = MakeBtn("Speichern", Color.FromArgb(76,175,80));
+            var pnlBtns = new FlowLayoutPanel { Dock = DockStyle.Bottom, Height = 72, FlowDirection = FlowDirection.LeftToRight, Padding = new Padding(8)};
+            btnNeu = MakeBtn("Neu", Accent, Accent2);
+            btnBearbeiten = MakeBtn("Bearbeiten", UiTheme.SecondaryStart, UiTheme.SecondaryEnd);
+            btnDuplizieren = MakeBtn("Duplizieren", UiTheme.PrimaryStart, UiTheme.PrimaryEnd);
+            btnLoeschen = MakeBtn("Löschen", UiTheme.DangerStart, UiTheme.DangerEnd);
+            btnSpeichernAlle = MakeBtn("Speichern", UiTheme.SuccessStart, UiTheme.SuccessEnd);
             btnNeu.Click += async (s,e)=> await NewRuleViaPopupAsync();
             btnBearbeiten.Click += async (s,e)=> await EditSelectedViaPopupAsync();
             btnDuplizieren.Click += async (s,e)=> await DuplicateSelectedViaPopupAsync();
@@ -78,18 +76,18 @@ namespace TaMi_Automatenclient
             pnlBtns.Controls.AddRange(new Control[]{btnNeu, btnBearbeiten, btnDuplizieren, btnLoeschen, btnSpeichernAlle}); split.Panel1.Controls.Add(pnlBtns); AdjustListColumns();
         }
 
-        private void PositionCloseButton()
+        private ModernGradientButton MakeBtn(string txt, Color start, Color end)
         {
-            try
+            return new ModernGradientButton
             {
-                if (btnClose == null || header == null) return;
-                btnClose.Left = Math.Max(8, header.ClientSize.Width - btnClose.Width - 8);
-                btnClose.BringToFront();
-            }
-            catch { }
+                Text = txt,
+                Width = 140,
+                Height = 44,
+                GradientStart = start,
+                GradientEnd = end,
+                Font = new Font("Segoe UI Variable", 12F, FontStyle.Bold)
+            };
         }
-
-        private Button MakeBtn(string txt, Color c){ var b = new Button{ Text=txt, Width=110, Height=34, BackColor=c, ForeColor=Color.White, FlatStyle=FlatStyle.Flat }; try{ b.FlatAppearance.BorderSize=0; }catch{} return b; }
 
         private void RefreshList()
         {

@@ -4,17 +4,18 @@ using System.Drawing;
 using System.Linq;
 using System.Windows.Forms;
 using System.Drawing.Drawing2D;
+using TaMi_Automatenclient.UI.Layout;
 
 namespace TaMi_Automatenclient
 {
-    public class AbrechnungsBedingungEditorForm : Form
+    public class AbrechnungsBedingungEditorForm : KassenclientBaseForm
     {
         public class Kondition { public string Feld { get; set; } public string Operator { get; set; } public string Wert { get; set; } }
         public class Ergebnis { public string Feld { get; set; } public string Wert { get; set; } }
 
-        private const int HeaderHeight = 56;
-        private static readonly Color Accent = Color.FromArgb(33, 150, 243);
-        private static readonly Color Accent2 = Color.FromArgb(33, 203, 243);
+        private const int HeaderHeight = UiTheme.HeaderHeight;
+        private static readonly Color Accent = UiTheme.PrimaryStart;
+        private static readonly Color Accent2 = UiTheme.PrimaryEnd;
 
         public List<Kondition> Bedingungen { get; private set; } = new List<Kondition>();
         public string Verknuepfung { get; private set; } = "AND";
@@ -23,21 +24,12 @@ namespace TaMi_Automatenclient
         public int Priority { get; private set; } = 100;
         public string RuleName { get; private set; }
 
-        private Panel header;
         private FlowLayoutPanel pnlBedingungen;
         private FlowLayoutPanel pnlErgebnisse;
         private ComboBox cboJoin;
         private CheckBox chkDefault;
         private NumericUpDown nudPriority;
         private TextBox txtName;
-
-        protected override void OnPaintBackground(PaintEventArgs e)
-        {
-            e.Graphics.Clear(Color.White);
-            var rect = new Rectangle(0, 0, ClientSize.Width, HeaderHeight);
-            using (var br = new LinearGradientBrush(rect, Accent, Accent2, 0f))
-                e.Graphics.FillRectangle(br, rect);
-        }
 
         public AbrechnungsBedingungEditorForm() 
         {
@@ -152,18 +144,20 @@ namespace TaMi_Automatenclient
 
         private void BuildUi()
         {
-            Text = "Regel bearbeiten"; StartPosition = FormStartPosition.CenterParent; FormBorderStyle = FormBorderStyle.Sizable; 
-            // Gr��e an Arbeitsbereich anpassen, damit unten die Buttons sichtbar bleiben
+            Text = "Regel bearbeiten";
+
             var wa = Screen.PrimaryScreen.WorkingArea;
             int targetW = Math.Min(1200, Math.Max(900, wa.Width - 200));
             int targetH = Math.Min(1000, Math.Max(800, wa.Height - 200));
-            ClientSize = new Size(targetW, targetH);
-            MinimumSize = new Size(900, 760);
-            MaximizeBox = true; MinimizeBox = true; DoubleBuffered = true; Font = new Font("Segoe UI Variable", 10F);
 
-            header = new Panel { Dock = DockStyle.Top, Height = HeaderHeight, BackColor = Color.Transparent };
-            var lbl = new Label { Text = "Bedingungen und Ergebnisse", Left = 16, Top = 0, Width = 640, Height = HeaderHeight, ForeColor = Color.White, Font = new Font("Segoe UI Variable", 14F, FontStyle.Bold), TextAlign = ContentAlignment.MiddleLeft, BackColor = Color.Transparent };
-            header.Controls.Add(lbl); Controls.Add(header);
+            SetupDefaultForm("AbrechnungsBedingungEditorForm", Text, new Size(targetW, targetH));
+            StartPosition = FormStartPosition.CenterParent;
+            MinimumSize = new Size(900, 760);
+            MaximizeBox = true;
+            MinimizeBox = true;
+            ShowInTaskbar = false;
+
+            AddHeaderPanel(Text, true, true, true);
 
             var lblName = new Label { Text = "Regelname:", Left = 16, Top = HeaderHeight + 8, Width = 100, Height = 28 };
             txtName = new TextBox { Left = 120, Top = HeaderHeight + 6, Width = 520 };
@@ -173,8 +167,8 @@ namespace TaMi_Automatenclient
             grpTop.Font = new Font("Segoe UI Variable", 10F, FontStyle.Bold);
             pnlBedingungen = new FlowLayoutPanel { Left = 10, Top = 24, Width = grpTop.Width - 24, Height = 240, AutoScroll = true, FlowDirection = FlowDirection.TopDown, WrapContents = false, BackColor = Color.White, Anchor = AnchorStyles.Top | AnchorStyles.Left | AnchorStyles.Right };
             pnlBedingungen.Controls.Add(CreateConditionRow());
-            var btnAddCond = new Button { Text = "+", Width = 36, Height = 30, Left = 10, Top = pnlBedingungen.Bottom + 6, BackColor = Accent, ForeColor = Color.White, FlatStyle = FlatStyle.Flat };
-            btnAddCond.FlatAppearance.BorderSize = 0; btnAddCond.Click += (s, e) => { AddJoinIfNeeded(); pnlBedingungen.Controls.Add(CreateConditionRow()); UpdateJoinIndicators(); };
+            var btnAddCond = new ModernGradientButton { Text = "+", Width = 42, Height = 32, Left = 10, Top = pnlBedingungen.Bottom + 6, GradientStart = Accent, GradientEnd = Accent2, Font = new Font("Segoe UI Variable", 12F, FontStyle.Bold) };
+            btnAddCond.Click += (s, e) => { AddJoinIfNeeded(); pnlBedingungen.Controls.Add(CreateConditionRow()); UpdateJoinIndicators(); };
             cboJoin = new ComboBox { Left = 56, Top = pnlBedingungen.Bottom + 6, Width = 120, DropDownStyle = ComboBoxStyle.DropDownList };
             cboJoin.Items.AddRange(new object[] { "AND", "OR" }); cboJoin.SelectedIndex = 0; cboJoin.SelectedIndexChanged += (s, e) => UpdateJoinIndicators();
             grpTop.Controls.AddRange(new Control[] { pnlBedingungen, btnAddCond, cboJoin });
@@ -184,17 +178,19 @@ namespace TaMi_Automatenclient
             grpBottom.Font = new Font("Segoe UI Variable", 10F, FontStyle.Bold);
             pnlErgebnisse = new FlowLayoutPanel { Left = 10, Top = 24, Width = grpBottom.Width - 24, Height = 140, AutoScroll = true, FlowDirection = FlowDirection.TopDown, WrapContents = false, BackColor = Color.White, Anchor = AnchorStyles.Top | AnchorStyles.Left | AnchorStyles.Right };
             pnlErgebnisse.Controls.Add(CreateResultRow());
-            var btnAddRes = new Button { Text = "+", Width = 36, Height = 30, Left = 10, Top = pnlErgebnisse.Bottom + 6, BackColor = Accent, ForeColor = Color.White, FlatStyle = FlatStyle.Flat }; btnAddRes.FlatAppearance.BorderSize = 0; btnAddRes.Click += (s, e) => pnlErgebnisse.Controls.Add(CreateResultRow());
+            var btnAddRes = new ModernGradientButton { Text = "+", Width = 42, Height = 32, Left = 10, Top = pnlErgebnisse.Bottom + 6, GradientStart = Accent, GradientEnd = Accent2, Font = new Font("Segoe UI Variable", 12F, FontStyle.Bold) };
+            btnAddRes.Click += (s, e) => pnlErgebnisse.Controls.Add(CreateResultRow());
             grpBottom.Controls.AddRange(new Control[] { pnlErgebnisse, btnAddRes }); Controls.Add(grpBottom);
 
             chkDefault = new CheckBox { Text = "Standard-Regel (Fallback)", Left = 12, Top = grpBottom.Bottom + 6, Width = 280 };
             nudPriority = new NumericUpDown { Left = chkDefault.Right + 16, Top = grpBottom.Bottom + 4, Width = 120, Minimum = 0, Maximum = 10000, Value = 100 };
             Controls.Add(chkDefault); Controls.Add(nudPriority);
 
-            var btnOk = new Button { Text = "OK", Width = 160, Height = 40, Left = ClientSize.Width - 340, Top = ClientSize.Height - 56, Anchor = AnchorStyles.Bottom | AnchorStyles.Right, BackColor = Accent, ForeColor = Color.White, FlatStyle = FlatStyle.Flat };
-            btnOk.FlatAppearance.BorderSize = 0; btnOk.Click += (s, e) => { Collect(); DialogResult = DialogResult.OK; };
-            var btnCancel = new Button { Text = "Abbrechen", Width = 160, Height = 40, Left = ClientSize.Width - 170, Top = ClientSize.Height - 56, Anchor = AnchorStyles.Bottom | AnchorStyles.Right, BackColor = Color.Gainsboro, FlatStyle = FlatStyle.Flat };
-            btnCancel.FlatAppearance.BorderSize = 0; btnCancel.Click += (s, e) => { DialogResult = DialogResult.Cancel; };
+            var btnOk = new ModernGradientButton { Text = "OK", Width = 160, Height = 44, Left = ClientSize.Width - 340, Top = ClientSize.Height - 60, Anchor = AnchorStyles.Bottom | AnchorStyles.Right, GradientStart = Accent, GradientEnd = Accent2, Font = new Font("Segoe UI Variable", 12F, FontStyle.Bold) };
+            btnOk.Click += (s, e) => { Collect(); DialogResult = DialogResult.OK; };
+
+            var btnCancel = new ModernGradientButton { Text = "Abbrechen", Width = 160, Height = 44, Left = ClientSize.Width - 170, Top = ClientSize.Height - 60, Anchor = AnchorStyles.Bottom | AnchorStyles.Right, GradientStart = UiTheme.SecondaryStart, GradientEnd = UiTheme.SecondaryEnd, Font = new Font("Segoe UI Variable", 12F, FontStyle.Bold) };
+            btnCancel.Click += (s, e) => { DialogResult = DialogResult.Cancel; };
             Controls.Add(btnOk); Controls.Add(btnCancel);
         }
 

@@ -6,6 +6,7 @@ using System.Runtime.InteropServices;
 using System.Windows.Forms;
 using System.Reflection;
 using System.IO;
+using TaMi_Automatenclient.UI.Layout;
 
 namespace TaMi_Automatenclient
 {
@@ -13,16 +14,16 @@ namespace TaMi_Automatenclient
     {
         private TaMiClient mTaMiClient;
 
-        private Button btnKassenbuch;
-        private Button btnRegeln;
-        private Button btnPersonal;
-        private Button btnZahlungen;
-        private Button btnOffene;
-        private Button btnUpdateHints; // NEW
+        private ModernGradientButton btnKassenbuch;
+        private ModernGradientButton btnRegeln;
+        private ModernGradientButton btnPersonal;
+        private ModernGradientButton btnZahlungen;
+        private ModernGradientButton btnOffene;
+        private ModernGradientButton btnUpdateHints; // NEW
         private Label lblBuildInfo;
 
-        private static readonly Color Accent = Color.FromArgb(33, 150, 243);
-        private static readonly Color AccentHover = Color.FromArgb(25, 118, 210);
+        private static readonly Color Accent = UiTheme.PrimaryStart;
+        private static readonly Color AccentHover = UiTheme.PrimaryEnd;
 
         public MenueForm()
         {
@@ -48,12 +49,12 @@ namespace TaMi_Automatenclient
             this.SetupDefaultForm("MenueForm", "Automaten-Client", new Size(500, 580));
             ShowInTaskbar = true;
 
-            this.btnKassenbuch = new Button();
-            this.btnRegeln = new Button();
-            this.btnPersonal = new Button();
-            this.btnZahlungen = new Button();
-            this.btnOffene = new Button();
-            this.btnUpdateHints = new Button();
+            this.btnKassenbuch = new ModernGradientButton();
+            this.btnRegeln = new ModernGradientButton();
+            this.btnPersonal = new ModernGradientButton();
+            this.btnZahlungen = new ModernGradientButton();
+            this.btnOffene = new ModernGradientButton();
+            this.btnUpdateHints = new ModernGradientButton();
             this.lblBuildInfo = new Label();
 
             this.SuspendLayout();
@@ -86,8 +87,8 @@ namespace TaMi_Automatenclient
 
             StylePrimaryButton(this.btnUpdateHints, "Update", new Point(x, y + (h + padY) * 5), new Size(w, h));
             this.btnUpdateHints.TabIndex = 5;
-            this.btnUpdateHints.BackColor = Color.FromArgb(0, 122, 204);
-            this.btnUpdateHints.FlatAppearance.MouseOverBackColor = Color.FromArgb(0, 102, 184);
+            this.btnUpdateHints.GradientStart = UiTheme.SuccessStart;
+            this.btnUpdateHints.GradientEnd = UiTheme.SuccessEnd;
             this.btnUpdateHints.Click += (s, e) =>
             {
                 try { Program.CheckForUpdateNow(this); } catch { }
@@ -141,38 +142,15 @@ namespace TaMi_Automatenclient
             catch { }
         }
 
-        private void StylePrimaryButton(Button b, string text, Point location, Size size)
+        private void StylePrimaryButton(ModernGradientButton b, string text, Point location, Size size)
         {
             b.Text = text;
             b.Font = new Font("Segoe UI Variable", 14F, FontStyle.Bold);
             b.Size = size;
             b.Location = location;
-            b.BackColor = Accent;
-            b.ForeColor = Color.White;
-            b.FlatStyle = FlatStyle.Flat;
-            b.FlatAppearance.BorderSize = 0;
-            b.FlatAppearance.MouseOverBackColor = AccentHover;
+            b.GradientStart = Accent;
+            b.GradientEnd = AccentHover;
             b.TextAlign = ContentAlignment.MiddleCenter;
-
-            b.Resize += (s, e) =>
-            {
-                try
-                {
-                    using (var path = new System.Drawing.Drawing2D.GraphicsPath())
-                    {
-                        int r = 12; var rect = new Rectangle(0, 0, b.Width, b.Height);
-                        path.AddArc(rect.X, rect.Y, r, r, 180, 90);
-                        path.AddArc(rect.Right - r, rect.Y, r, r, 270, 90);
-                        path.AddArc(rect.Right - r, rect.Bottom - r, r, r, 0, 90);
-                        path.AddArc(rect.X, rect.Bottom - r, r, r, 90, 90);
-                        path.CloseFigure();
-                        b.Region = new Region(path);
-                    }
-                }
-                catch { }
-            };
-
-            b.PerformLayout();
         }
 
         private void btnKassenbuch_Click(object sender, EventArgs e)
