@@ -71,10 +71,20 @@ namespace TaMi_Automatenclient
         private void InitializeLayout()
         {
             StartPosition = FormStartPosition.CenterParent;
-            var title = $"Einzahlungen: {_kassenName} (FID: {_firmenId})";
+            var isPersonalGuthaben = _firmenId < 0;
+            var title = $"Einzahlungen: {_kassenName} (FID: {_firmenId})" + (isPersonalGuthaben ? "  [PERSONALGUTHABEN]" : string.Empty);
             SetupDefaultForm("DayViewForm", title, new Size(1800, 900));
             ShowInTaskbar = false;
             AddHeaderPanel(Text, true, true, true);
+
+            if (isPersonalGuthaben)
+            {
+                try
+                {
+                    BackColor = Color.FromArgb(255, 252, 240);
+                }
+                catch { }
+            }
 
             btnLockDay = new ModernGradientButton
             {

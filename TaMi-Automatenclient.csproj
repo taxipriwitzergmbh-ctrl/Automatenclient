@@ -107,6 +107,9 @@
     <Compile Include="Form\MenueForm.cs">
       <SubType>Form</SubType>
     </Compile>
+    <Compile Include="Form\MitarbeiterinfoForm.cs">
+      <SubType>Form</SubType>
+    </Compile>
     <Compile Include="Form\OffeneUebersichtForm.cs">
       <SubType>Form</SubType>
     </Compile>

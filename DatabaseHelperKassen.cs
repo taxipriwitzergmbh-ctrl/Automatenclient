@@ -27,6 +27,7 @@ namespace TaMi_Automatenclient
         private string _tblZahlungen;    // [dbo].[TKassenbuchZahlungen]
         private string _tblFahrzeuge;    // [dbo].[TFahrzeuge] (NEU)
         private string _tblSchichten;    // [dbo].[TSchichten] (NEU)
+        private string _tblNotizen;      // [dbo].[TNotizen] (NEU)
 
 
         public DatabaseHelperKassen()
@@ -109,6 +110,7 @@ namespace TaMi_Automatenclient
             _tblFahrzeuge = await ResolveQualifiedTableAsync("TFahrzeuge") ?? "[dbo].[TFahrzeuge]"; // NEU
             _tblVorlagen  = await ResolveQualifiedTableAsync("TKassenbuchVorlagen") ?? "[dbo].[TKassenbuchVorlagen]"; // NEU
             _tblSchichten = await ResolveQualifiedTableAsync("TSchichten") ?? "[dbo].[TSchichten]"; // NEU
+            _tblNotizen   = await ResolveQualifiedTableAsync("TNotizen") ?? "[dbo].[TNotizen]"; // NEU
 
             using (var cmd = _connection.CreateCommand())
             {
@@ -120,6 +122,80 @@ JOIN sys.columns c ON c.object_id = t.object_id AND c.name = 'Belegnummer'
 WHERE t.name = 'TKassenbuch'";
                 var o = await cmd.ExecuteScalarAsync();
                 _belegIstIdentity = (o != null && o != DBNull.Value) && Convert.ToBoolean(o);
+            }
+
+        }
+
+        // --- Notizen (Mitarbeiterinfo) ---
+        public async Task<DataTable> GetNotizenByRelTypAsync(byte relTyp, bool includeArchived = false)
+        {
+            await EnsureOpenAsync();
+            using (var cmd = _connection.CreateCommand())
+            {
+                cmd.CommandText = $@"
+ SELECT NotizID, Flags, RelTyp, RelID, Datum, Text, ZeitAnlage, UserAnlage, ZeitBearbeitet, UserBearbeitet, GueltigBis
+ FROM {_tblNotizen} WITH (NOLOCK)
+ WHERE RelTyp = @RelTyp
+   AND (@IncludeArchived = 1 OR (ISNULL(Flags,0) & 1) = 0)
+   AND (ISNULL(Flags,0) & 2) = 0
+ ORDER BY Datum DESC";
+                cmd.Parameters.AddWithValue("@RelTyp", relTyp);
+                cmd.Parameters.AddWithValue("@IncludeArchived", includeArchived ? 1 : 0);
+                using (var rdr = await cmd.ExecuteReaderAsync())
+                {
+                    var dt = new DataTable();
+                    dt.Load(rdr);
+                    return dt;
+                }
+            }
+        }
+
+        public async Task<int> InsertNotizAsync(byte relTyp, string relId, DateTime datum, string text, short flags = 0, DateTime? gueltigBis = null)
+        {
+            await EnsureOpenAsync();
+            using (var cmd = _connection.CreateCommand())
+            {
+                // NotizID wird nicht automatisch vergeben -> immer MAX + 1 (mit Locks gegen Parallelität)
+                int newId = 1;
+                using (var cmdId = _connection.CreateCommand())
+                {
+                    cmdId.CommandText = $@"SELECT ISNULL(MAX(NotizID),0)+1 FROM {_tblNotizen} WITH (UPDLOCK, HOLDLOCK)";
+                    var oId = await cmdId.ExecuteScalarAsync();
+                    try { newId = (oId == null || oId == DBNull.Value) ? 1 : Convert.ToInt32(oId); } catch { newId = 1; }
+                }
+
+                cmd.CommandText = $@"
+INSERT INTO {_tblNotizen} (NotizID, Flags, RelTyp, RelID, Datum, Text, ZeitAnlage, UserAnlage, GueltigBis)
+VALUES (@NotizID, @Flags, @RelTyp, @RelID, @Datum, @Text, GETDATE(), @UserAnlage, @GueltigBis);
+SELECT @NotizID;";
+                cmd.Parameters.AddWithValue("@NotizID", newId);
+                cmd.Parameters.AddWithValue("@Flags", flags);
+                cmd.Parameters.AddWithValue("@RelTyp", relTyp);
+                cmd.Parameters.AddWithValue("@RelID", (object)relId ?? string.Empty);
+                cmd.Parameters.AddWithValue("@Datum", datum);
+                cmd.Parameters.AddWithValue("@Text", (object)text ?? string.Empty);
+                int userId = -1;
+                try { if (Program.MainTaMiClient != null) userId = Program.MainTaMiClient.UserId; } catch { userId = -1; }
+                cmd.Parameters.AddWithValue("@UserAnlage", userId);
+                var gb = gueltigBis ?? new DateTime(1900, 1, 1);
+                cmd.Parameters.AddWithValue("@GueltigBis", gb);
+                var o = await cmd.ExecuteScalarAsync();
+                if (o == null || o == DBNull.Value) return 0;
+                return Convert.ToInt32(o);
+            }
+        }
+
+        public async Task<int> ArchiveNotizAsync(int notizId)
+        {
+            await EnsureOpenAsync();
+            using (var cmd = _connection.CreateCommand())
+            {
+                cmd.CommandText = $@"UPDATE {_tblNotizen} SET Flags = ISNULL(Flags,0) | 1, ZeitBearbeitet = GETDATE(), UserBearbeitet = @User WHERE NotizID = @Id";
+                cmd.Parameters.AddWithValue("@Id", notizId);
+                int userId = -1;
+                try { if (Program.MainTaMiClient != null) userId = Program.MainTaMiClient.UserId; } catch { userId = -1; }
+                cmd.Parameters.AddWithValue("@User", userId);
+                return await cmd.ExecuteNonQueryAsync();
             }
         }
 

@@ -19,6 +19,7 @@ namespace TaMi_Automatenclient
         private ModernGradientButton btnPersonal;
         private ModernGradientButton btnZahlungen;
         private ModernGradientButton btnOffene;
+        private ModernGradientButton btnMitarbeiterinfo;
         private ModernGradientButton btnUpdateHints; // NEW
         private Label lblBuildInfo;
 
@@ -46,7 +47,7 @@ namespace TaMi_Automatenclient
 
         private void BuildUI()
         {
-            this.SetupDefaultForm("MenueForm", "Automaten-Client", new Size(500, 580));
+            this.SetupDefaultForm("MenueForm", "Automaten-Client", new Size(500, 660));
             ShowInTaskbar = true;
 
             this.btnKassenbuch = new ModernGradientButton();
@@ -54,6 +55,7 @@ namespace TaMi_Automatenclient
             this.btnPersonal = new ModernGradientButton();
             this.btnZahlungen = new ModernGradientButton();
             this.btnOffene = new ModernGradientButton();
+            this.btnMitarbeiterinfo = new ModernGradientButton();
             this.btnUpdateHints = new ModernGradientButton();
             this.lblBuildInfo = new Label();
 
@@ -85,8 +87,12 @@ namespace TaMi_Automatenclient
             this.btnOffene.TabIndex = 4;
             this.btnOffene.Click += (s, e) => { using (var f = new OffeneUebersichtForm()) f.ShowDialog(this); };
 
-            StylePrimaryButton(this.btnUpdateHints, "Update", new Point(x, y + (h + padY) * 5), new Size(w, h));
-            this.btnUpdateHints.TabIndex = 5;
+            StylePrimaryButton(this.btnMitarbeiterinfo, "Mitarbeiterinfo", new Point(x, y + (h + padY) * 5), new Size(w, h));
+            this.btnMitarbeiterinfo.TabIndex = 5;
+            this.btnMitarbeiterinfo.Click += (s, e) => { using (var f = new MitarbeiterinfoForm()) f.ShowDialog(this); };
+
+            StylePrimaryButton(this.btnUpdateHints, "Update", new Point(x, y + (h + padY) * 6), new Size(w, h));
+            this.btnUpdateHints.TabIndex = 6;
             this.btnUpdateHints.GradientStart = UiTheme.SuccessStart;
             this.btnUpdateHints.GradientEnd = UiTheme.SuccessEnd;
             this.btnUpdateHints.Click += (s, e) =>
@@ -102,6 +108,7 @@ namespace TaMi_Automatenclient
             this.Controls.Add(this.btnPersonal);
             this.Controls.Add(this.btnZahlungen);
             this.Controls.Add(this.btnOffene);
+            this.Controls.Add(this.btnMitarbeiterinfo);
             this.Controls.Add(this.btnUpdateHints);
 
             try
