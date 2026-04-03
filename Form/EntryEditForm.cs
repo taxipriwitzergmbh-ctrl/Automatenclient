@@ -5,7 +5,7 @@ using System.Runtime.InteropServices;
 using System.Windows.Forms;
 using System.Drawing.Drawing2D;
 using System.Threading.Tasks;
-using System.Data.SqlClient; // FhzId-Lookup f�r Schicht
+using System.Data.SqlClient; // FhzId-Lookup für Schicht
 using TaMi_Automatenclient.UI.Layout;
 
 namespace TaMi_Automatenclient
@@ -37,11 +37,11 @@ namespace TaMi_Automatenclient
         private readonly string _belegnummer;
         private readonly string _kassenBelegnummer;
 
-        // Zusatz: Schicht/Fahrzeug-Kontext f�r Rules
+        // Zusatz: Schicht/Fahrzeug-Kontext für Rules
         private int? _schichtId;
         private int? _fhzId; // wird lazy geladen
 
-        // Flags zum Steuern der Regel�berschreibung und zur Erkennung von Benutzereingaben
+        // Flags zum Steuern der Regelüberschreibung und zur Erkennung von Benutzereingaben
         private bool _applyingRules;
         private bool _dirtyK1, _dirtyK2, _dirtyKto, _dirtyTxt;
 
@@ -65,7 +65,7 @@ namespace TaMi_Automatenclient
             _typ = typ ?? string.Empty;
             _belegnummer = belegnummer ?? string.Empty;
             _kassenBelegnummer = kassenBelegnummer ?? string.Empty;
-            // SchichtId ggf. merken (f�r FhzId-Aufl�sung)
+            // SchichtId ggf. merken (für FhzId-Auflösung)
             if (int.TryParse((schichtId ?? string.Empty).Trim(), out var sid) && sid > 0) _schichtId = sid; else _schichtId = null;
 
             Text = "Buchung bearbeiten";
@@ -85,7 +85,7 @@ namespace TaMi_Automatenclient
             {
                 if (e.Control && e.KeyCode == Keys.A)
                 {
-                    // Direktes Bearbeiten in der Datenbank ausf�hren
+                    // Direktes Bearbeiten in der Datenbank ausführen
                     if (TryCommit())
                     {
                         try
@@ -171,7 +171,7 @@ namespace TaMi_Automatenclient
             _txtKonto = new TextBox { Left = left + labelW + 10, Top = top - 4, Width = 140, Text = vorhandenKonto ?? string.Empty, TabIndex = 3 };
             Controls.Add(_txtKonto); top += gapY;
 
-            // Dirty-Flags setzen, aber nur wenn der Nutzer tippt (nicht w�hrend ApplyRulesAsync)
+            // Dirty-Flags setzen, aber nur wenn der Nutzer tippt (nicht während ApplyRulesAsync)
             _txtBuchungstext.TextChanged += (s, e) => { if (!_applyingRules) _dirtyTxt = true; };
             _txtKost1.TextChanged += (s, e) => { if (!_applyingRules) _dirtyK1 = true; };
             _txtKost2.TextChanged += (s, e) => { if (!_applyingRules) _dirtyK2 = true; };
@@ -203,7 +203,7 @@ namespace TaMi_Automatenclient
             _footer.Controls.AddRange(new Control[] { _btnSave, _btnCancel });
         }
 
-        // L�dt ggf. FhzId und wendet danach Regeln an
+        // Lädt ggf. FhzId und wendet danach Regeln an
         private async Task LoadContextAndApplyRulesAsync()
         {
             await EnsureFhzIdLoadedAsync();

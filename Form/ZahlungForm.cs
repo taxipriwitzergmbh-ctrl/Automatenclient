@@ -88,7 +88,7 @@ namespace TaMi_Automatenclient
 
         private void BuildUI()
         {
-            // Breite erh�ht (vorher 760)
+            // Breite erhöht (vorher 760)
             DoubleBuffered = true;
             KeyPreview = true;
             KeyDown += ZahlungForm_KeyDown;
@@ -112,7 +112,7 @@ namespace TaMi_Automatenclient
                 {
                     txtPid.Text = drv["PID"].ToString();
                     bool ges=false; try{ if(drv.Row.Table.Columns.Contains("Gesperrt") && drv["Gesperrt"]!=DBNull.Value) ges=Convert.ToBoolean(drv["Gesperrt"]);}catch{}
-                    _currentSelectedGesperrt=ges; lblSelName.Text = ges?"Mitarbeiter gesperrt: "+drv["Name"]:"Ausgew�hlt: "+drv["Name"];
+                    _currentSelectedGesperrt=ges; lblSelName.Text = ges?"Mitarbeiter gesperrt: "+drv["Name"]:"Ausgewählt: "+drv["Name"];
                     await LoadOpenPaymentsAsync();
                 }
             };
@@ -127,12 +127,12 @@ namespace TaMi_Automatenclient
             btnCreatePreset.Click += (s,e)=> ShowPresetOverlay(); content.Controls.Add(btnCreatePreset);
             content.Controls.Add(new Label{ Text="Typ:", Left=24, Top=y+80+6, Width=labelW });
             cboTyp = new ComboBox { Left=24+labelW, Top=y+80, Width=160, DropDownStyle=ComboBoxStyle.DropDownList };
-            cboTyp.Items.AddRange(new object[]{"Bitte ausw�hlen","Einzahlung","Auszahlung"}); cboTyp.SelectedIndex=0; content.Controls.Add(cboTyp);
+            cboTyp.Items.AddRange(new object[]{"Bitte auswählen","Einzahlung","Auszahlung"}); cboTyp.SelectedIndex=0; content.Controls.Add(cboTyp);
             content.Controls.Add(new Label{ Text="MwSt:", Left=cboTyp.Right+20, Top=y+80+6, Width=50 });
             cboMwst = new ComboBox { Left=cboTyp.Right+20+50, Top=y+80, Width=80, DropDownStyle=ComboBoxStyle.DropDownList };
-            cboMwst.Items.AddRange(new object[]{"Bitte ausw�hlen","19","7","0"}); cboMwst.SelectedIndex=0; content.Controls.Add(cboMwst);
+            cboMwst.Items.AddRange(new object[]{"Bitte auswählen","19","7","0"}); cboMwst.SelectedIndex=0; content.Controls.Add(cboMwst);
 
-            // NEU: Betrag vor Firma und gr��ere Breiten
+            // NEU: Betrag vor Firma und größere Breiten
             int betragLabelLeft = cboMwst.Right + 30;
             content.Controls.Add(new Label{ Text="Betrag:", Left=betragLabelLeft, Top=y+80+6, Width=55 });
             nudAmount = new NumericUpDown { Left=betragLabelLeft + 55, Top=y+80, Width=100, DecimalPlaces=2, Maximum=1000000, Minimum=-1000000, Increment=0.10M }; // schmaler
@@ -213,7 +213,7 @@ namespace TaMi_Automatenclient
                 using(var db=new DatabaseHelperKassen())
                 {
                     var dt=await db.LoadZahlungsVorlagenAsync();
-                    _suppressPresetEvents=true; cboPreset.Items.Clear(); cboPreset.Items.Add(new PresetListItem{ Text="Vorlage ausw�hlen", Row=null});
+                    _suppressPresetEvents=true; cboPreset.Items.Clear(); cboPreset.Items.Add(new PresetListItem{ Text="Vorlage auswählen", Row=null});
                     foreach(DataRow r in dt.Rows){ string name=Convert.ToString(r["VorlagenName"]); if(string.IsNullOrWhiteSpace(name)) continue; cboPreset.Items.Add(new PresetListItem{ Text=name, Row=r}); }
                     cboPreset.SelectedIndex=0; _presetsLoaded=true;
                 }
@@ -231,7 +231,7 @@ namespace TaMi_Automatenclient
                     var dt=await db.GetMandantenAsync();
                     if(!dt.Columns.Contains("ManID")) dt.Columns.Add("ManID",typeof(int));
                     if(!dt.Columns.Contains("ManName")) dt.Columns.Add("ManName",typeof(string));
-                    var ph=dt.NewRow(); ph["ManID"]=0; ph["ManName"]="Bitte ausw�hlen"; dt.Rows.InsertAt(ph,0);
+                    var ph=dt.NewRow(); ph["ManID"]=0; ph["ManName"]="Bitte auswählen"; dt.Rows.InsertAt(ph,0);
                     cboFirma.DisplayMember="ManName"; cboFirma.ValueMember="ManID"; cboFirma.DataSource=dt; cboFirma.SelectedIndex=0; _mandantenLoaded=true;
                 }
             }
@@ -275,12 +275,12 @@ namespace TaMi_Automatenclient
         private bool ValidateEntry(bool editing, out string msg)
         {
             if(_currentSelectedGesperrt){ msg="Mitarbeiter gesperrt."; return false; }
-            if(!int.TryParse(txtPid.Text.Trim(), out var pid) || pid<=0){ msg="Personalnummer ung�ltig."; return false; }
-            if(cboTyp.SelectedIndex<=0){ msg="Bitte Typ ausw�hlen."; return false; }
-            if(cboMwst.SelectedIndex<=0){ msg="Bitte MwSt ausw�hlen."; return false; }
-            if(cboFirma.SelectedIndex<=0){ msg="Bitte Firma ausw�hlen."; return false; }
+            if(!int.TryParse(txtPid.Text.Trim(), out var pid) || pid<=0){ msg="Personalnummer ungültig."; return false; }
+            if(cboTyp.SelectedIndex<=0){ msg="Bitte Typ auswählen."; return false; }
+            if(cboMwst.SelectedIndex<=0){ msg="Bitte MwSt auswählen."; return false; }
+            if(cboFirma.SelectedIndex<=0){ msg="Bitte Firma auswählen."; return false; }
             if(string.IsNullOrWhiteSpace(txtText.Text)){ msg="Buchungstext fehlt."; return false; }
-            if(editing && !_editBeleg.HasValue){ msg="Keine Zahlung gew�hlt."; return false; }
+            if(editing && !_editBeleg.HasValue){ msg="Keine Zahlung gewählt."; return false; }
             msg=null; return true;
         }
 
@@ -315,19 +315,19 @@ namespace TaMi_Automatenclient
             btnSaveChanges.Enabled = _editBeleg.HasValue;
         }
 
-        // --- �nderungen speichern ---
+        // --- Änderungen speichern ---
         private async Task SaveEditedPaymentAsync()
         {
             if(!ValidateEntry(true, out var msg)){ if(msg!=null) MessageBox.Show(this,msg,"Hinweis",MessageBoxButtons.OK,MessageBoxIcon.Information); return; }
             if(!_editBeleg.HasValue) return; string typText=cboTyp.SelectedItem as string; string typCode=MapTypTextToCode(typText); string mwst=cboMwst.SelectedItem as string; decimal amount=nudAmount.Value; decimal b19=0,b7=0,b0=0; if(mwst=="19") b19=amount; else if(mwst=="7") b7=amount; else b0=amount; int? k1=int.TryParse(txtK1.Text,out var vk1)?(int?)vk1:null; int? k2=int.TryParse(txtK2.Text,out var vk2)?(int?)vk2:null; int? kto=int.TryParse(txtKto.Text,out var vkto)?(int?)vkto:null; int fid=0; try{ fid=Convert.ToInt32(cboFirma.SelectedValue);}catch{}
-            try{ using(var db=new DatabaseHelperKassen()){ int n=await db.UpdateOffeneZahlungAsync(_editBeleg.Value, typCode, txtText.Text.Trim(), b19,b7,b0, k1,k2,kto); if(n<=0){ MessageBox.Show(this,"�nderung nicht m�glich (evtl. verbucht).","Hinweis",MessageBoxButtons.OK,MessageBoxIcon.Information); return; } } lblInfo.Text="�nderungen gespeichert."; _editBeleg=null; btnSaveChanges.Enabled=false; await LoadOpenPaymentsAsync(); }
+            try{ using(var db=new DatabaseHelperKassen()){ int n=await db.UpdateOffeneZahlungAsync(_editBeleg.Value, typCode, txtText.Text.Trim(), b19,b7,b0, k1,k2,kto); if(n<=0){ MessageBox.Show(this,"Änderung nicht möglich (evtl. verbucht).","Hinweis",MessageBoxButtons.OK,MessageBoxIcon.Information); return; } } lblInfo.Text="Änderungen gespeichert."; _editBeleg=null; btnSaveChanges.Enabled=false; await LoadOpenPaymentsAsync(); }
             catch(Exception ex){ MessageBox.Show(this,"Fehler beim Speichern: "+ex.Message,"Fehler",MessageBoxButtons.OK,MessageBoxIcon.Error);} }
 
         // --- Storno ---
         private async Task StorniereAuswahlAsync()
         {
-            if(dgvOpen?.CurrentRow==null) return; var row=(dgvOpen.CurrentRow.DataBoundItem as DataRowView)?.Row; if(row==null) return; if(!row.Table.Columns.Contains("Belegnummer")) return; int beleg=0; try{ beleg=Convert.ToInt32(row["Belegnummer"]);}catch{} if(beleg<=0) return; if(MessageBox.Show(this,$"Zahlung {beleg} wirklich stornieren?","Best�tigung",MessageBoxButtons.YesNo,MessageBoxIcon.Question)!=DialogResult.Yes) return;
-            try{ using(var db=new DatabaseHelperKassen()) { int n=await db.StorniereOffeneZahlungAsync(beleg); if(n<=0){ MessageBox.Show(this,"Storno nicht m�glich (evtl. verbucht).","Hinweis",MessageBoxButtons.OK,MessageBoxIcon.Information); return; } } await LoadOpenPaymentsAsync(); }
+            if(dgvOpen?.CurrentRow==null) return; var row=(dgvOpen.CurrentRow.DataBoundItem as DataRowView)?.Row; if(row==null) return; if(!row.Table.Columns.Contains("Belegnummer")) return; int beleg=0; try{ beleg=Convert.ToInt32(row["Belegnummer"]);}catch{} if(beleg<=0) return; if(MessageBox.Show(this,$"Zahlung {beleg} wirklich stornieren?","Bestätigung",MessageBoxButtons.YesNo,MessageBoxIcon.Question)!=DialogResult.Yes) return;
+            try{ using(var db=new DatabaseHelperKassen()) { int n=await db.StorniereOffeneZahlungAsync(beleg); if(n<=0){ MessageBox.Show(this,"Storno nicht möglich (evtl. verbucht).","Hinweis",MessageBoxButtons.OK,MessageBoxIcon.Information); return; } } await LoadOpenPaymentsAsync(); }
             catch(Exception ex){ MessageBox.Show(this,"Fehler beim Stornieren: "+ex.Message,"Fehler",MessageBoxButtons.OK,MessageBoxIcon.Error);} }
 
         // --- Grid ---
@@ -386,7 +386,7 @@ namespace TaMi_Automatenclient
                     {
                         if(Convert.ToInt32(cboMitarbeiter.SelectedValue ?? -1)!=pid) cboMitarbeiter.SelectedValue=pid;
                         bool ges=false; try{ if(r.Table.Columns.Contains("Gesperrt") && r["Gesperrt"]!=DBNull.Value) ges=Convert.ToBoolean(r["Gesperrt"]);}catch{}
-                        _currentSelectedGesperrt=ges; lblSelName.Text = ges?"Mitarbeiter gesperrt: "+r["Name"]:"Ausgew�hlt: "+r["Name"];
+                        _currentSelectedGesperrt=ges; lblSelName.Text = ges?"Mitarbeiter gesperrt: "+r["Name"]:"Ausgewählt: "+r["Name"];
                         await LoadOpenPaymentsAsync(); return;
                     }
                 }
@@ -396,7 +396,7 @@ namespace TaMi_Automatenclient
                 var p = await db.GetPersonalInfoAsync(pid);
                 if(p!=null)
                 {
-                    _currentSelectedGesperrt=false; lblSelName.Text=$"Ausgew�hlt: {p.Name} {p.Vorname}";
+                    _currentSelectedGesperrt=false; lblSelName.Text=$"Ausgewählt: {p.Name} {p.Vorname}";
                 }
                 else
                 {
@@ -462,7 +462,7 @@ namespace TaMi_Automatenclient
 
             var btnNeu = new Button { Text = "Neu", Left = 24, Width = 80, Height = 34, Top = body.Height - 46, Anchor = AnchorStyles.Left | AnchorStyles.Bottom, BackColor = Accent, ForeColor = Color.White, FlatStyle = FlatStyle.Flat };
             btnNeu.FlatAppearance.BorderSize = 0;
-            var btnDelete = new Button { Text = "L�schen", Left = btnNeu.Right + 8, Width = 90, Height = 34, Top = body.Height - 46, Anchor = AnchorStyles.Left | AnchorStyles.Bottom, BackColor = Color.FromArgb(229, 57, 53), ForeColor = Color.White, FlatStyle = FlatStyle.Flat };
+            var btnDelete = new Button { Text = "Löschen", Left = btnNeu.Right + 8, Width = 90, Height = 34, Top = body.Height - 46, Anchor = AnchorStyles.Left | AnchorStyles.Bottom, BackColor = Color.FromArgb(229, 57, 53), ForeColor = Color.White, FlatStyle = FlatStyle.Flat };
             btnDelete.FlatAppearance.BorderSize = 0; body.Controls.Add(btnNeu); body.Controls.Add(btnDelete);
 
             int baseX = 270; int wLabel = 70; int curY = 14; int spacing = 30;
@@ -549,12 +549,12 @@ namespace TaMi_Automatenclient
             btnDelete.Click += async (s, e) =>
             {
                 if (!(lst.SelectedItem is PresetListItem ciDel) || editBeleg == null) return;
-                if (MessageBox.Show(dlg, "Vorlage wirklich l�schen?", "Best�tigung", MessageBoxButtons.YesNo, MessageBoxIcon.Question) != DialogResult.Yes) return;
+                if (MessageBox.Show(dlg, "Vorlage wirklich löschen?", "Bestätigung", MessageBoxButtons.YesNo, MessageBoxIcon.Question) != DialogResult.Yes) return;
                 try
                 {
                     using (var db = new DatabaseHelperKassen()) await db.UpdateZahlungsVorlageAsync(editBeleg.Value, "Einzahlung", "Vorlage", string.Empty, null, null, null, "19", 0);
                 }
-                catch (Exception ex) { MessageBox.Show(dlg, "L�schen fehlgeschlagen: " + ex.Message, "Fehler", MessageBoxButtons.OK, MessageBoxIcon.Error); return; }
+                catch (Exception ex) { MessageBox.Show(dlg, "Löschen fehlgeschlagen: " + ex.Message, "Fehler", MessageBoxButtons.OK, MessageBoxIcon.Error); return; }
                 await loadListAsync(); clearFields();
             };
             tbName.TextChanged += (s, e) => btnSave.Enabled = !string.IsNullOrWhiteSpace(tbName.Text);
@@ -586,7 +586,7 @@ namespace TaMi_Automatenclient
             dlg.Dispose();
         }
 
-        // Hilfsmethoden f�r Typ-Mapping (minimalinvasiv)
+        // Hilfsmethoden für Typ-Mapping (minimalinvasiv)
         private static string MapTypTextToCode(string text)
         {
             if (string.IsNullOrWhiteSpace(text)) return string.Empty;
@@ -594,7 +594,7 @@ namespace TaMi_Automatenclient
             {
                 case "einzahlung": return "2";
                 case "auszahlung": return "3";
-                // ggf. weitere Typen sp�ter:
+                // ggf. weitere Typen später:
                 case "anfangsbestand": return "1";
                 case "schichtabrechnung": return "4";
                 case "personalguthaben": return "5";

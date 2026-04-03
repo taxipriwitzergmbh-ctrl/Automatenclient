@@ -13,7 +13,7 @@ namespace TaMi_Automatenclient
     {
         private const int HeaderHeight = UiTheme.HeaderHeight;
 
-        // R�ckgaben
+        // Rückgaben
         public decimal Betrag19 => nud19.Value;
         public decimal Betrag7  => nud7.Value;
         public decimal Betrag0  => nud0.Value;
@@ -56,9 +56,9 @@ namespace TaMi_Automatenclient
         // Kontextanzeige (optional) analog EntryEditForm
         private string _zeit, _schichtIdStr, _fahrerName, _kennzeichen, _belegnummer, _kassenBelegnummer;
         private Label _lblZeit, _lblSchichtId, _lblFahrer, _lblKennzeichen, _lblBelegnummer, _lblKassenBelegnummer;
-        private int _contextInfoHeight; // zus�tzliche H�he oberhalb der Eingabefelder
+        private int _contextInfoHeight; // zusätzliche Höhe oberhalb der Eingabefelder
 
-        // Dirty-Flags pro MwSt-Teil, damit Benutzerwerte nicht �berschrieben werden
+        // Dirty-Flags pro MwSt-Teil, damit Benutzerwerte nicht überschrieben werden
         private bool _applyingRules;
         private bool _d19K1, _d19K2, _d19Kto, _d19Txt;
         private bool _d7K1, _d7K2, _d7Kto, _d7Txt;
@@ -73,8 +73,8 @@ namespace TaMi_Automatenclient
         {
         }
 
-        // Zus�tzlicher Komfort-Konstruktor: Signatur analog EntryEditForm
-        // Dadurch k�nnen bestehende Aufrufer dieselben Parameter verwenden und die Kontextwerte erscheinen direkt.
+        // Zusätzlicher Komfort-Konstruktor: Signatur analog EntryEditForm
+        // Dadurch können bestehende Aufrufer dieselben Parameter verwenden und die Kontextwerte erscheinen direkt.
         // NEU: optionale fhzId aufnehmen, damit fahrzeugbezogene Regeln greifen
         public EntrySplitForm(string zeit, string typ, string buchungstext, string betragGesamt,
             decimal v19, decimal v7, decimal v0,
@@ -87,7 +87,7 @@ namespace TaMi_Automatenclient
             : this(
                 // originalSumme
                 ParseMoneySafe(betragGesamt),
-                // vorhandene Betr�ge zuweisen: wenn keiner gesetzt ist, default auf Gesamt in 19%
+                // vorhandene Beträge zuweisen: wenn keiner gesetzt ist, default auf Gesamt in 19%
                 v19 != 0m ? v19 : 0m,
                 v7  != 0m ? v7  : 0m,
                 v0  != 0m ? v0  : 0m,
@@ -100,7 +100,7 @@ namespace TaMi_Automatenclient
                 // Firmenkontext
                 firmenId,
                 typ ?? string.Empty,
-                // FHZ aus Aufrufer (erm�glicht fahrzeugbezogene Regeln)
+                // FHZ aus Aufrufer (ermöglicht fahrzeugbezogene Regeln)
                 fhzId,
                 // Kontextlabels
                 zeit,
@@ -110,7 +110,7 @@ namespace TaMi_Automatenclient
                 belegnummer,
                 kassenBelegnummer)
         {
-            // Falls keine Einzelbetr�ge �bergeben wurden, alle 0: setze 19% auf Gesamt
+            // Falls keine Einzelbeträge übergeben wurden, alle 0: setze 19% auf Gesamt
             if (v19 == 0m && v7 == 0m && v0 == 0m)
             {
                 try
@@ -124,7 +124,7 @@ namespace TaMi_Automatenclient
             }
         }
 
-        // Neuer �berladener Konstruktor mit Kontextfeldern analog EntryEditForm
+        // Neuer überladener Konstruktor mit Kontextfeldern analog EntryEditForm
         public EntrySplitForm(decimal originalSumme, decimal vorhand19, decimal vorhand7, decimal vorhand0,
             int? startK1, int? startK2, int? startKto, string standardText,
             int firmenId, string typ, int? fhzId,
@@ -158,7 +158,7 @@ namespace TaMi_Automatenclient
             nud7.Value  = _start7;
             nud0.Value  = _start0;
 
-            // Basisgruppe bestimmen: die mit dem gr��ten |Startwert| (bei 0 -> 19)
+            // Basisgruppe bestimmen: die mit dem größten |Startwert| (bei 0 -> 19)
             _baseGroup = "19";
             try
             {
@@ -177,7 +177,7 @@ namespace TaMi_Automatenclient
             if (startK2.HasValue) { txt19_K2.Text = txt7_K2.Text = txt0_K2.Text = startK2.Value.ToString(CultureInfo.InvariantCulture); }
             if (startKto.HasValue){ txt19_Kto.Text= txt7_Kto.Text= txt0_Kto.Text= startKto.Value.ToString(CultureInfo.InvariantCulture); }
 
-            // Beim �ffnen passende Regeln anwenden (pro MwSt-Teil) und vorhandene Werte �berschreiben
+            // Beim öffnen passende Regeln anwenden (pro MwSt-Teil) und vorhandene Werte überschreiben
             Shown += async (s, e) => await ApplyRulesForAllVatsAsync(forceOverwrite: true);
 
             UpdateSumInfo();
@@ -234,7 +234,7 @@ namespace TaMi_Automatenclient
             lblSumInfo = new Label { Left = leftAmt, Top = top + 50, Width = 600, Height = 24, ForeColor = Color.DimGray };
             Controls.Add(lblSumInfo);
 
-            // Dirty-Flags setzen, wenn der Benutzer die Felder �ndert
+            // Dirty-Flags setzen, wenn der Benutzer die Felder ändert
             txt19_K1.TextChanged += (s, e) => { if (!_applyingRules) _d19K1 = true; };
             txt19_K2.TextChanged += (s, e) => { if (!_applyingRules) _d19K2 = true; };
             txt19_Kto.TextChanged += (s, e) => { if (!_applyingRules) _d19Kto = true; };
@@ -270,7 +270,7 @@ namespace TaMi_Automatenclient
             };
         }
 
-        // Baut optionale Kontextinformation analog EntryEditForm �ber dem Inhalt
+        // Baut optionale Kontextinformation analog EntryEditForm über dem Inhalt
         private void BuildContextInfo()
         {
             _contextInfoHeight = 0;
@@ -299,10 +299,10 @@ namespace TaMi_Automatenclient
             _lblKassenBelegnummer = new Label { Text = _kassenBelegnummer ?? string.Empty, Left = left + labelW + 10, Top = top, Width = 280 }; top += gapY;
             Controls.Add(_lblKassenBelegnummer);
 
-            _contextInfoHeight = (top - (HeaderHeight + 8)) + 10; // H�he des Blocks merken
+            _contextInfoHeight = (top - (HeaderHeight + 8)) + 10; // Höhe des Blocks merken
         }
 
-        // �ffentliche Methode zum Setzen/Aktualisieren des Kontextes nach der Instanziierung
+        // öffentliche Methode zum Setzen/Aktualisieren des Kontextes nach der Instanziierung
         public void SetContext(string zeit, string schichtId, string fahrerName, string kennzeichen, string belegnummer, string kassenBelegnummer)
         {
             _zeit = zeit ?? string.Empty;
@@ -342,7 +342,7 @@ namespace TaMi_Automatenclient
         private TextBox CreateTextBox(int left, int top) => new TextBox { Left = left, Top = top, Width = 340 };
 
         // Rechnet IMMER die Basisgruppe aus: Base = OriginalSumme - (Summe der anderen beiden).
-        // Damit wird stets �vom Ursprung abgezogen/aufgeschlagen�, positiv wie negativ.
+        // Damit wird stets vom Ursprung abgezogen/aufgeschlagen, positiv wie negativ.
         private void AdjustBaseAfterChange(string changed)
         {
             if (_updating) return;
@@ -404,7 +404,7 @@ namespace TaMi_Automatenclient
                 if (group == "19")
                 {
                     var amt = Betrag19;
-                    if (amt <= 0m) amt = 0.01m; // Minimalwert, damit Regeln mit "> 0" matchen (nur f�r Matching)
+                    if (amt <= 0m) amt = 0.01m; // Minimalwert, damit Regeln mit "> 0" matchen (nur für Matching)
                     b19 = amt;
                 }
                 else if (group == "7")

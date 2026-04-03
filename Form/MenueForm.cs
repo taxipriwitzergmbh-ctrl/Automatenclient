@@ -1,4 +1,4 @@
-using SuE.TaMi;
+ï»¿using SuE.TaMi;
 using System;
 using System.Drawing;
 using System.Drawing.Drawing2D;
@@ -83,7 +83,7 @@ namespace TaMi_Automatenclient
             this.btnZahlungen.TabIndex = 3;
             this.btnZahlungen.Click += (s, e) => { using (var f = new ZahlungForm()) f.ShowDialog(this); };
 
-            StylePrimaryButton(this.btnOffene, "Offene Übersicht", new Point(x, y + (h + padY) * 4), new Size(w, h));
+            StylePrimaryButton(this.btnOffene, "Offene Ãœbersicht", new Point(x, y + (h + padY) * 4), new Size(w, h));
             this.btnOffene.TabIndex = 4;
             this.btnOffene.Click += (s, e) => { using (var f = new OffeneUebersichtForm()) f.ShowDialog(this); };
 
@@ -118,7 +118,7 @@ namespace TaMi_Automatenclient
                 DateTime buildDt;
                 try { buildDt = File.GetLastWriteTime(asmPath); }
                 catch { buildDt = DateTime.Now; }
-                string info = $"Version {version} • Build {buildDt:dd.MM.yyyy HH:mm}";
+                string info = $"Version {version} - Build {buildDt:dd.MM.yyyy HH:mm}";
 
                 lblBuildInfo.AutoSize = true;
                 lblBuildInfo.Text = info;
@@ -162,7 +162,7 @@ namespace TaMi_Automatenclient
 
         private void btnKassenbuch_Click(object sender, EventArgs e)
         {
-            var kassenuebersichtForm = new KassenübersichtForm();
+            var kassenuebersichtForm = new KassenÃ¼bersichtForm();
             kassenuebersichtForm.ShowDialog(this);
         }
     }
