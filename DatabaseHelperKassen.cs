@@ -5,101 +5,90 @@ using System.Data.SqlClient;
 using System.IO;
 using System.Threading.Tasks;
 
-namespace TaMi_Automatenclient
-{
-    public sealed class DatabaseHelperKassen : IDisposable
-    {
+namespace TaMi_Automatenclient {
+    public sealed class DatabaseHelperKassen : IDisposable {
         private SqlConnection _connection;
-
-        private string  _tblKassenbuch;     // z. B. [dbo].[TKassenbuch]
-        private string  _tblMandanten;      // z. B. [dbo].[TMandanten]
-        private bool?   _belegIstIdentity;  // true, falls Belegnummer Identity ist
-        private string  _tblDevices;        // NEU: [dbo].[TKassenbuchDevice]
-        private string  _tblVorlagen;       // NEU: [dbo].[TKassenbuchVorlagen]
-
+        private string _tblKassenbuch; // z. B. [dbo].[TKassenbuch]
+        private string _tblMandanten; // z. B. [dbo].[TMandanten]
+        private bool? _belegIstIdentity; // true, falls Belegnummer Identity ist
+        private string _tblDevices; // NEU: [dbo].[TKassenbuchDevice]
+        private string _tblVorlagen; // NEU: [dbo].[TKassenbuchVorlagen]
         // Persistenz der Abrechnungsbedingungen
-        private string  _tblAbrechnungsRegeln;
-        private string  _tblAbrechnungsClauses; // NEU
-
-
+        private string _tblAbrechnungsRegeln;
+        private string _tblAbrechnungsClauses; // NEU
         // Weitere Tabellen
-        private string _tblPersonal;     // [dbo].[TPersonal]
-        private string _tblZahlungen;    // [dbo].[TKassenbuchZahlungen]
-        private string _tblFahrzeuge;    // [dbo].[TFahrzeuge] (NEU)
-        private string _tblSchichten;    // [dbo].[TSchichten] (NEU)
-        private string _tblNotizen;      // [dbo].[TNotizen] (NEU)
+        private string _tblPersonal; // [dbo].[TPersonal]
+        private string _tblZahlungen; // [dbo].[TKassenbuchZahlungen]
+        private string _tblFahrzeuge; // [dbo].[TFahrzeuge] (NEU)
+        private string _tblSchichten; // [dbo].[TSchichten] (NEU)
+        private string _tblNotizen; // [dbo].[TNotizen] (NEU)
 
 
-        public DatabaseHelperKassen()
-        {
+        public DatabaseHelperKassen() {
             // lazily opened in EnsureOpenAsync; keep ctor lightweight
         }
 
-        public static string GetConnectionString()
-        {
+        public static string GetConnectionString() {
             // Primär: aus MainTaMiClient (wenn in TaMi-Kassenclient ausgeführt)
-            try
-            {
-                if (Program.MainTaMiClient != null && !string.IsNullOrWhiteSpace(Program.MainTaMiClient.DatabaseConnectionStr))
-                    return Program.MainTaMiClient.DatabaseConnectionStr;
+            try {
+                if (Program.MainTaMiClient != null && !string.IsNullOrWhiteSpace(Program.MainTaMiClient.DatabaseConnectionStr)) return Program.MainTaMiClient.DatabaseConnectionStr;
             }
-            catch { }
 
+            catch {
+            }
             // Fallback: INI wie im Geldautomat-Client lesen
-            try
-            {
+            try {
                 string iniPath = @"C:\\ProgramData\\SuE-Software\\SuE-TaMi Client SQL\\TaMi Client.ini";
                 string server = "localhost,1433";
-                if (System.IO.File.Exists(iniPath))
-                {
-                    foreach (var line in System.IO.File.ReadAllLines(iniPath))
-                    {
+
+                if (System.IO.File.Exists(iniPath)) {
+                    foreach (var line in System.IO.File.ReadAllLines(iniPath)) {
                         var trimmed = (line ?? string.Empty).Trim();
-                        if (!trimmed.StartsWith("#") && trimmed.StartsWith("Server=", StringComparison.OrdinalIgnoreCase))
-                        {
+
+                        if (!trimmed.StartsWith("#") && trimmed.StartsWith("Server=", StringComparison.OrdinalIgnoreCase)) {
                             server = trimmed.Substring("Server=".Length);
                             break;
                         }
                     }
                 }
+
                 string user = "TaMiCli";
                 string password = "tami";
                 string dbName = "SuE-TaMi";
                 return $"Data Source={server};Initial Catalog={dbName};User ID={user};Password={password};Network Library=DBMSSOCN;";
             }
-            catch { }
 
+            catch {
+            }
             // Letzter Rückfall: lokale Standardwerte
             return "Data Source=localhost,1433;Initial Catalog=SuE-TaMi;User ID=TaMiCli;Password=tami;Network Library=DBMSSOCN;";
         }
 
-        private async Task EnsureOpenAsync()
-        {
-            if (_connection == null)
-            {
-                try
-                {
-                    if (Program.MainTaMiClient != null)
-                        _connection = Program.MainTaMiClient.OpenTaMiDB(true);
+        private async Task EnsureOpenAsync() {
+            if (_connection == null) {
+                try {
+                    if (Program.MainTaMiClient != null) _connection = Program.MainTaMiClient.OpenTaMiDB(true);
                 }
-                catch { _connection = null; }
 
-                if (_connection == null)
-                {
-                    try { _connection = new SqlConnection(GetConnectionString()); }
-                    catch { }
+                catch {
+                    _connection = null;
+                }
+
+                if (_connection == null) {
+                    try {
+                        _connection = new SqlConnection(GetConnectionString());
+                    }
+
+                    catch {
+                    }
                 }
             }
 
-            if (_connection.State != ConnectionState.Open)
-                await _connection.OpenAsync();
-
-            if (_tblKassenbuch == null)
-                await ResolveObjectNamesAsync();
+            if (_connection.State != ConnectionState.Open) await _connection.OpenAsync();
+            if (_tblKassenbuch == null) await ResolveObjectNamesAsync();
         }
 
-        private async Task ResolveObjectNamesAsync()
-        {
+        private async Task ResolveObjectNamesAsync() {
             _tblKassenbuch = await ResolveQualifiedTableAsync("TKassenbuch") ?? "[dbo].[TKassenbuch]";
             _tblMandanten = await ResolveQualifiedTableAsync("TMandanten") ?? "[dbo].[TMandanten]";
             _tblDevices = await ResolveQualifiedTableAsync("TKassenbuchDevice") ?? "[dbo].[TKassenbuchDevice]"; // neu
@@ -108,293 +97,286 @@ namespace TaMi_Automatenclient
             _tblPersonal = await ResolveQualifiedTableAsync("TPersonal") ?? "[dbo].[TPersonal]";
             _tblZahlungen = await ResolveQualifiedTableAsync("TKassenbuchZahlungen") ?? "[dbo].[TKassenbuchZahlungen]";
             _tblFahrzeuge = await ResolveQualifiedTableAsync("TFahrzeuge") ?? "[dbo].[TFahrzeuge]"; // NEU
-            _tblVorlagen  = await ResolveQualifiedTableAsync("TKassenbuchVorlagen") ?? "[dbo].[TKassenbuchVorlagen]"; // NEU
+            _tblVorlagen = await ResolveQualifiedTableAsync("TKassenbuchVorlagen") ?? "[dbo].[TKassenbuchVorlagen]"; // NEU
             _tblSchichten = await ResolveQualifiedTableAsync("TSchichten") ?? "[dbo].[TSchichten]"; // NEU
-            _tblNotizen   = await ResolveQualifiedTableAsync("TNotizen") ?? "[dbo].[TNotizen]"; // NEU
+            _tblNotizen = await ResolveQualifiedTableAsync("TNotizen") ?? "[dbo].[TNotizen]"; // NEU
 
-            using (var cmd = _connection.CreateCommand())
-            {
-                cmd.CommandText = @"
-SELECT c.is_identity
-FROM sys.tables t
-JOIN sys.schemas s ON s.schema_id = t.schema_id
-JOIN sys.columns c ON c.object_id = t.object_id AND c.name = 'Belegnummer'
-WHERE t.name = 'TKassenbuch'";
-                var o = await cmd.ExecuteScalarAsync();
+            using (var cmd = _connection.CreateCommand()) {
+                cmd .CommandText = @" SELECT c.is_identity FROM sys.tables t JOIN sys.schemas s ON s.schema_id = t.schema_id JOIN sys.columns c ON c.object_id = t.object_id AND c.name = 'Belegnummer' WHERE t.name = 'TKassenbuch'"; var o = await cmd.ExecuteScalarAsync();
                 _belegIstIdentity = (o != null && o != DBNull.Value) && Convert.ToBoolean(o);
             }
-
         }
-
         // --- Notizen (Mitarbeiterinfo) ---
-        public async Task<DataTable> GetNotizenByRelTypAsync(byte relTyp, bool includeArchived = false)
-        {
+        public async Task<DataTable > GetNotizenByRelTypAsync(byte relTyp, bool includeArchived = false) {
             await EnsureOpenAsync();
-            using (var cmd = _connection.CreateCommand())
-            {
-                cmd.CommandText = $@"
- SELECT NotizID, Flags, RelTyp, RelID, Datum, Text, ZeitAnlage, UserAnlage, ZeitBearbeitet, UserBearbeitet, GueltigBis
- FROM {_tblNotizen} WITH (NOLOCK)
- WHERE RelTyp = @RelTyp
-   AND (@IncludeArchived = 1 OR (ISNULL(Flags,0) & 1) = 0)
-   AND (ISNULL(Flags,0) & 2) = 0
- ORDER BY Datum DESC";
-                cmd.Parameters.AddWithValue("@RelTyp", relTyp);
-                cmd.Parameters.AddWithValue("@IncludeArchived", includeArchived ? 1 : 0);
-                using (var rdr = await cmd.ExecuteReaderAsync())
-                {
+
+            using (var cmd = _connection.CreateCommand()) {
+                cmd .CommandText = $@" SELECT NotizID, Flags, RelTyp, RelID, Datum, Text, ZeitAnlage, UserAnlage, ZeitBearbeitet, UserBearbeitet, GueltigBis FROM {
+                    _tblNotizen
+                }
+
+                WITH (NOLOCK) WHERE RelTyp = @RelTyp AND (@IncludeArchived = 1 OR (ISNULL(Flags,0) & 1) = 0) AND (ISNULL(Flags,0) & 2) = 0 ORDER BY Datum DESC"; cmd.Parameters.AddWithValue("@RelTyp", relTyp);
+                cmd .Parameters.AddWithValue("@IncludeArchived", includeArchived ? 1 : 0);
+
+                using (var rdr = await cmd.ExecuteReaderAsync()) {
                     var dt = new DataTable();
-                    dt.Load(rdr);
+                    dt .Load(rdr);
                     return dt;
                 }
             }
         }
 
-        public async Task<int> InsertNotizAsync(byte relTyp, string relId, DateTime datum, string text, short flags = 0, DateTime? gueltigBis = null)
-        {
+        public async Task<int > InsertNotizAsync(byte relTyp, string relId, DateTime datum, string text, short flags = 0, DateTime? gueltigBis = null) {
             await EnsureOpenAsync();
-            using (var cmd = _connection.CreateCommand())
-            {
+
+            using (var cmd = _connection.CreateCommand()) {
                 // NotizID wird nicht automatisch vergeben -> immer MAX + 1 (mit Locks gegen Parallelität)
                 int newId = 1;
-                using (var cmdId = _connection.CreateCommand())
-                {
-                    cmdId.CommandText = $@"SELECT ISNULL(MAX(NotizID),0)+1 FROM {_tblNotizen} WITH (UPDLOCK, HOLDLOCK)";
+
+                using (var cmdId = _connection.CreateCommand()) {
+                    cmdId .CommandText = $@"SELECT ISNULL(MAX(NotizID),0)+1 FROM {_tblNotizen} WITH (UPDLOCK, HOLDLOCK)";
                     var oId = await cmdId.ExecuteScalarAsync();
-                    try { newId = (oId == null || oId == DBNull.Value) ? 1 : Convert.ToInt32(oId); } catch { newId = 1; }
+
+                    try {
+                        newId = (oId == null || oId == DBNull.Value) ? 1 : Convert.ToInt32(oId);
+                    }
+
+                    catch {
+                        newId = 1;
+                    }
                 }
 
-                cmd.CommandText = $@"
-INSERT INTO {_tblNotizen} (NotizID, Flags, RelTyp, RelID, Datum, Text, ZeitAnlage, UserAnlage, GueltigBis)
-VALUES (@NotizID, @Flags, @RelTyp, @RelID, @Datum, @Text, GETDATE(), @UserAnlage, @GueltigBis);
-SELECT @NotizID;";
-                cmd.Parameters.AddWithValue("@NotizID", newId);
-                cmd.Parameters.AddWithValue("@Flags", flags);
-                cmd.Parameters.AddWithValue("@RelTyp", relTyp);
-                cmd.Parameters.AddWithValue("@RelID", (object)relId ?? string.Empty);
-                cmd.Parameters.AddWithValue("@Datum", datum);
-                cmd.Parameters.AddWithValue("@Text", (object)text ?? string.Empty);
+                cmd .CommandText = $@" INSERT INTO {
+                    _tblNotizen
+                }
+
+                (NotizID, Flags, RelTyp, RelID, Datum, Text, ZeitAnlage, UserAnlage, GueltigBis) VALUES (@NotizID, @Flags, @RelTyp, @RelID, @Datum, @Text, GETDATE(), @UserAnlage, @GueltigBis);
+                SELECT @NotizID;
+                "; cmd.Parameters.AddWithValue("@NotizID", newId);
+                cmd .Parameters.AddWithValue("@Flags", flags);
+                cmd .Parameters.AddWithValue("@RelTyp", relTyp);
+                cmd .Parameters.AddWithValue("@RelID", (object)relId ?? string.Empty);
+                cmd .Parameters.AddWithValue("@Datum", datum);
+                cmd .Parameters.AddWithValue("@Text", (object)text ?? string.Empty);
                 int userId = -1;
-                try { if (Program.MainTaMiClient != null) userId = Program.MainTaMiClient.UserId; } catch { userId = -1; }
-                cmd.Parameters.AddWithValue("@UserAnlage", userId);
+
+                try {
+                    if (Program.MainTaMiClient != null) userId = Program.MainTaMiClient.UserId;
+                }
+
+                catch {
+                    userId = -1;
+                }
+
+                cmd .Parameters.AddWithValue("@UserAnlage", userId);
                 var gb = gueltigBis ?? new DateTime(1900, 1, 1);
-                cmd.Parameters.AddWithValue("@GueltigBis", gb);
+                cmd .Parameters.AddWithValue("@GueltigBis", gb);
                 var o = await cmd.ExecuteScalarAsync();
                 if (o == null || o == DBNull.Value) return 0;
                 return Convert.ToInt32(o);
             }
         }
 
-        public async Task<int> ArchiveNotizAsync(int notizId)
-        {
+        public async Task<int > ArchiveNotizAsync(int notizId) {
             await EnsureOpenAsync();
-            using (var cmd = _connection.CreateCommand())
-            {
-                cmd.CommandText = $@"UPDATE {_tblNotizen} SET Flags = ISNULL(Flags,0) | 1, ZeitBearbeitet = GETDATE(), UserBearbeitet = @User WHERE NotizID = @Id";
-                cmd.Parameters.AddWithValue("@Id", notizId);
+
+            using (var cmd = _connection.CreateCommand()) {
+                cmd .CommandText = $@"UPDATE {_tblNotizen} SET Flags = ISNULL(Flags,0) | 1, ZeitBearbeitet = GETDATE(), UserBearbeitet = @User WHERE NotizID = @Id";
+                cmd .Parameters.AddWithValue("@Id", notizId);
                 int userId = -1;
-                try { if (Program.MainTaMiClient != null) userId = Program.MainTaMiClient.UserId; } catch { userId = -1; }
-                cmd.Parameters.AddWithValue("@User", userId);
+
+                try {
+                    if (Program.MainTaMiClient != null) userId = Program.MainTaMiClient.UserId;
+                }
+
+                catch {
+                    userId = -1;
+                }
+
+                cmd .Parameters.AddWithValue("@User", userId);
                 return await cmd.ExecuteNonQueryAsync();
             }
         }
 
-        private async Task<string> ResolveQualifiedTableAsync(string tableName)
-        {
-            using (var cmd = _connection.CreateCommand())
-            {
-                cmd.CommandText = @"
-SELECT QUOTENAME(s.name) + '.' + QUOTENAME(t.name)
-FROM sys.tables t
-JOIN sys.schemas s ON s.schema_id = t.schema_id
-WHERE t.name = @name";
-
-                cmd.Parameters.AddWithValue("@name", tableName);
-
+        private async Task<string > ResolveQualifiedTableAsync(string tableName) {
+            using (var cmd = _connection.CreateCommand()) {
+                cmd .CommandText = @" SELECT QUOTENAME(s.name) + '.' + QUOTENAME(t.name) FROM sys.tables t JOIN sys.schemas s ON s.schema_id = t.schema_id WHERE t.name = @name"; cmd.Parameters.AddWithValue("@name", tableName);
                 var o = await cmd.ExecuteScalarAsync();
-
                 return (o == null || o == DBNull.Value) ? null : Convert.ToString(o);
             }
         }
 
-        private static string ExtractTableName(string qualified)
-        {
+        private static string ExtractTableName(string qualified) {
             if (string.IsNullOrEmpty(qualified)) return null;
             // Expect format [schema].[name]
             int lastOpen = qualified.LastIndexOf('[');
             int lastClose = qualified.LastIndexOf(']');
-            if (lastOpen >= 0 && lastClose > lastOpen)
-                return qualified.Substring(lastOpen + 1, lastClose - lastOpen - 1);
+            if (lastOpen >= 0 && lastClose > lastOpen) return qualified.Substring(lastOpen + 1, lastClose - lastOpen - 1);
             var parts = qualified.Split('.');
             return parts.Length > 0 ? parts[parts.Length - 1].Trim('[', ']') : qualified;
         }
 
-        private async Task<HashSet<string>> GetWritableColumnsAsync(SqlTransaction tx)
-        {
-            using (var cmd = _connection.CreateCommand())
-            {
-                cmd.Transaction = tx;
-                cmd.CommandText = $"SELECT TOP 0 * FROM {_tblKassenbuch}";
-                using (var rdr = await cmd.ExecuteReaderAsync())
-                {
+        private async Task<HashSet<string > > GetWritableColumnsAsync(SqlTransaction tx) {
+            using (var cmd = _connection.CreateCommand()) {
+                cmd .Transaction = tx;
+                cmd .CommandText = $"SELECT TOP 0 * FROM {_tblKassenbuch}";
+
+                using (var rdr = await cmd.ExecuteReaderAsync()) {
                     var schema = rdr.GetSchemaTable();
                     var set = new HashSet<string>(StringComparer.OrdinalIgnoreCase);
-                    foreach (DataRow r in schema.Rows)
-                    {
+
+                    foreach (DataRow r in schema.Rows) {
                         string name = Convert.ToString(r["ColumnName"]);
                         bool isReadOnly = r.Table.Columns.Contains("IsReadOnly") && r["IsReadOnly"] is bool bro && bro;
                         bool isHidden = r.Table.Columns.Contains("IsHidden") && r["IsHidden"] is bool bh && bh;
                         bool isRowVersion = r.Table.Columns.Contains("IsRowVersion") && r["IsRowVersion"] is bool brv && brv;
                         if (!isReadOnly && !isHidden && !isRowVersion) set.Add(name);
                     }
-                    set.Remove("BetragGesamt");
-                    set.Remove("Betrag");
+
+                    set .Remove("BetragGesamt");
+                    set .Remove("Betrag");
                     return set;
                 }
             }
         }
-
         // --- Personal-/Zahlungs-Hilfen ---
-        public async Task<DataTable> GetActivePersonalAsync()
-        {
+        public async Task<DataTable > GetActivePersonalAsync() {
             await EnsureOpenAsync();
-            using (var cmd = _connection.CreateCommand())
-            {
-                cmd.CommandText = $@"SELECT PID, (Name + ' ' + Vorname) AS Name, Vorname FROM {_tblPersonal} WITH (NOLOCK) WHERE (Gesperrt = 0 OR Gesperrt IS NULL) ORDER BY Name ASC, Vorname ASC";
-                using (var rdr = await cmd.ExecuteReaderAsync()) { var dt = new DataTable(); dt.Load(rdr); return dt; }
-            }
-        }
 
-        public async Task<DataTable> GetMandantenAsync()
-        {
-            await EnsureOpenAsync();
-            using (var cmd = _connection.CreateCommand())
-            {
-                // Nur Mandanten deren Flags-Bit 512 NICHT gesetzt ist (Flags & 512 = 0)
-                // Falls die Spalte Flags nicht existiert, fallback ohne Filter (TRY/CATCH in SQL)
-                cmd.CommandText = $@"
-BEGIN TRY
-    SELECT ManID, ManName FROM {_tblMandanten} WITH (NOLOCK) WHERE (ISNULL(Flags,0) & 512) = 0 ORDER BY ManName ASC;
-END TRY
-BEGIN CATCH
-    SELECT ManID, ManName FROM {_tblMandanten} WITH (NOLOCK) ORDER BY ManName ASC;
-END CATCH";
-                using (var rdr = await cmd.ExecuteReaderAsync())
-                {
+            using (var cmd = _connection.CreateCommand()) {
+                cmd .CommandText = $@"SELECT PID, (Name + ' ' + Vorname) AS Name, Vorname FROM {_tblPersonal} WITH (NOLOCK) WHERE (Gesperrt = 0 OR Gesperrt IS NULL) ORDER BY Name ASC, Vorname ASC";
+
+                using (var rdr = await cmd.ExecuteReaderAsync()) {
                     var dt = new DataTable();
-                    dt.Load(rdr);
+                    dt .Load(rdr);
                     return dt;
                 }
             }
         }
 
-        public async Task<PersonalInfo> GetPersonalInfoAsync(int pid)
-        {
+        public async Task<DataTable > GetMandantenAsync() {
             await EnsureOpenAsync();
-            using (var cmd = _connection.CreateCommand())
-            {
-                cmd.CommandText = $@"SELECT PID, Name, Vorname, NFCTagUID, Fahrercode FROM {_tblPersonal} WITH (NOLOCK) WHERE PID = @PID";
-                cmd.Parameters.AddWithValue("@PID", pid);
-                using (var rdr = await cmd.ExecuteReaderAsync(CommandBehavior.SingleRow))
-                {
+
+            using (var cmd = _connection.CreateCommand()) {
+                // Nur Mandanten deren Flags-Bit 512 NICHT gesetzt ist (Flags & 512 = 0)
+                // Falls die Spalte Flags nicht existiert, fallback ohne Filter (TRY/CATCH in SQL)
+                cmd .CommandText = $@" BEGIN TRY SELECT ManID, ManName FROM {
+                    _tblMandanten
+                }
+
+                WITH (NOLOCK) WHERE (ISNULL(Flags,0) & 512) = 0 ORDER BY ManName ASC;
+
+                END TRY BEGIN CATCH SELECT ManID, ManName FROM {
+                    _tblMandanten
+                }
+
+                WITH (NOLOCK) ORDER BY ManName ASC;
+
+                END CATCH"; using (var rdr = await cmd.ExecuteReaderAsync()) {
+                    var dt = new DataTable();
+                    dt .Load(rdr);
+                    return dt;
+                }
+            }
+        }
+
+        public async Task<PersonalInfo > GetPersonalInfoAsync(int pid) {
+            await EnsureOpenAsync();
+
+            using (var cmd = _connection.CreateCommand()) {
+                cmd .CommandText = $@"SELECT PID, Name, Vorname, NFCTagUID, Fahrercode FROM {_tblPersonal} WITH (NOLOCK) WHERE PID = @PID";
+                cmd .Parameters.AddWithValue("@PID", pid);
+
+                using (var rdr = await cmd.ExecuteReaderAsync(CommandBehavior.SingleRow)) {
                     if (!rdr.Read()) return null;
-                    return new PersonalInfo
-                    {
-                        PID = rdr.GetInt32(rdr.GetOrdinal("PID")),
-                        Name = rdr.GetString(rdr.GetOrdinal("Name")),
-                        Vorname = rdr.GetString(rdr.GetOrdinal("Vorname")),
-                        NFCTagUID = rdr.IsDBNull(rdr.GetOrdinal("NFCTagUID")) ? null : rdr["NFCTagUID"].ToString(),
+
+                    return new PersonalInfo {
+                        PID = rdr.GetInt32(rdr.GetOrdinal("PID")), Name = rdr.GetString(rdr.GetOrdinal("Name")), Vorname = rdr.GetString(rdr.GetOrdinal("Vorname")), NFCTagUID = rdr.IsDBNull(rdr.GetOrdinal("NFCTagUID")) ? null : rdr["NFCTagUID"].ToString(),
                         Fahrercode = rdr.IsDBNull(rdr.GetOrdinal("Fahrercode")) ? null : rdr["Fahrercode"].ToString()
-                    };
+                    }
+
+                    ;
                 }
             }
         }
 
-        public async Task<DataTable> GetOpenShiftsListAsync(int persId)
-        {
+        public async Task<DataTable > GetOpenShiftsListAsync(int persId) {
             await EnsureOpenAsync();
-            using (var cmd = _connection.CreateCommand())
-            {
-                cmd.CommandText = $@"
-SELECT 
-    s.SchichtId,
-    s.PersId,
-    s.PersName,
-    s.FhzId,
-    f.Kennzeichen,
-    s.StartZeit,
-    ISNULL(s.EinnahmenBar1,0) - ISNULL(s.EinzahlungFahrer1,0) AS Betrag19,
-    ISNULL(s.EinnahmenBar2,0) - ISNULL(s.EinzahlungFahrer2,0) AS Betrag7,
-    ISNULL(s.EinnahmenBar3,0) - ISNULL(s.EinzahlungFahrer3,0) AS Betrag0,
-    CAST(
-        (ISNULL(s.EinnahmenBar1,0) - ISNULL(s.EinzahlungFahrer1,0)) +
-        (ISNULL(s.EinnahmenBar2,0) - ISNULL(s.EinzahlungFahrer2,0)) +
-        (ISNULL(s.EinnahmenBar3,0) - ISNULL(s.EinzahlungFahrer3,0))
-        AS money) AS OffenerBetrag
-FROM TSchichten s WITH (NOLOCK)
-LEFT JOIN {_tblFahrzeuge} f WITH (NOLOCK) ON f.FID = s.FhzId
-WHERE (s.Flags & 1) = 0 AND (s.Flags & 4) = 0 AND s.PersId = @PersId
-ORDER BY s.StartZeit DESC;";
 
-                cmd.Parameters.AddWithValue("@PersId", persId);
-                using (var rdr = await cmd.ExecuteReaderAsync()) 
-                { 
-                    var dt = new DataTable(); 
-                    dt.Load(rdr); 
-                    return dt; 
+            using (var cmd = _connection.CreateCommand()) {
+                cmd .CommandText = $@" SELECT s.SchichtId, s.PersId, s.PersName, s.FhzId, f.Kennzeichen, s.StartZeit, ISNULL(s.EinnahmenBar1,0) - ISNULL(s.EinzahlungFahrer1,0) AS Betrag19, ISNULL(s.EinnahmenBar2,0) - ISNULL(s.EinzahlungFahrer2,0) AS Betrag7, ISNULL(s.EinnahmenBar3,0) - ISNULL(s.EinzahlungFahrer3,0) AS Betrag0, CAST( (ISNULL(s.EinnahmenBar1,0) - ISNULL(s.EinzahlungFahrer1,0)) + (ISNULL(s.EinnahmenBar2,0) - ISNULL(s.EinzahlungFahrer2,0)) + (ISNULL(s.EinnahmenBar3,0) - ISNULL(s.EinzahlungFahrer3,0)) AS money) AS OffenerBetrag FROM TSchichten s WITH (NOLOCK) LEFT JOIN {
+                    _tblFahrzeuge
+                }
+
+                f WITH (NOLOCK) ON f.FID = s.FhzId WHERE (s.Flags & 1) = 0 AND (s.Flags & 4) = 0 AND s.PersId = @PersId ORDER BY s.StartZeit DESC;
+                "; cmd.Parameters.AddWithValue("@PersId", persId);
+
+                using (var rdr = await cmd.ExecuteReaderAsync()) {
+                    var dt = new DataTable();
+                    dt .Load(rdr);
+                    return dt;
                 }
             }
         }
 
-        public async Task<DataTable> GetOffeneAuszahlungenAsync(int persId)
-        {
+        public async Task<DataTable > GetOffeneAuszahlungenAsync(int persId) {
             await EnsureOpenAsync();
-            using (var cmd = _connection.CreateCommand())
-            {
-                cmd.CommandText = $@"SELECT z.*, z.ManID AS FirmenID FROM {_tblZahlungen} z WHERE z.PersId = @pid AND (z.Verbucht = 0 OR z.Verbucht IS NULL)";
-                cmd.Parameters.AddWithValue("@pid", persId);
-                using (var rdr = await cmd.ExecuteReaderAsync()) { var dt = new DataTable(); dt.Load(rdr); return dt; }
+
+            using (var cmd = _connection.CreateCommand()) {
+                cmd .CommandText = $@"SELECT z.*, z.ManID AS FirmenID FROM {_tblZahlungen} z WHERE z.PersId = @pid AND (z.Verbucht = 0 OR z.Verbucht IS NULL)";
+                cmd .Parameters.AddWithValue("@pid", persId);
+
+                using (var rdr = await cmd.ExecuteReaderAsync()) {
+                    var dt = new DataTable();
+                    dt .Load(rdr);
+                    return dt;
+                }
             }
         }
-
         // NEU: Alle offenen Zahlungen für alle Mitarbeiter (mit Namen)
-        public async Task<DataTable> GetAllOffeneAuszahlungenAsync()
-        {
+        public async Task<DataTable > GetAllOffeneAuszahlungenAsync() {
             await EnsureOpenAsync();
-            using (var cmd = _connection.CreateCommand())
-            {
+
+            using (var cmd = _connection.CreateCommand()) {
                 // UI mappt später Typ-Code zu Text und generiert Betrag/MwSt aus Einzelbeträgen
-                cmd.CommandText = $@"SELECT z.*, (p.Name + ' ' + p.Vorname) AS PersName
-FROM {_tblZahlungen} z WITH (NOLOCK)
-LEFT JOIN {_tblPersonal} p WITH (NOLOCK) ON p.PID = z.PersId
-WHERE (z.Verbucht = 0 OR z.Verbucht IS NULL)
-ORDER BY z.ErfasstAm DESC, z.Belegnummer DESC";
-                using (var rdr = await cmd.ExecuteReaderAsync()) { var dt = new DataTable(); dt.Load(rdr); return dt; }
+                cmd .CommandText = $@"SELECT z.*, (p.Name + ' ' + p.Vorname) AS PersName FROM {
+                    _tblZahlungen
+                }
+
+                z WITH (NOLOCK)
+                LEFT JOIN {
+                    _tblPersonal
+                }
+
+                p WITH (NOLOCK) ON p.PID = z.PersId WHERE (z.Verbucht = 0 OR z.Verbucht IS NULL) ORDER BY z.ErfasstAm DESC, z.Belegnummer DESC"; using (var rdr = await cmd.ExecuteReaderAsync()) {
+                    var dt = new DataTable();
+                    dt .Load(rdr);
+                    return dt;
+                }
             }
         }
 
-        public async Task<int> InsertOffeneZahlungAsync(int persId, string typ, string buchungstext, decimal b19, decimal b7, decimal b0, int? k1 = null, int? k2 = null, int? kto = null, int firmenId = 0)
-        {
+        public async Task<int > InsertOffeneZahlungAsync(int persId, string typ, string buchungstext, decimal b19, decimal b7, decimal b0, int? k1 = null, int? k2 = null, int? kto = null, int firmenId = 0) {
             await EnsureOpenAsync();
-
             // Optional: Spalte 'UserAnlage' (int) verwenden, falls vorhanden
             bool hasUserAnlage = false;
-            try
-            {
-                using (var chk = _connection.CreateCommand())
-                {
+
+            try {
+                using (var chk = _connection.CreateCommand()) {
                     // _tblZahlungen liegt in Form [schema].[name] vor -> Klammern entfernen für OBJECT_ID
                     string obj = (_tblZahlungen ?? "[dbo].[TKassenbuchZahlungen]").Replace("[", string.Empty).Replace("]", string.Empty);
-                    chk.CommandText = "SELECT 1 FROM sys.columns WHERE Name='UserAnlage' AND object_id = OBJECT_ID(@obj)";
-                    chk.Parameters.AddWithValue("@obj", obj);
+                    chk .CommandText = "SELECT 1 FROM sys.columns WHERE Name='UserAnlage' AND object_id = OBJECT_ID(@obj)";
+                    chk .Parameters.AddWithValue("@obj", obj);
                     var exists = await chk.ExecuteScalarAsync();
                     hasUserAnlage = exists != null && exists != DBNull.Value;
                 }
             }
-            catch { hasUserAnlage = false; }
 
-            using (var cmd = _connection.CreateCommand())
-            {
+            catch {
+                hasUserAnlage = false;
+            }
+
+            using (var cmd = _connection.CreateCommand()) {
                 decimal safeB19 = b19;
                 decimal safeB7 = b7;
                 decimal safeB0 = b0;
@@ -405,58 +387,67 @@ ORDER BY z.ErfasstAm DESC, z.Belegnummer DESC";
                 string safeTyp = typ ?? string.Empty; // kann bereits numerischer Code sein ("2"/"3")
                 string safeTxt = buchungstext ?? string.Empty;
 
-                if (hasUserAnlage)
-                {
-                    cmd.CommandText = $@"INSERT INTO {_tblZahlungen}
-(PersId, Typ, Buchungstext, Betrag19, Betrag7, Betrag0, BetragGesamt, Kost1, Kost2, Konto, ManID, DeviceID, Verbucht, ErfasstAm, UserAnlage)
-OUTPUT INSERTED.Belegnummer
-VALUES(@pid,@typ,@txt,@b19,@b7,@b0,@bg,@k1,@k2,@kto,@fid,0,0,SYSDATETIME(),@ua);";
-                }
-                else
-                {
-                    cmd.CommandText = $@"INSERT INTO {_tblZahlungen}
-(PersId, Typ, Buchungstext, Betrag19, Betrag7, Betrag0, BetragGesamt, Kost1, Kost2, Konto, ManID, DeviceID, Verbucht, ErfasstAm)
-OUTPUT INSERTED.Belegnummer
-VALUES(@pid,@typ,@txt,@b19,@b7,@b0,@bg,@k1,@k2,@kto,@fid,0,0,SYSDATETIME());";
+                if (hasUserAnlage) {
+                    cmd .CommandText = $@"INSERT INTO {_tblZahlungen} (PersId, Typ, Buchungstext, Betrag19, Betrag7, Betrag0, BetragGesamt, Kost1, Kost2, Konto, ManID, DeviceID, Verbucht, ErfasstAm, UserAnlage) OUTPUT INSERTED.Belegnummer VALUES(@pid,@typ,@txt,@b19,@b7,@b0,@bg,@k1,@k2,@kto,@fid,0,0,SYSDATETIME(),@ua);
+                    ";
                 }
 
-                cmd.Parameters.AddWithValue("@pid", persId);
+                else {
+                    cmd .CommandText = $@"INSERT INTO {_tblZahlungen} (PersId, Typ, Buchungstext, Betrag19, Betrag7, Betrag0, BetragGesamt, Kost1, Kost2, Konto, ManID, DeviceID, Verbucht, ErfasstAm) OUTPUT INSERTED.Belegnummer VALUES(@pid,@typ,@txt,@b19,@b7,@b0,@bg,@k1,@k2,@kto,@fid,0,0,SYSDATETIME());
+                    ";
+                }
+
+                cmd .Parameters.AddWithValue("@pid", persId);
                 // Typ als tinyint ablegen
-                cmd.Parameters.Add("@typ", SqlDbType.TinyInt).Value = MapTypStringToCode(safeTyp);
-                cmd.Parameters.AddWithValue("@txt", safeTxt);
-                cmd.Parameters.AddWithValue("@b19", safeB19);
-                cmd.Parameters.AddWithValue("@b7", safeB7);
-                cmd.Parameters.AddWithValue("@b0", safeB0);
-                cmd.Parameters.AddWithValue("@bg", sum);
-                cmd.Parameters.AddWithValue("@k1", safeK1);
-                cmd.Parameters.AddWithValue("@k2", safeK2);
-                cmd.Parameters.AddWithValue("@kto", safeKto);
-                cmd.Parameters.AddWithValue("@fid", firmenId);
-                if (hasUserAnlage)
-                {
-                    int ua = 0; try { ua = AppSession.CurrentUser?.PID ?? 0; } catch { ua = 0; }
-                    cmd.Parameters.AddWithValue("@ua", ua);
+                cmd .Parameters.Add("@typ", SqlDbType.TinyInt).Value = MapTypStringToCode(safeTyp);
+                cmd .Parameters.AddWithValue("@txt", safeTxt);
+                cmd .Parameters.AddWithValue("@b19", safeB19);
+                cmd .Parameters.AddWithValue("@b7", safeB7);
+                cmd .Parameters.AddWithValue("@b0", safeB0);
+                cmd .Parameters.AddWithValue("@bg", sum);
+                cmd .Parameters.AddWithValue("@k1", safeK1);
+                cmd .Parameters.AddWithValue("@k2", safeK2);
+                cmd .Parameters.AddWithValue("@kto", safeKto);
+                cmd .Parameters.AddWithValue("@fid", firmenId);
+
+                if (hasUserAnlage) {
+                    int ua = 0;
+
+                    try {
+                        ua = AppSession.CurrentUser?.PID ?? 0;
+                    }
+
+                    catch {
+                        ua = 0;
+                    }
+
+                    cmd .Parameters.AddWithValue("@ua", ua);
                 }
 
                 var o = await cmd.ExecuteScalarAsync();
                 if (o == null || o == DBNull.Value) return 0;
-                int id; if (o is int) id = (int)o; else if (o is decimal) id = Convert.ToInt32((decimal)o); else int.TryParse(Convert.ToString(o), out id);
+                int id;
+                if (o is int) id = (int)o;
+                else if (o is decimal) id = Convert.ToInt32((decimal)o);
+                else int.TryParse(Convert.ToString(o), out id);
                 return id;
             }
         }
-
         // Vorlagen (Templates) – Erkennung: eigene Tabelle TKassenbuchVorlagen (NEU)
-        public async Task<int> InsertZahlungsVorlageAsync(string typ, string vorlagenName, string buchungstext, string kost1, string kost2, string konto, string mwst, int firmenId = 0)
-        {
+        public async Task<int > InsertZahlungsVorlageAsync(string typ, string vorlagenName, string buchungstext, string kost1, string kost2, string konto, string mwst, int firmenId = 0) {
             await EnsureOpenAsync();
             byte typCode = MapTypStringToCode(typ);
             decimal b19 = 0m, b7 = 0m, b0 = 0m;
-            switch ((mwst ?? string.Empty).Trim())
-            {
-                case "19": b19 = 1m; break;
-                case "7":  b7  = 1m; break;
-                case "0":  b0  = 1m; break;
+
+            switch ((mwst ?? string.Empty).Trim()) {
+                case "19": b19 = 1m;
+                break;
+                case "7": b7 = 1m;
+                break;
+                case "0": b0 = 1m;
+                break;
             }
+
             string vName = (vorlagenName ?? string.Empty).Trim();
             string bText = (buchungstext ?? string.Empty).Trim();
             if (string.IsNullOrWhiteSpace(vName)) vName = bText;
@@ -466,37 +457,42 @@ VALUES(@pid,@typ,@txt,@b19,@b7,@b0,@bg,@k1,@k2,@kto,@fid,0,0,SYSDATETIME());";
             string k1 = string.IsNullOrWhiteSpace(kost1) ? "0" : kost1.Trim();
             string k2 = string.IsNullOrWhiteSpace(kost2) ? "0" : kost2.Trim();
             string kto = string.IsNullOrWhiteSpace(konto) ? "0" : konto.Trim();
-            using (var cmd = _connection.CreateCommand())
-            {
-                cmd.CommandText = $@"INSERT INTO {_tblVorlagen}
-(Typ,VorlagenName,Buchungstext,Betrag19,Betrag7,Betrag0,ManID,Kost1,Kost2,Konto)
-OUTPUT INSERTED.ID
-VALUES(@Typ,@VName,@BText,@B19,@B7,@B0,@FID,@K1,@K2,@Kto);";
-                cmd.Parameters.AddWithValue("@Typ", typCode);
-                cmd.Parameters.AddWithValue("@VName", vName);
-                cmd.Parameters.AddWithValue("@BText", bText);
-                cmd.Parameters.AddWithValue("@B19", b19);
-                cmd.Parameters.AddWithValue("@B7", b7);
-                cmd.Parameters.AddWithValue("@B0", b0);
-                cmd.Parameters.AddWithValue("@FID", firmenId);
-                cmd.Parameters.AddWithValue("@K1", k1);
-                cmd.Parameters.AddWithValue("@K2", k2);
-                cmd.Parameters.AddWithValue("@Kto", kto);
+
+            using (var cmd = _connection.CreateCommand()) {
+                cmd .CommandText = $@"INSERT INTO {_tblVorlagen} (Typ,VorlagenName,Buchungstext,Betrag19,Betrag7,Betrag0,ManID,Kost1,Kost2,Konto) OUTPUT INSERTED.ID VALUES(@Typ,@VName,@BText,@B19,@B7,@B0,@FID,@K1,@K2,@Kto);
+                "; cmd.Parameters.AddWithValue("@Typ", typCode);
+                cmd .Parameters.AddWithValue("@VName", vName);
+                cmd .Parameters.AddWithValue("@BText", bText);
+                cmd .Parameters.AddWithValue("@B19", b19);
+                cmd .Parameters.AddWithValue("@B7", b7);
+                cmd .Parameters.AddWithValue("@B0", b0);
+                cmd .Parameters.AddWithValue("@FID", firmenId);
+                cmd .Parameters.AddWithValue("@K1", k1);
+                cmd .Parameters.AddWithValue("@K2", k2);
+                cmd .Parameters.AddWithValue("@Kto", kto);
                 var o = await cmd.ExecuteScalarAsync();
-                int id = 0; if (o is int) id = (int)o; else if (o is decimal) id = Convert.ToInt32((decimal)o); else int.TryParse(Convert.ToString(o), out id);
+                int id = 0;
+                if (o is int) id = (int)o;
+                else if (o is decimal) id = Convert.ToInt32((decimal)o);
+                else int.TryParse(Convert.ToString(o), out id);
                 return id;
             }
         }
 
-        public async Task<int> UpdateZahlungsVorlageAsync(int belegnummer, string typ, string vorlagenName, string buchungstext, string kost1, string kost2, string konto, string mwst, int firmenId = 0)
-        {
+        public async Task<int > UpdateZahlungsVorlageAsync(int belegnummer, string typ, string vorlagenName, string buchungstext, string kost1, string kost2, string konto, string mwst, int firmenId = 0) {
             await EnsureOpenAsync();
             byte typCode = MapTypStringToCode(typ);
             decimal b19 = 0m, b7 = 0m, b0 = 0m;
-            switch ((mwst ?? string.Empty).Trim())
-            {
-                case "19": b19 = 1m; break; case "7": b7 = 1m; break; case "0": b0 = 1m; break;
+
+            switch ((mwst ?? string.Empty).Trim()) {
+                case "19": b19 = 1m;
+                break;
+                case "7": b7 = 1m;
+                break;
+                case "0": b0 = 1m;
+                break;
             }
+
             string vName = (vorlagenName ?? string.Empty).Trim();
             string bText = (buchungstext ?? string.Empty).Trim();
             if (string.IsNullOrWhiteSpace(vName)) vName = bText;
@@ -506,194 +502,156 @@ VALUES(@Typ,@VName,@BText,@B19,@B7,@B0,@FID,@K1,@K2,@Kto);";
             string k1 = string.IsNullOrWhiteSpace(kost1) ? "0" : kost1.Trim();
             string k2 = string.IsNullOrWhiteSpace(kost2) ? "0" : kost2.Trim();
             string kto = string.IsNullOrWhiteSpace(konto) ? "0" : konto.Trim();
-            using (var cmd = _connection.CreateCommand())
-            {
-                cmd.CommandText = $@"UPDATE {_tblVorlagen}
-SET Typ=@Typ, VorlagenName=@VName, Buchungstext=@BText, Betrag19=@B19, Betrag7=@B7, Betrag0=@B0,
-    ManID=@FID, Kost1=@K1, Kost2=@K2, Konto=@Kto
-WHERE ID=@ID";
-                cmd.Parameters.AddWithValue("@Typ", typCode);
-                cmd.Parameters.AddWithValue("@VName", vName);
-                cmd.Parameters.AddWithValue("@BText", bText);
-                cmd.Parameters.AddWithValue("@B19", b19);
-                cmd.Parameters.AddWithValue("@B7", b7);
-                cmd.Parameters.AddWithValue("@B0", b0);
-                cmd.Parameters.AddWithValue("@FID", firmenId);
-                cmd.Parameters.AddWithValue("@K1", k1);
-                cmd.Parameters.AddWithValue("@K2", k2);
-                cmd.Parameters.AddWithValue("@Kto", kto);
-                cmd.Parameters.AddWithValue("@ID", belegnummer);
+
+            using (var cmd = _connection.CreateCommand()) {
+                cmd .CommandText = $@"UPDATE {_tblVorlagen} SET Typ=@Typ, VorlagenName=@VName, Buchungstext=@BText, Betrag19=@B19, Betrag7=@B7, Betrag0=@B0, ManID=@FID, Kost1=@K1, Kost2=@K2, Konto=@Kto WHERE ID=@ID"; cmd.Parameters.AddWithValue("@Typ", typCode);
+                cmd .Parameters.AddWithValue("@VName", vName);
+                cmd .Parameters.AddWithValue("@BText", bText);
+                cmd .Parameters.AddWithValue("@B19", b19);
+                cmd .Parameters.AddWithValue("@B7", b7);
+                cmd .Parameters.AddWithValue("@B0", b0);
+                cmd .Parameters.AddWithValue("@FID", firmenId);
+                cmd .Parameters.AddWithValue("@K1", k1);
+                cmd .Parameters.AddWithValue("@K2", k2);
+                cmd .Parameters.AddWithValue("@Kto", kto);
+                cmd .Parameters.AddWithValue("@ID", belegnummer);
                 return await cmd.ExecuteNonQueryAsync();
             }
         }
 
-        public async Task<DataTable> LoadZahlungsVorlagenAsync()
-        {
+        public async Task<DataTable > LoadZahlungsVorlagenAsync() {
             await EnsureOpenAsync();
-            using (var cmd = _connection.CreateCommand())
-            {
-                cmd.CommandText = $@"SELECT 
-    v.ID AS Belegnummer,
-    CASE v.Typ WHEN 2 THEN 'Einzahlung' WHEN 3 THEN 'Auszahlung' ELSE CONVERT(varchar(3),v.Typ) END AS Typ,
-    v.VorlagenName,
-    v.Buchungstext,
-    v.Kost1,
-    v.Kost2,
-    v.Konto,
-    v.Betrag19,
-    v.Betrag7,
-    v.Betrag0,
-    v.ManID AS FirmenID
-FROM {_tblVorlagen} v WITH (NOLOCK)
-ORDER BY v.VorlagenName ASC, v.Typ ASC;";
-                using (var rdr = await cmd.ExecuteReaderAsync())
-                {
-                    var dt = new DataTable(); dt.Load(rdr); return dt;
+
+            using (var cmd = _connection.CreateCommand()) {
+                cmd .CommandText = $@"SELECT v.ID AS Belegnummer, CASE v.Typ WHEN 2 THEN 'Einzahlung' WHEN 3 THEN 'Auszahlung' ELSE CONVERT(varchar(3),v.Typ) END AS Typ, v.VorlagenName, v.Buchungstext, v.Kost1, v.Kost2, v.Konto, v.Betrag19, v.Betrag7, v.Betrag0, v.ManID AS FirmenID FROM {
+                    _tblVorlagen
+                }
+
+                v WITH (NOLOCK) ORDER BY v.VorlagenName ASC, v.Typ ASC;
+
+                "; using (var rdr = await cmd.ExecuteReaderAsync()) {
+                    var dt = new DataTable();
+                    dt .Load(rdr);
+                    return dt;
                 }
             }
         }
 
-        public async Task<int> SetFahrercodeAsync(int pid, string code)
-        {
+        public async Task<int > SetFahrercodeAsync(int pid, string code) {
             await EnsureOpenAsync();
-            using (var cmd = _connection.CreateCommand())
-            {
-                cmd.CommandText = $@"UPDATE {_tblPersonal} SET Fahrercode=@C WHERE PID=@PID";
-                cmd.Parameters.AddWithValue("@C", (object)code ?? DBNull.Value);
-                cmd.Parameters.AddWithValue("@PID", pid);
+
+            using (var cmd = _connection.CreateCommand()) {
+                cmd .CommandText = $@"UPDATE {_tblPersonal} SET Fahrercode=@C WHERE PID=@PID";
+                cmd .Parameters.AddWithValue("@C", (object)code ?? DBNull.Value);
+                cmd .Parameters.AddWithValue("@PID", pid);
                 return await cmd.ExecuteNonQueryAsync();
             }
         }
 
-        public async Task<int> SetNfcAsync(int pid, string nfc)
-        {
+        public async Task<int > SetNfcAsync(int pid, string nfc) {
             await EnsureOpenAsync();
-            using (var cmd = _connection.CreateCommand())
-            {
-                cmd.CommandText = $@"UPDATE {_tblPersonal} SET NFCTagUID=@N WHERE PID=@PID";
-                cmd.Parameters.AddWithValue("@N", (object)nfc ?? DBNull.Value);
-                cmd.Parameters.AddWithValue("@PID", pid);
+
+            using (var cmd = _connection.CreateCommand()) {
+                cmd .CommandText = $@"UPDATE {_tblPersonal} SET NFCTagUID=@N WHERE PID=@PID";
+                cmd .Parameters.AddWithValue("@N", (object)nfc ?? DBNull.Value);
+                cmd .Parameters.AddWithValue("@PID", pid);
                 return await cmd.ExecuteNonQueryAsync();
             }
         }
 
-        public async Task<decimal> GetLastPersonalGuthabenSaldoAsync(int persId)
-        {
+        public async Task<decimal > GetLastPersonalGuthabenSaldoAsync(int persId) {
             await EnsureOpenAsync();
-            using (var cmd = _connection.CreateCommand())
-            {
-                cmd.CommandText = $@"SELECT TOP 1 SaldoPersonalguthaben FROM {_tblKassenbuch} WITH (NOLOCK) WHERE PersId = @PersId AND Typ = '5' ORDER BY ErfasstAm DESC";
-                cmd.Parameters.AddWithValue("@PersId", persId);
+
+            using (var cmd = _connection.CreateCommand()) {
+                cmd .CommandText = $@"SELECT TOP 1 SaldoPersonalguthaben FROM {_tblKassenbuch} WITH (NOLOCK) WHERE PersId = @PersId AND Typ = '5' ORDER BY ErfasstAm DESC";
+                cmd .Parameters.AddWithValue("@PersId", persId);
                 var o = await cmd.ExecuteScalarAsync();
                 return (o == null || o == DBNull.Value) ? 0m : Convert.ToDecimal(o);
             }
         }
-
         // NEU: Aktuelle Personalguthaben-Salden (nur != 0) für alle Mitarbeiter
-        public async Task<DataTable> GetAllPersonalGuthabenSaldenAsync()
-        {
+        public async Task<DataTable > GetAllPersonalGuthabenSaldenAsync() {
             await EnsureOpenAsync();
-            using (var cmd = _connection.CreateCommand())
-            {
-                cmd.CommandText = $@"
-;WITH x AS (
+
+            using (var cmd = _connection.CreateCommand()) {
+                cmd .CommandText = $@";
+
+                WITH x AS (
     SELECT PersId,
            SaldoPersonalguthaben AS Saldo,
            ROW_NUMBER() OVER (PARTITION BY PersId ORDER BY ErfasstAm DESC, Belegnummer DESC) rn
     FROM {_tblKassenbuch} WITH (NOLOCK)
     WHERE Typ = '5' AND ISNULL(RevIsOld,0) = 0
 )
-SELECT p.PID,
-       (p.Name + ' ' + p.Vorname) AS PersName,
-       CAST(x.Saldo AS money) AS Saldo
-FROM x
-JOIN {_tblPersonal} p WITH (NOLOCK) ON p.PID = x.PersId
-WHERE x.rn = 1 AND ISNULL(x.Saldo,0) <> 0
-ORDER BY p.Name ASC, p.Vorname ASC;";
-                using (var rdr = await cmd.ExecuteReaderAsync()) { var dt = new DataTable(); dt.Load(rdr); return dt; }
-            }
-        }
+                SELECT p.PID,
+                (p.Name + ' ' + p.Vorname) AS PersName,
+                CAST(x.Saldo AS money) AS Saldo
+                FROM x
+                JOIN {
+                    _tblPersonal
+                }
 
-        // NEU: Alle offenen Schichten für alle Mitarbeiter
-        public async Task<DataTable> GetAllOpenShiftsAsync()
-        {
-            await EnsureOpenAsync();
-            using (var cmd = _connection.CreateCommand())
-            {
-                cmd.CommandText = $@"
-SELECT 
-    s.SchichtId,
-    s.PersId,
-    s.PersName,
-    s.FhzId,
-    f.Kennzeichen,
-    s.StartZeit,
-    ISNULL(s.EinnahmenBar1,0) - ISNULL(s.EinzahlungFahrer1,0) AS Betrag19,
-    ISNULL(s.EinnahmenBar2,0) - ISNULL(s.EinzahlungFahrer2,0) AS Betrag7,
-    ISNULL(s.EinnahmenBar3,0) - ISNULL(s.EinzahlungFahrer3,0) AS Betrag0,
-    CAST(
-        (ISNULL(s.EinnahmenBar1,0) - ISNULL(s.EinzahlungFahrer1,0)) +
-        (ISNULL(s.EinnahmenBar2,0) - ISNULL(s.EinzahlungFahrer2,0)) +
-        (ISNULL(s.EinnahmenBar3,0) - ISNULL(s.EinzahlungFahrer3,0))
-        AS money) AS OffenerBetrag
-FROM TSchichten s WITH (NOLOCK)
-LEFT JOIN {_tblFahrzeuge} f WITH (NOLOCK) ON f.FID = s.FhzId
-WHERE (s.Flags & 1) = 0 AND (s.Flags & 4) = 0
-ORDER BY s.StartZeit DESC;";
-                using (var rdr = await cmd.ExecuteReaderAsync())
-                {
-                    var dt = new DataTable(); dt.Load(rdr); return dt;
+                p WITH (NOLOCK) ON p.PID = x.PersId WHERE x.rn = 1 AND ISNULL(x.Saldo,0) <> 0 ORDER BY p.Name ASC, p.Vorname ASC;
+
+                "; using (var rdr = await cmd.ExecuteReaderAsync()) {
+                    var dt = new DataTable();
+                    dt .Load(rdr);
+                    return dt;
                 }
             }
         }
-
-        // NEU: Personalguthaben-Verlauf (jüngste zuerst)
-        public async Task<DataTable> GetPersonalGuthabenVerlaufAsync(int persId)
-        {
+        // NEU: Alle offenen Schichten für alle Mitarbeiter
+        public async Task<DataTable > GetAllOpenShiftsAsync() {
             await EnsureOpenAsync();
-            using (var cmd = _connection.CreateCommand())
-            {
-                cmd.CommandText = $@"
-SELECT TOP 500
-    ErfasstAm,
-    Typ,
-    Buchungstext,
-    CAST(ISNULL(Betrag19,0) + ISNULL(Betrag7,0) + ISNULL(Betrag0,0) AS money) AS Delta,
-    SaldoPersonalguthaben AS Saldo,
-    Betrag19,
-    Betrag7,
-    Betrag0,
-    Belegnummer
-FROM {_tblKassenbuch} WITH (NOLOCK)
-WHERE PersId = @PersId AND Typ = '5' AND ISNULL(RevIsOld,0) = 0
-ORDER BY ErfasstAm DESC, Belegnummer DESC;";
-                cmd.Parameters.AddWithValue("@PersId", persId);
-                using (var rdr = await cmd.ExecuteReaderAsync())
-                {
+
+            using (var cmd = _connection.CreateCommand()) {
+                cmd .CommandText = $@" SELECT s.SchichtId, s.PersId, s.PersName, s.FhzId, f.Kennzeichen, s.StartZeit, ISNULL(s.EinnahmenBar1,0) - ISNULL(s.EinzahlungFahrer1,0) AS Betrag19, ISNULL(s.EinnahmenBar2,0) - ISNULL(s.EinzahlungFahrer2,0) AS Betrag7, ISNULL(s.EinnahmenBar3,0) - ISNULL(s.EinzahlungFahrer3,0) AS Betrag0, CAST( (ISNULL(s.EinnahmenBar1,0) - ISNULL(s.EinzahlungFahrer1,0)) + (ISNULL(s.EinnahmenBar2,0) - ISNULL(s.EinzahlungFahrer2,0)) + (ISNULL(s.EinnahmenBar3,0) - ISNULL(s.EinzahlungFahrer3,0)) AS money) AS OffenerBetrag FROM TSchichten s WITH (NOLOCK) LEFT JOIN {
+                    _tblFahrzeuge
+                }
+
+                f WITH (NOLOCK) ON f.FID = s.FhzId WHERE (s.Flags & 1) = 0 AND (s.Flags & 4) = 0 ORDER BY s.StartZeit DESC;
+
+                "; using (var rdr = await cmd.ExecuteReaderAsync()) {
                     var dt = new DataTable();
-                    dt.Load(rdr);
+                    dt .Load(rdr);
+                    return dt;
+                }
+            }
+        }
+        // NEU: Personalguthaben-Verlauf (jüngste zuerst)
+        public async Task<DataTable > GetPersonalGuthabenVerlaufAsync(int persId) {
+            await EnsureOpenAsync();
+
+            using (var cmd = _connection.CreateCommand()) {
+                cmd .CommandText = $@" SELECT TOP 500 ErfasstAm, Typ, Buchungstext, CAST(ISNULL(Betrag19,0) + ISNULL(Betrag7,0) + ISNULL(Betrag0,0) AS money) AS Delta, SaldoPersonalguthaben AS Saldo, Betrag19, Betrag7, Betrag0, Belegnummer FROM {
+                    _tblKassenbuch
+                }
+
+                WITH (NOLOCK) WHERE PersId = @PersId AND Typ = '5' AND ISNULL(RevIsOld,0) = 0 ORDER BY ErfasstAm DESC, Belegnummer DESC;
+                "; cmd.Parameters.AddWithValue("@PersId", persId);
+
+                using (var rdr = await cmd.ExecuteReaderAsync()) {
+                    var dt = new DataTable();
+                    dt .Load(rdr);
                     return dt;
                 }
             }
         }
 
-        public async Task MarkZahlungAlsVerbuchtAsync(int belegnummer)
-        {
+        public async Task MarkZahlungAlsVerbuchtAsync(int belegnummer) {
             await EnsureOpenAsync();
-            using (var cmd = _connection.CreateCommand())
-            {
-                cmd.CommandText = $@"UPDATE {_tblZahlungen} SET Verbucht = 1 WHERE Belegnummer = @bnr";
-                cmd.Parameters.AddWithValue("@bnr", belegnummer);
+
+            using (var cmd = _connection.CreateCommand()) {
+                cmd .CommandText = $@"UPDATE {_tblZahlungen} SET Verbucht = 1 WHERE Belegnummer = @bnr";
+                cmd .Parameters.AddWithValue("@bnr", belegnummer);
                 await cmd.ExecuteNonQueryAsync();
             }
         }
-
         // Bearbeiten/Löschen offener Zahlungen
-        public async Task<int> UpdateOffeneZahlungAsync(int belegnummer, string typ, string buchungstext, decimal b19, decimal b7, decimal b0, int? k1, int? k2, int? kto)
-        {
+        public async Task<int > UpdateOffeneZahlungAsync(int belegnummer, string typ, string buchungstext, decimal b19, decimal b7, decimal b0, int? k1, int? k2, int? kto) {
             await EnsureOpenAsync();
-            using (var cmd = _connection.CreateCommand())
-            {
+
+            using (var cmd = _connection.CreateCommand()) {
                 decimal safeB19 = b19;
                 decimal safeB7 = b7;
                 decimal safeB0 = b0;
@@ -702,120 +660,96 @@ ORDER BY ErfasstAm DESC, Belegnummer DESC;";
                 int safeK2 = k2 ?? 0;
                 int safeKto = kto ?? 0;
                 string safeTxt = buchungstext ?? string.Empty;
-
-                cmd.CommandText = $@"UPDATE {_tblZahlungen}
-SET Typ=@typ, Buchungstext=@txt, Betrag19=@b19, Betrag7=@b7, Betrag0=@b0, BetragGesamt=@bg, Kost1=@k1, Kost2=@k2, Konto=@kto
-WHERE Belegnummer=@bnr AND (Verbucht=0 OR Verbucht IS NULL)";
-                cmd.Parameters.Add("@typ", SqlDbType.TinyInt).Value = MapTypStringToCode(typ);
-                cmd.Parameters.AddWithValue("@txt", safeTxt);
-                cmd.Parameters.AddWithValue("@b19", safeB19);
-                cmd.Parameters.AddWithValue("@b7", safeB7);
-                cmd.Parameters.AddWithValue("@b0", safeB0);
-                cmd.Parameters.AddWithValue("@bg", sum);
-                cmd.Parameters.AddWithValue("@k1", safeK1);
-                cmd.Parameters.AddWithValue("@k2", safeK2);
-                cmd.Parameters.AddWithValue("@kto", safeKto);
-                cmd.Parameters.AddWithValue("@bnr", belegnummer);
+                cmd .CommandText = $@"UPDATE {_tblZahlungen} SET Typ=@typ, Buchungstext=@txt, Betrag19=@b19, Betrag7=@b7, Betrag0=@b0, BetragGesamt=@bg, Kost1=@k1, Kost2=@k2, Konto=@kto WHERE Belegnummer=@bnr AND (Verbucht=0 OR Verbucht IS NULL)"; cmd.Parameters.Add("@typ", SqlDbType.TinyInt).Value = MapTypStringToCode(typ);
+                cmd .Parameters.AddWithValue("@txt", safeTxt);
+                cmd .Parameters.AddWithValue("@b19", safeB19);
+                cmd .Parameters.AddWithValue("@b7", safeB7);
+                cmd .Parameters.AddWithValue("@b0", safeB0);
+                cmd .Parameters.AddWithValue("@bg", sum);
+                cmd .Parameters.AddWithValue("@k1", safeK1);
+                cmd .Parameters.AddWithValue("@k2", safeK2);
+                cmd .Parameters.AddWithValue("@kto", safeKto);
+                cmd .Parameters.AddWithValue("@bnr", belegnummer);
                 return await cmd.ExecuteNonQueryAsync();
             }
         }
 
-        public async Task<int> DeleteOffeneZahlungAsync(int belegnummer)
-        {
+        public async Task<int > DeleteOffeneZahlungAsync(int belegnummer) {
             await EnsureOpenAsync();
-            using (var cmd = _connection.CreateCommand())
-            {
-                cmd.CommandText = $@"DELETE FROM {_tblZahlungen} WHERE Belegnummer=@bnr AND (Verbucht=0 OR Verbucht IS NULL)";
-                cmd.Parameters.AddWithValue("@bnr", belegnummer);
+
+            using (var cmd = _connection.CreateCommand()) {
+                cmd .CommandText = $@"DELETE FROM {_tblZahlungen} WHERE Belegnummer=@bnr AND (Verbucht=0 OR Verbucht IS NULL)";
+                cmd .Parameters.AddWithValue("@bnr", belegnummer);
                 return await cmd.ExecuteNonQueryAsync();
             }
         }
-
         // NEU: Storniert eine offene Zahlung (setzt Verbucht=1 und AutomatenName='Storniert')
-        public async Task<int> StorniereOffeneZahlungAsync(int belegnummer)
-        {
+        public async Task<int > StorniereOffeneZahlungAsync(int belegnummer) {
             await EnsureOpenAsync();
-            using (var cmd = _connection.CreateCommand())
-            {
+
+            using (var cmd = _connection.CreateCommand()) {
                 // AutomatenName nicht mehr verändern, nur Verbucht setzen
-                cmd.CommandText = $@"UPDATE {_tblZahlungen} SET Verbucht=1 WHERE Belegnummer=@bnr AND (Verbucht=0 OR Verbucht IS NULL)";
-                cmd.Parameters.AddWithValue("@bnr", belegnummer);
+                cmd .CommandText = $@"UPDATE {_tblZahlungen} SET Verbucht=1 WHERE Belegnummer=@bnr AND (Verbucht=0 OR Verbucht IS NULL)";
+                cmd .Parameters.AddWithValue("@bnr", belegnummer);
                 return await cmd.ExecuteNonQueryAsync();
             }
         }
-
         // ---------- Kassenfunktionen ----------
-        public async Task<DataRow> GetEintragByBelegnummerAsync(string belegnummer)
-        {
+        public async Task<DataRow > GetEintragByBelegnummerAsync(string belegnummer) {
             await EnsureOpenAsync();
-            using (var cmd = _connection.CreateCommand())
-            {
-                cmd.CommandText = $@"SELECT TOP 1 * FROM {_tblKassenbuch} WITH (NOLOCK) WHERE Belegnummer = @Belegnummer AND ISNULL(RevIsOld,0) = 0 ORDER BY ErfasstAm DESC";
-                cmd.Parameters.AddWithValue("@Belegnummer", belegnummer ?? (object)DBNull.Value);
-                using (var rdr = await cmd.ExecuteReaderAsync())
-                {
+
+            using (var cmd = _connection.CreateCommand()) {
+                cmd .CommandText = $@"SELECT TOP 1 * FROM {_tblKassenbuch} WITH (NOLOCK) WHERE Belegnummer = @Belegnummer AND ISNULL(RevIsOld,0) = 0 ORDER BY ErfasstAm DESC";
+                cmd .Parameters.AddWithValue("@Belegnummer", belegnummer ?? (object)DBNull.Value);
+
+                using (var rdr = await cmd.ExecuteReaderAsync()) {
                     var dt = new DataTable();
-                    dt.Load(rdr);
+                    dt .Load(rdr);
                     return dt.Rows.Count > 0 ? dt.Rows[0] : null;
                 }
             }
         }
-
         // Hilfsfunktion: Belegnummer über KassenBelegnummer auflösen (neueste, nicht alte Revision)
-        public async Task<string> ResolveBelegnummerByKassenBelegAsync(string kassenBelegnummer)
-        {
+        public async Task<string > ResolveBelegnummerByKassenBelegAsync(string kassenBelegnummer) {
             await EnsureOpenAsync();
             if (string.IsNullOrWhiteSpace(kassenBelegnummer)) return null;
-            using (var cmd = _connection.CreateCommand())
-            {
-                cmd.CommandText = $@"SELECT TOP 1 Belegnummer FROM {_tblKassenbuch} WITH (NOLOCK) WHERE KassenBelegnummer = @KBNR AND ISNULL(RevIsOld,0)=0 ORDER BY ErfasstAm DESC";
-                cmd.Parameters.AddWithValue("@KBNR", kassenBelegnummer);
+
+            using (var cmd = _connection.CreateCommand()) {
+                cmd .CommandText = $@"SELECT TOP 1 Belegnummer FROM {_tblKassenbuch} WITH (NOLOCK) WHERE KassenBelegnummer = @KBNR AND ISNULL(RevIsOld,0)=0 ORDER BY ErfasstAm DESC";
+                cmd .Parameters.AddWithValue("@KBNR", kassenBelegnummer);
                 var o = await cmd.ExecuteScalarAsync();
                 if (o == null || o == DBNull.Value) return null;
                 return Convert.ToString(o);
             }
         }
-
         // Direkte Bearbeitung des aktuellen Eintrags ohne Revision – NUR per eindeutiger Belegnummer
-        public async Task<int> UpdateEntryDirectAsync(string belegnummer, string kassenBelegnummer,
-            string buchungstext, int? kost1, int? kost2, int? konto,
-            decimal betrag19, decimal betrag7, decimal betrag0)
-        {
+        public async Task<int > UpdateEntryDirectAsync(string belegnummer, string kassenBelegnummer, string buchungstext, int? kost1, int? kost2, int? konto, decimal betrag19, decimal betrag7, decimal betrag0) {
             await EnsureOpenAsync();
+            if (string.IsNullOrWhiteSpace(belegnummer)) throw new ArgumentException("Belegnummer ist erforderlich, um genau einen Eintrag zu aktualisieren.", nameof(belegnummer));
 
-            if (string.IsNullOrWhiteSpace(belegnummer))
-                throw new ArgumentException("Belegnummer ist erforderlich, um genau einen Eintrag zu aktualisieren.", nameof(belegnummer));
-
-            using (var cmd = _connection.CreateCommand())
-            {
-                cmd.CommandText = $@"UPDATE {_tblKassenbuch}
-SET Buchungstext=@txt, Betrag19=@b19, Betrag7=@b7, Betrag0=@b0,
-    Kost1=@k1, Kost2=@k2, Konto=@kto
-WHERE ISNULL(RevIsOld,0)=0 AND Belegnummer = @bnr";
-                cmd.Parameters.AddWithValue("@txt", (object)(buchungstext ?? (object)DBNull.Value) ?? DBNull.Value);
-                cmd.Parameters.AddWithValue("@b19", betrag19);
-                cmd.Parameters.AddWithValue("@b7", betrag7);
-                cmd.Parameters.AddWithValue("@b0", betrag0);
-                cmd.Parameters.AddWithValue("@k1", (object)kost1 ?? DBNull.Value);
-                cmd.Parameters.AddWithValue("@k2", (object)kost2 ?? DBNull.Value);
-                cmd.Parameters.AddWithValue("@kto", (object)konto ?? DBNull.Value);
-                cmd.Parameters.AddWithValue("@bnr", belegnummer);
+            using (var cmd = _connection.CreateCommand()) {
+                cmd .CommandText = $@"UPDATE {_tblKassenbuch} SET Buchungstext=@txt, Betrag19=@b19, Betrag7=@b7, Betrag0=@b0, Kost1=@k1, Kost2=@k2, Konto=@kto WHERE ISNULL(RevIsOld,0)=0 AND Belegnummer = @bnr"; cmd.Parameters.AddWithValue("@txt", (object)(buchungstext ?? (object)DBNull.Value) ?? DBNull.Value);
+                cmd .Parameters.AddWithValue("@b19", betrag19);
+                cmd .Parameters.AddWithValue("@b7", betrag7);
+                cmd .Parameters.AddWithValue("@b0", betrag0);
+                cmd .Parameters.AddWithValue("@k1", (object)kost1 ?? DBNull.Value);
+                cmd .Parameters.AddWithValue("@k2", (object)kost2 ?? DBNull.Value);
+                cmd .Parameters.AddWithValue("@kto", (object)konto ?? DBNull.Value);
+                cmd .Parameters.AddWithValue("@bnr", belegnummer);
                 return await cmd.ExecuteNonQueryAsync();
             }
         }
 
-        private async Task InsertCloneWithSameBelegnummerAsync(SqlTransaction tx, DataRow src, IDictionary<string, object> overrides, int newRevNum)
-        {
+        private async Task InsertCloneWithSameBelegnummerAsync(SqlTransaction tx, DataRow src, IDictionary<string, object> overrides, int newRevNum) {
             var writable = await GetWritableColumnsAsync(tx);
-            using (var cmd = _connection.CreateCommand())
-            {
-                cmd.Transaction = tx;
+
+            using (var cmd = _connection.CreateCommand()) {
+                cmd .Transaction = tx;
                 var cols = new List<string>();
                 var vals = new List<string>();
                 int pi = 0;
 
-                foreach (DataColumn c in src.Table.Columns)
-                {
+                foreach (DataColumn c in src.Table.Columns) {
                     var name = c.ColumnName;
                     if (!writable.Contains(name)) continue;
                     if (name.Equals("RevIsOld", StringComparison.OrdinalIgnoreCase)) continue;
@@ -832,33 +766,31 @@ WHERE ISNULL(RevIsOld,0)=0 AND Belegnummer = @bnr";
                     vals.Add(pName);
                     cmd.Parameters.AddWithValue(pName, value ?? DBNull.Value);
                 }
-
                 // Wichtig: Belegnummer NICHT setzen; DB generiert sie automatisch
-                cmd.CommandText = $@"INSERT INTO {_tblKassenbuch} ({string.Join(", ", cols)}) VALUES ({string.Join(", ", vals)})";
+                cmd .CommandText = $@"INSERT INTO {_tblKassenbuch} ({string.Join(", ", cols)}) VALUES ({string.Join(", ", vals)})";
                 await cmd.ExecuteNonQueryAsync();
             }
         }
-
         // -------- Angepasste Methoden: AutomatenName -> DeviceID ---------
 
-        public async Task<DataTable> GetKassenListeAsync(IEnumerable<string> automatenNamen)
-        {
+        public async Task<DataTable > GetKassenListeAsync(IEnumerable<string> automatenNamen) {
             await EnsureOpenAsync();
             var ids = new List<byte>();
-            foreach (var n in automatenNamen ?? Array.Empty<string>())
-            {
+
+            foreach (var n in automatenNamen ?? Array.Empty<string>()) {
                 if (byte.TryParse((n ?? string.Empty).Trim(), out var b)) ids.Add(b);
             }
-            if (ids.Count == 0) return new DataTable();
 
+            if (ids.Count == 0) return new DataTable();
             var paramNames = new List<string>();
-            int i = 0; foreach (var _ in ids) paramNames.Add($"@D{i++}");
+            int i = 0;
+            foreach (var _ in ids) paramNames.Add($"@D{i++}");
             string inClause = string.Join(", ", paramNames);
 
-            using (var cmd = _connection.CreateCommand())
-            {
-                cmd.CommandText = $@"
-;WITH raw AS (
+            using (var cmd = _connection.CreateCommand()) {
+                cmd .CommandText = $@";
+
+                WITH raw AS (
     SELECT 
         k.ManID AS FirmenId,
         k.DeviceID,
@@ -866,7 +798,7 @@ WHERE ISNULL(RevIsOld,0)=0 AND Belegnummer = @bnr";
         k.ErfasstAm
     FROM {_tblKassenbuch} k WITH (NOLOCK)
     WHERE k.DeviceID IN ({inClause})
-), x AS (
+                ), x AS (
     SELECT 
         FirmenId,
         DeviceID,
@@ -875,184 +807,175 @@ WHERE ISNULL(RevIsOld,0)=0 AND Belegnummer = @bnr";
         ROW_NUMBER() OVER (PARTITION BY FirmenId, DeviceID ORDER BY ErfasstAm DESC) rn
     FROM raw
 )
-SELECT 
-    x.FirmenId,
-    x.DeviceID,
-    COALESCE(NULLIF(LTRIM(RTRIM(d.AutomatenName)), ''), 'Gerät ' + CAST(x.DeviceID AS varchar(10))) AS AutomatenName,
-    CASE 
-        WHEN x.FirmenId = -1 THEN 'Personalguthaben'
-        WHEN x.FirmenId BETWEEN 0 AND 255 THEN ISNULL(m.ManName, 'ID ' + CAST(x.FirmenId AS varchar(10)))
-        WHEN x.FirmenId IS NULL THEN 'Unbekannt'
-        ELSE 'ID ' + CAST(x.FirmenId AS varchar(10))
-    END AS ManName,
-    x.Kassenbestand,
-    x.ErfasstAm
-FROM x
-LEFT JOIN {_tblMandanten} m ON (x.FirmenId BETWEEN 0 AND 255 AND m.ManID = x.FirmenId)
-LEFT JOIN {_tblDevices} d ON d.DeviceID = x.DeviceID
-WHERE x.rn = 1
-ORDER BY ManName ASC, x.DeviceID ASC;";
+                SELECT
+                x.FirmenId,
+                x.DeviceID,
+                COALESCE(NULLIF(LTRIM(RTRIM(d.AutomatenName)), ''), 'Gerät ' + CAST(x.DeviceID AS varchar(10))) AS AutomatenName,
+                CASE
+                WHEN x.FirmenId = -1 THEN 'Personalguthaben'
+                WHEN x.FirmenId BETWEEN 0 AND 255 THEN ISNULL(m.ManName, 'ID ' + CAST(x.FirmenId AS varchar(10)))
+                WHEN x.FirmenId IS NULL THEN 'Unbekannt'
+                ELSE 'ID ' + CAST(x.FirmenId AS varchar(10))
+                END AS ManName,
+                x.Kassenbestand,
+                x.ErfasstAm
+                FROM x
+                LEFT JOIN {
+                    _tblMandanten
+                }
 
-                i = 0; foreach (var id in ids) cmd.Parameters.AddWithValue($"@D{i++}", id);
+                m ON (x.FirmenId BETWEEN 0 AND 255 AND m.ManID = x.FirmenId)
+                LEFT JOIN {
+                    _tblDevices
+                }
 
-                using (var rdr = await cmd.ExecuteReaderAsync()) { var dt = new DataTable(); dt.Load(rdr); return dt; }
+                d ON d.DeviceID = x.DeviceID WHERE x.rn = 1 ORDER BY ManName ASC, x.DeviceID ASC;
+                "; i = 0;
+                foreach (var id in ids) cmd.Parameters.AddWithValue($"@D{i++}", id);
+
+                using (var rdr = await cmd.ExecuteReaderAsync()) {
+                    var dt = new DataTable();
+                    dt .Load(rdr);
+                    return dt;
+                }
             }
         }
 
-        public async Task<decimal> GetAnfangsbestandAsync(int firmenId, string automatenNameAlsDeviceId, DateTime tag)
-        {
+        public async Task<decimal > GetAnfangsbestandAsync(int firmenId, string automatenNameAlsDeviceId, DateTime tag) {
             await EnsureOpenAsync();
-            byte deviceId = 0; byte.TryParse(automatenNameAlsDeviceId ?? string.Empty, out deviceId);
+            byte deviceId = 0;
+            byte .TryParse(automatenNameAlsDeviceId ?? string.Empty, out deviceId);
             var dayStart = new DateTime(tag.Year, tag.Month, tag.Day, 0, 0, 0);
-            using (var cmd = _connection.CreateCommand())
-            {
-                cmd.CommandText = $"SELECT TOP 1 Kassenbestand FROM {_tblKassenbuch} WITH (NOLOCK) WHERE ManID = @FID AND DeviceID = @Dev AND ErfasstAm < @DayStart ORDER BY ErfasstAm DESC;";
-                cmd.Parameters.AddWithValue("@FID", firmenId);
-                cmd.Parameters.AddWithValue("@Dev", deviceId);
-                cmd.Parameters.AddWithValue("@DayStart", dayStart);
-                var res = await cmd.ExecuteScalarAsync(); return (res == null || res == DBNull.Value) ? 0m : Convert.ToDecimal(res);
+
+            using (var cmd = _connection.CreateCommand()) {
+                cmd .CommandText = $"SELECT TOP 1 Kassenbestand FROM {_tblKassenbuch} WITH (NOLOCK) WHERE ManID = @FID AND DeviceID = @Dev AND ErfasstAm < @DayStart ORDER BY ErfasstAm DESC;";
+                cmd .Parameters.AddWithValue("@FID", firmenId);
+                cmd .Parameters.AddWithValue("@Dev", deviceId);
+                cmd .Parameters.AddWithValue("@DayStart", dayStart);
+                var res = await cmd.ExecuteScalarAsync();
+                return (res == null || res == DBNull.Value) ? 0m : Convert.ToDecimal(res);
             }
         }
 
-        public async Task<decimal> GetEndbestandAsync(int firmenId, string automatenNameAlsDeviceId, DateTime tag)
-        {
+        public async Task<decimal > GetEndbestandAsync(int firmenId, string automatenNameAlsDeviceId, DateTime tag) {
             await EnsureOpenAsync();
-            byte deviceId = 0; byte.TryParse(automatenNameAlsDeviceId ?? string.Empty, out deviceId);
+            byte deviceId = 0;
+            byte .TryParse(automatenNameAlsDeviceId ?? string.Empty, out deviceId);
             var dayEnd = new DateTime(tag.Year, tag.Month, tag.Day, 23, 59, 59);
-            using (var cmd = _connection.CreateCommand())
-            {
-                cmd.CommandText = $"SELECT TOP 1 Kassenbestand FROM {_tblKassenbuch} WITH (NOLOCK) WHERE ManID = @FID AND DeviceID = @Dev AND ErfasstAm <= @DayEnd ORDER BY ErfasstAm DESC, Belegnummer DESC;";
-                cmd.Parameters.AddWithValue("@FID", firmenId);
-                cmd.Parameters.AddWithValue("@Dev", deviceId);
-                cmd.Parameters.AddWithValue("@DayEnd", dayEnd);
-                var res = await cmd.ExecuteScalarAsync(); return (res == null || res == DBNull.Value) ? 0m : Convert.ToDecimal(res);
+
+            using (var cmd = _connection.CreateCommand()) {
+                cmd .CommandText = $"SELECT TOP 1 Kassenbestand FROM {_tblKassenbuch} WITH (NOLOCK) WHERE ManID = @FID AND DeviceID = @Dev AND ErfasstAm <= @DayEnd ORDER BY ErfasstAm DESC, Belegnummer DESC;";
+                cmd .Parameters.AddWithValue("@FID", firmenId);
+                cmd .Parameters.AddWithValue("@Dev", deviceId);
+                cmd .Parameters.AddWithValue("@DayEnd", dayEnd);
+                var res = await cmd.ExecuteScalarAsync();
+                return (res == null || res == DBNull.Value) ? 0m : Convert.ToDecimal(res);
             }
         }
 
-        public async Task<DataTable> GetKassenTagEintraegeAsync(int firmenId, string automatenNameAlsDeviceId, DateTime tag)
-        {
+        public async Task<DataTable > GetKassenTagEintraegeAsync(int firmenId, string automatenNameAlsDeviceId, DateTime tag) {
             await EnsureOpenAsync();
-            byte deviceId = 0; byte.TryParse(automatenNameAlsDeviceId ?? string.Empty, out deviceId);
+            byte deviceId = 0;
+            byte .TryParse(automatenNameAlsDeviceId ?? string.Empty, out deviceId);
             var dayStart = new DateTime(tag.Year, tag.Month, tag.Day, 0, 0, 0);
             var dayEnd = new DateTime(tag.Year, tag.Month, tag.Day, 23, 59, 59);
-            using (var cmd = _connection.CreateCommand())
-            {
-                cmd.CommandText = $@"
-SELECT 
-    Belegnummer,
-    KassenBelegnummer,
-    SchichtId,
-    FhzId,
-    ErfasstAm,
-    Typ,
-    Buchungstext,
-    CAST(ISNULL(Betrag19,0) + ISNULL(Betrag7,0) + ISNULL(Betrag0,0) AS money) AS Betrag,
-    Betrag19,
-    Betrag7,
-    Betrag0,
-    Kassenbestand,
-    Kost1,
-    Kost2,
-    Konto,
-    ISNULL(RevNum, 0) AS RevNum,
-    ISNULL(RevIsOld, 0) AS RevIsOld,
-    ISNULL(Festgeschrieben, 0) AS Festgeschrieben
-FROM {_tblKassenbuch} WITH (NOLOCK)
-WHERE ManID = @FID AND DeviceID = @Dev AND ErfasstAm >= @From AND ErfasstAm <= @To
-ORDER BY ErfasstAm ASC, Belegnummer ASC;";
-                cmd.Parameters.AddWithValue("@FID", firmenId);
-                cmd.Parameters.AddWithValue("@Dev", deviceId);
-                cmd.Parameters.AddWithValue("@From", dayStart);
-                cmd.Parameters.AddWithValue("@To", dayEnd);
-                using (var rdr = await cmd.ExecuteReaderAsync()) { var dt = new DataTable(); dt.Load(rdr); return dt; }
+
+            using (var cmd = _connection.CreateCommand()) {
+                cmd .CommandText = $@" SELECT Belegnummer, KassenBelegnummer, SchichtId, FhzId, ErfasstAm, Typ, Buchungstext, CAST(ISNULL(Betrag19,0) + ISNULL(Betrag7,0) + ISNULL(Betrag0,0) AS money) AS Betrag, Betrag19, Betrag7, Betrag0, Kassenbestand, Kost1, Kost2, Konto, ISNULL(RevNum, 0) AS RevNum, ISNULL(RevIsOld, 0) AS RevIsOld, ISNULL(Festgeschrieben, 0) AS Festgeschrieben FROM {
+                    _tblKassenbuch
+                }
+
+                WITH (NOLOCK) WHERE ManID = @FID AND DeviceID = @Dev AND ErfasstAm >= @From AND ErfasstAm <= @To ORDER BY ErfasstAm ASC, Belegnummer ASC;
+                "; cmd.Parameters.AddWithValue("@FID", firmenId);
+                cmd .Parameters.AddWithValue("@Dev", deviceId);
+                cmd .Parameters.AddWithValue("@From", dayStart);
+                cmd .Parameters.AddWithValue("@To", dayEnd);
+
+                using (var rdr = await cmd.ExecuteReaderAsync()) {
+                    var dt = new DataTable();
+                    dt .Load(rdr);
+                    return dt;
+                }
             }
         }
-
         // NEU: Einträge für beliebigen Zeitraum (inkl. FhzId/SchichtId)
-        public async Task<DataTable> GetKassenEintraegeAsync(int firmenId, string automatenNameAlsDeviceId, DateTime von, DateTime bis)
-        {
+        public async Task<DataTable > GetKassenEintraegeAsync(int firmenId, string automatenNameAlsDeviceId, DateTime von, DateTime bis) {
             await EnsureOpenAsync();
-            byte deviceId = 0; byte.TryParse(automatenNameAlsDeviceId ?? string.Empty, out deviceId);
+            byte deviceId = 0;
+            byte .TryParse(automatenNameAlsDeviceId ?? string.Empty, out deviceId);
             var from = new DateTime(von.Year, von.Month, von.Day, 0, 0, 0);
             var to = new DateTime(bis.Year, bis.Month, bis.Day, 23, 59, 59);
-            using (var cmd = _connection.CreateCommand())
-            {
-                cmd.CommandText = $@"
-SELECT 
-    Belegnummer,
-    KassenBelegnummer,
-    SchichtId,
-    FhzId,
-    ErfasstAm,
-    Typ,
-    Buchungstext,
-    CAST(ISNULL(Betrag19,0) + ISNULL(Betrag7,0) + ISNULL(Betrag0,0) AS money) AS Betrag,
-    Betrag19,
-    Betrag7,
-    Betrag0,
-    Kassenbestand,
-    Kost1,
-    Kost2,
-    Konto,
-    ISNULL(RevNum, 0) AS RevNum,
-    ISNULL(RevIsOld, 0) AS RevIsOld,
-    ISNULL(Festgeschrieben, 0) AS Festgeschrieben
-FROM {_tblKassenbuch} WITH (NOLOCK)
-WHERE ManID = @FID AND DeviceID = @Dev AND ErfasstAm >= @From AND ErfasstAm <= @To
-ORDER BY ErfasstAm ASC, Belegnummer ASC;";
-                cmd.Parameters.AddWithValue("@FID", firmenId);
-                cmd.Parameters.AddWithValue("@Dev", deviceId);
-                cmd.Parameters.AddWithValue("@From", from);
-                cmd.Parameters.AddWithValue("@To", to);
-                using (var rdr = await cmd.ExecuteReaderAsync()) { var dt = new DataTable(); dt.Load(rdr); return dt; }
+
+            using (var cmd = _connection.CreateCommand()) {
+                cmd .CommandText = $@" SELECT Belegnummer, KassenBelegnummer, SchichtId, FhzId, ErfasstAm, Typ, Buchungstext, CAST(ISNULL(Betrag19,0) + ISNULL(Betrag7,0) + ISNULL(Betrag0,0) AS money) AS Betrag, Betrag19, Betrag7, Betrag0, Kassenbestand, Kost1, Kost2, Konto, ISNULL(RevNum, 0) AS RevNum, ISNULL(RevIsOld, 0) AS RevIsOld, ISNULL(Festgeschrieben, 0) AS Festgeschrieben FROM {
+                    _tblKassenbuch
+                }
+
+                WITH (NOLOCK) WHERE ManID = @FID AND DeviceID = @Dev AND ErfasstAm >= @From AND ErfasstAm <= @To ORDER BY ErfasstAm ASC, Belegnummer ASC;
+                "; cmd.Parameters.AddWithValue("@FID", firmenId);
+                cmd .Parameters.AddWithValue("@Dev", deviceId);
+                cmd .Parameters.AddWithValue("@From", from);
+                cmd .Parameters.AddWithValue("@To", to);
+
+                using (var rdr = await cmd.ExecuteReaderAsync()) {
+                    var dt = new DataTable();
+                    dt .Load(rdr);
+                    return dt;
+                }
             }
         }
 
-        public async Task<int> LockDayAsync(int firmenId, string automatenNameAlsDeviceId, DateTime tag)
-        {
+        public async Task<int > LockDayAsync(int firmenId, string automatenNameAlsDeviceId, DateTime tag) {
             await EnsureOpenAsync();
-            byte deviceId = 0; byte.TryParse(automatenNameAlsDeviceId ?? string.Empty, out deviceId);
-            using (var cmd = _connection.CreateCommand())
-            {
+            byte deviceId = 0;
+            byte .TryParse(automatenNameAlsDeviceId ?? string.Empty, out deviceId);
+
+            using (var cmd = _connection.CreateCommand()) {
                 var dayEnd = new DateTime(tag.Year, tag.Month, tag.Day, 23, 59, 59);
-                cmd.CommandText = $"UPDATE {_tblKassenbuch} SET Festgeschrieben = 1 WHERE ManID = @FID AND DeviceID = @Dev AND ErfasstAm <= @DayEnd AND ISNULL(Festgeschrieben,0) = 0";
-                cmd.Parameters.AddWithValue("@FID", firmenId);
-                cmd.Parameters.AddWithValue("@Dev", deviceId);
-                cmd.Parameters.AddWithValue("@DayEnd", dayEnd);
+                cmd .CommandText = $"UPDATE {_tblKassenbuch} SET Festgeschrieben = 1 WHERE ManID = @FID AND DeviceID = @Dev AND ErfasstAm <= @DayEnd AND ISNULL(Festgeschrieben,0) = 0";
+                cmd .Parameters.AddWithValue("@FID", firmenId);
+                cmd .Parameters.AddWithValue("@Dev", deviceId);
+                cmd .Parameters.AddWithValue("@DayEnd", dayEnd);
                 return await cmd.ExecuteNonQueryAsync();
             }
         }
 
-        public async Task<bool> IsLockedUntilAsync(int firmenId, string automatenNameAlsDeviceId, DateTime tag)
-        {
+        public async Task<bool > IsLockedUntilAsync(int firmenId, string automatenNameAlsDeviceId, DateTime tag) {
             await EnsureOpenAsync();
-            byte deviceId = 0; byte.TryParse(automatenNameAlsDeviceId ?? string.Empty, out deviceId);
-            using (var cmd = _connection.CreateCommand())
-            {
+            byte deviceId = 0;
+            byte .TryParse(automatenNameAlsDeviceId ?? string.Empty, out deviceId);
+
+            using (var cmd = _connection.CreateCommand()) {
                 var dayEnd = new DateTime(tag.Year, tag.Month, tag.Day, 23, 59, 59);
-                cmd.CommandText = $"SELECT COUNT(1) FROM {_tblKassenbuch} WHERE ManID = @FID AND DeviceID = @Dev AND ErfasstAm <= @DayEnd AND ISNULL(Festgeschrieben,0) = 0";
-                cmd.Parameters.AddWithValue("@FID", firmenId);
-                cmd.Parameters.AddWithValue("@Dev", deviceId);
-                cmd.Parameters.AddWithValue("@DayEnd", dayEnd);
+                cmd .CommandText = $"SELECT COUNT(1) FROM {_tblKassenbuch} WHERE ManID = @FID AND DeviceID = @Dev AND ErfasstAm <= @DayEnd AND ISNULL(Festgeschrieben,0) = 0";
+                cmd .Parameters.AddWithValue("@FID", firmenId);
+                cmd .Parameters.AddWithValue("@Dev", deviceId);
+                cmd .Parameters.AddWithValue("@DayEnd", dayEnd);
                 var o = await cmd.ExecuteScalarAsync();
                 var cnt = (o == null || o == DBNull.Value) ? 0 : Convert.ToInt32(o);
                 return cnt == 0; // true, wenn bis inkl. Tag alles festgeschrieben ist
             }
         }
-
         // Revision / Split Methoden bleiben unverändert, da sie Belegnummer-basiert arbeiten
-        public async Task ReviseSingleAsync(string belegnummer, string buchungstext, int? kost1, int? kost2, int? konto,
-            decimal betrag19, decimal betrag7, decimal betrag0)
-        {
+        public async Task ReviseSingleAsync(string belegnummer, string buchungstext, int? kost1, int? kost2, int? konto, decimal betrag19, decimal betrag7, decimal betrag0) {
             await EnsureOpenAsync();
+
             using (var tx = _connection.BeginTransaction())
-            using (var cmd = _connection.CreateCommand())
-            {
-                cmd.Transaction = tx;
-                cmd.CommandText = $@"SELECT TOP 1 * FROM {_tblKassenbuch} WITH (UPDLOCK, ROWLOCK) WHERE Belegnummer = @Belegnummer AND ISNULL(RevIsOld,0)=0 ORDER BY ErfasstAm DESC";
-                cmd.Parameters.AddWithValue("@Belegnummer", belegnummer ?? (object)DBNull.Value);
-                var src = new DataTable(); using (var rdr = await cmd.ExecuteReaderAsync()) { src.Load(rdr); }
-                if (src.Rows.Count == 0) { tx.Rollback(); throw new InvalidOperationException("Eintrag nicht gefunden."); }
+            using (var cmd = _connection.CreateCommand()) {
+                cmd .Transaction = tx;
+                cmd .CommandText = $@"SELECT TOP 1 * FROM {_tblKassenbuch} WITH (UPDLOCK, ROWLOCK) WHERE Belegnummer = @Belegnummer AND ISNULL(RevIsOld,0)=0 ORDER BY ErfasstAm DESC";
+                cmd .Parameters.AddWithValue("@Belegnummer", belegnummer ?? (object)DBNull.Value);
+                var src = new DataTable();
+
+                using (var rdr = await cmd.ExecuteReaderAsync()) {
+                    src .Load(rdr);
+                }
+
+                if (src.Rows.Count == 0) {
+                    tx .Rollback();
+                    throw new InvalidOperationException("Eintrag nicht gefunden.");
+                }
+
                 var r = src.Rows[0];
                 int currentRev = (r.Table.Columns.Contains("RevNum") && r["RevNum"] != DBNull.Value) ? Convert.ToInt32(r["RevNum"]) : 0;
                 int newRev = currentRev + 1;
@@ -1088,20 +1011,25 @@ ORDER BY ErfasstAm ASC, Belegnummer ASC;";
             }
         }
 
-        public async Task SplitByVatAsync(string belegnummer, string buchungstext,
-            decimal b19, int? k1_19, int? k2_19, int? kto_19,
-            decimal b7, int? k1_7, int? k2_7, int? kto_7,
-            decimal b0, int? k1_0, int? k2_0, int? kto_0)
-        {
+        public async Task SplitByVatAsync(string belegnummer, string buchungstext, decimal b19, int? k1_19, int? k2_19, int? kto_19, decimal b7, int? k1_7, int? k2_7, int? kto_7, decimal b0, int? k1_0, int? k2_0, int? kto_0) {
             await EnsureOpenAsync();
+
             using (var tx = _connection.BeginTransaction())
-            using (var cmd = _connection.CreateCommand())
-            {
-                cmd.Transaction = tx;
-                cmd.CommandText = $@"SELECT TOP 1 * FROM {_tblKassenbuch} WITH (UPDLOCK, ROWLOCK) WHERE Belegnummer = @Belegnummer AND ISNULL(RevIsOld,0) = 0 ORDER BY ErfasstAm DESC";
-                cmd.Parameters.AddWithValue("@Belegnummer", belegnummer ?? (object)DBNull.Value);
-                var src = new DataTable(); using (var rdr = await cmd.ExecuteReaderAsync()) { src.Load(rdr); }
-                if (src.Rows.Count == 0) { tx.Rollback(); throw new InvalidOperationException("Eintrag nicht gefunden."); }
+            using (var cmd = _connection.CreateCommand()) {
+                cmd .Transaction = tx;
+                cmd .CommandText = $@"SELECT TOP 1 * FROM {_tblKassenbuch} WITH (UPDLOCK, ROWLOCK) WHERE Belegnummer = @Belegnummer AND ISNULL(RevIsOld,0) = 0 ORDER BY ErfasstAm DESC";
+                cmd .Parameters.AddWithValue("@Belegnummer", belegnummer ?? (object)DBNull.Value);
+                var src = new DataTable();
+
+                using (var rdr = await cmd.ExecuteReaderAsync()) {
+                    src .Load(rdr);
+                }
+
+                if (src.Rows.Count == 0) {
+                    tx .Rollback();
+                    throw new InvalidOperationException("Eintrag nicht gefunden.");
+                }
+
                 var r = src.Rows[0];
                 int currentRev = (r.Table.Columns.Contains("RevNum") && r["RevNum"] != DBNull.Value) ? Convert.ToInt32(r["RevNum"]) : 0;
                 int nextRev = currentRev + 1;
@@ -1224,23 +1152,18 @@ WHERE SchichtId=@SID";
                 tx.Commit();
             }
         }
-
         // ---------- Persistenz Abrechnungsregeln ----------
-        private async Task EnsureRulesTableAsync()
-        {
+        private async Task EnsureRulesTableAsync() {
             await EnsureOpenAsync();
-            if (string.IsNullOrEmpty(_tblAbrechnungsRegeln))
-                _tblAbrechnungsRegeln = await ResolveQualifiedTableAsync("TAbrechnungsBedingungen") ?? "[dbo].[TAbrechnungsBedingungen]";
-            if (string.IsNullOrEmpty(_tblAbrechnungsClauses))
-                _tblAbrechnungsClauses = await ResolveQualifiedTableAsync("TAbrechnungsBedingungenClause") ?? "[dbo].[TAbrechnungsBedingungenClause]";
+            if (string.IsNullOrEmpty(_tblAbrechnungsRegeln)) _tblAbrechnungsRegeln = await ResolveQualifiedTableAsync("TAbrechnungsBedingungen") ?? "[dbo].[TAbrechnungsBedingungen]";
+            if (string.IsNullOrEmpty(_tblAbrechnungsClauses)) _tblAbrechnungsClauses = await ResolveQualifiedTableAsync("TAbrechnungsBedingungenClause") ?? "[dbo].[TAbrechnungsBedingungenClause]";
 
-            using (var cmd = _connection.CreateCommand())
-            {
-                cmd.CommandText = $@"
-IF NOT EXISTS (SELECT 1 FROM sys.tables t JOIN sys.schemas s ON s.schema_id=t.schema_id WHERE t.name='TAbrechnungsBedingungen')
-BEGIN
-    CREATE TABLE {_tblAbrechnungsRegeln}
-    (
+            using (var cmd = _connection.CreateCommand()) {
+                cmd .CommandText = $@" IF NOT EXISTS (SELECT 1 FROM sys.tables t JOIN sys.schemas s ON s.schema_id=t.schema_id WHERE t.name='TAbrechnungsBedingungen') BEGIN CREATE TABLE {
+                    _tblAbrechnungsRegeln
+                }
+
+                (
         Id              int IDENTITY(1,1) PRIMARY KEY,
         Name            varchar(200) NOT NULL,
         JoinKind        varchar(10)  NULL,
@@ -1257,27 +1180,16 @@ BEGIN
         CreatedAt       datetime2(0) NOT NULL DEFAULT(SYSUTCDATETIME()),
         ModifiedAt      datetime2(0) NULL
     );
-END
+                END -- Migration: vorhandene int-Spalten auf varchar(20) ändern DECLARE @objRules nvarchar(256) = REPLACE(REPLACE('{_tblAbrechnungsRegeln}', '[', ''), ']', '');
+                IF EXISTS (SELECT 1 FROM sys.columns WHERE object_id = OBJECT_ID(@objRules) AND name = 'ResultKost1' AND system_type_id IN (48,52,56,127)) BEGIN EXEC('ALTER TABLE {_tblAbrechnungsRegeln} ALTER COLUMN ResultKost1 varchar(20) NULL');
+                END IF EXISTS (SELECT 1 FROM sys.columns WHERE object_id = OBJECT_ID(@objRules) AND name = 'ResultKost2' AND system_type_id IN (48,52,56,127)) BEGIN EXEC('ALTER TABLE {_tblAbrechnungsRegeln} ALTER COLUMN ResultKost2 varchar(20) NULL');
+                END IF EXISTS (SELECT 1 FROM sys.columns WHERE object_id = OBJECT_ID(@objRules) AND name = 'ResultKonto' AND system_type_id IN (48,52,56,127)) BEGIN EXEC('ALTER TABLE {_tblAbrechnungsRegeln} ALTER COLUMN ResultKonto varchar(20) NULL');
 
--- Migration: vorhandene int-Spalten auf varchar(20) ändern
-DECLARE @objRules nvarchar(256) = REPLACE(REPLACE('{_tblAbrechnungsRegeln}', '[', ''), ']', '');
-IF EXISTS (SELECT 1 FROM sys.columns WHERE object_id = OBJECT_ID(@objRules) AND name = 'ResultKost1' AND system_type_id IN (48,52,56,127))
-BEGIN
-    EXEC('ALTER TABLE {_tblAbrechnungsRegeln} ALTER COLUMN ResultKost1 varchar(20) NULL');
-END
-IF EXISTS (SELECT 1 FROM sys.columns WHERE object_id = OBJECT_ID(@objRules) AND name = 'ResultKost2' AND system_type_id IN (48,52,56,127))
-BEGIN
-    EXEC('ALTER TABLE {_tblAbrechnungsRegeln} ALTER COLUMN ResultKost2 varchar(20) NULL');
-END
-IF EXISTS (SELECT 1 FROM sys.columns WHERE object_id = OBJECT_ID(@objRules) AND name = 'ResultKonto' AND system_type_id IN (48,52,56,127))
-BEGIN
-    EXEC('ALTER TABLE {_tblAbrechnungsRegeln} ALTER COLUMN ResultKonto varchar(20) NULL');
-END
+                END IF NOT EXISTS (SELECT 1 FROM sys.tables t JOIN sys.schemas s ON s.schema_id=t.schema_id WHERE t.name='TAbrechnungsBedingungenClause') BEGIN CREATE TABLE {
+                    _tblAbrechnungsClauses
+                }
 
-IF NOT EXISTS (SELECT 1 FROM sys.tables t JOIN sys.schemas s ON s.schema_id=t.schema_id WHERE t.name='TAbrechnungsBedingungenClause')
-BEGIN
-    CREATE TABLE {_tblAbrechnungsClauses}
-    (
+                (
         Id       int IDENTITY(1,1) PRIMARY KEY,
         RuleId   int NOT NULL,
         GroupId  int NOT NULL DEFAULT(0),
@@ -1285,128 +1197,194 @@ BEGIN
         Operator nvarchar(16) NOT NULL,
         Value    nvarchar(4000) NULL
     );
-    CREATE INDEX IX_Clauses_RuleId ON {_tblAbrechnungsClauses}(RuleId);
-END";
-                await cmd.ExecuteNonQueryAsync();
+
+                CREATE INDEX IX_Clauses_RuleId ON {
+                    _tblAbrechnungsClauses
+                }
+
+                (RuleId);
+                END "; await cmd.ExecuteNonQueryAsync();
             }
         }
 
-        public async Task<DataTable> LoadAbrechnungsRegelnAsync()
-        {
+        public async Task<DataTable > LoadAbrechnungsRegelnAsync() {
             await EnsureRulesTableAsync();
-            using (var cmd = _connection.CreateCommand())
-            {
+
+            using (var cmd = _connection.CreateCommand()) {
                 // Explicit column list to avoid binding issues with legacy/removed columns
-                cmd.CommandText = $@"SELECT Id, Name, JoinKind, IsDefault, Priority,
-    ResultKost1, ResultKost2, ResultKonto, ResultText, IsActive
-FROM {_tblAbrechnungsRegeln} WITH (NOLOCK)
-WHERE IsActive=1
-ORDER BY Priority ASC, Id ASC";
-                using (var rdr = await cmd.ExecuteReaderAsync())
-                {
-                    var dt = new DataTable(); dt.Load(rdr); return dt;
+                cmd .CommandText = $@"SELECT Id, Name, JoinKind, IsDefault, Priority, ResultKost1, ResultKost2, ResultKonto, ResultText, IsActive FROM {
+                    _tblAbrechnungsRegeln
+                }
+
+                WITH (NOLOCK) WHERE IsActive=1 ORDER BY Priority ASC, Id ASC"; using (var rdr = await cmd.ExecuteReaderAsync()) {
+                    var dt = new DataTable();
+                    dt .Load(rdr);
+                    return dt;
                 }
             }
         }
 
-        public async Task<DataTable> LoadAbrechnungsClausesAsync()
-        {
+        public async Task<DataTable > LoadAbrechnungsClausesAsync() {
             await EnsureRulesTableAsync();
-            using (var cmd = _connection.CreateCommand())
-            {
-                cmd.CommandText = $@"SELECT * FROM {_tblAbrechnungsClauses} WITH (NOLOCK) ORDER BY RuleId ASC, GroupId ASC, Id ASC";
-                using (var rdr = await cmd.ExecuteReaderAsync())
-                {
-                    var dt = new DataTable(); dt.Load(rdr); return dt;
+
+            using (var cmd = _connection.CreateCommand()) {
+                cmd .CommandText = $@"SELECT * FROM {_tblAbrechnungsClauses} WITH (NOLOCK) ORDER BY RuleId ASC, GroupId ASC, Id ASC";
+
+                using (var rdr = await cmd.ExecuteReaderAsync()) {
+                    var dt = new DataTable();
+                    dt .Load(rdr);
+                    return dt;
                 }
             }
         }
 
-        public async Task<int> SaveAbrechnungsRegelAsync(AbrechnungsRegel r)
-        {
+        public async Task<int > SaveAbrechnungsRegelAsync(AbrechnungsRegel r) {
             await EnsureRulesTableAsync();
-            using (var cmd = _connection.CreateCommand())
-            {
-                if (r.Id == 0)
-                {
-                    cmd.CommandText = $@"INSERT INTO {_tblAbrechnungsRegeln}
-(Name, JoinKind, IsDefault, Priority, ResultKost1, ResultKost2, ResultKonto, ResultText, IsActive, ModifiedAt)
-VALUES (@Name,@Join,@Def,@Prio,@K1,@K2,@Kto,@Txt,1,SYSUTCDATETIME()); SELECT SCOPE_IDENTITY();";
-                }
-                else
-                {
-                    cmd.CommandText = $@"UPDATE {_tblAbrechnungsRegeln}
-SET Name=@Name, JoinKind=@Join, IsDefault=@Def, Priority=@Prio, ResultKost1=@K1, ResultKost2=@K2, ResultKonto=@Kto, ResultText=@Txt, ModifiedAt=SYSUTCDATETIME()
-WHERE Id=@Id; SELECT @Id;";
-                    cmd.Parameters.AddWithValue("@Id", r.Id);
-                }
-                cmd.Parameters.AddWithValue("@Name", (r.Name ?? string.Empty).Trim());
-                cmd.Parameters.AddWithValue("@Join", (r.JoinKind ?? string.Empty).Trim());
-                cmd.Parameters.AddWithValue("@Def", r.IsDefault);
-                cmd.Parameters.AddWithValue("@Prio", r.Priority);
 
+            using (var cmd = _connection.CreateCommand()) {
+                if (r.Id == 0) {
+                    cmd .CommandText = $@"INSERT INTO {_tblAbrechnungsRegeln} (Name, JoinKind, IsDefault, Priority, ResultKost1, ResultKost2, ResultKonto, ResultText, IsActive, ModifiedAt) VALUES (@Name,@Join,@Def,@Prio,@K1,@K2,@Kto,@Txt,1,SYSUTCDATETIME());
+                    SELECT SCOPE_IDENTITY();
+                    ";
+                }
+
+                else {
+                    cmd .CommandText = $@"UPDATE {_tblAbrechnungsRegeln} SET Name=@Name, JoinKind=@Join, IsDefault=@Def, Priority=@Prio, ResultKost1=@K1, ResultKost2=@K2, ResultKonto=@Kto, ResultText=@Txt, ModifiedAt=SYSUTCDATETIME() WHERE Id=@Id;
+                    SELECT @Id;
+                    "; cmd.Parameters.AddWithValue("@Id", r.Id);
+                }
+
+                cmd .Parameters.AddWithValue("@Name", (r.Name ?? string.Empty).Trim());
+                cmd .Parameters.AddWithValue("@Join", (r.JoinKind ?? string.Empty).Trim());
+                cmd .Parameters.AddWithValue("@Def", r.IsDefault);
+                cmd .Parameters.AddWithValue("@Prio", r.Priority);
                 // Werte als String speichern (varchar(20)); numerische werden konvertiert, leere zu ""
-                string Normalize(object v)
-                {
+                string Normalize(object v) {
                     var s = v == null ? string.Empty : Convert.ToString(v);
                     return string.IsNullOrWhiteSpace(s) ? string.Empty : s.Trim();
                 }
+
                 var pK1 = Normalize(r.ResultKost1);
                 var pK2 = Normalize(r.ResultKost2);
                 var pKto = Normalize(r.ResultKonto);
-                cmd.Parameters.AddWithValue("@K1", pK1);
-                cmd.Parameters.AddWithValue("@K2", pK2);
-                cmd.Parameters.AddWithValue("@Kto", pKto);
-
-                cmd.Parameters.AddWithValue("@Txt", (r.ResultBuchungstext ?? string.Empty));
+                cmd .Parameters.AddWithValue("@K1", pK1);
+                cmd .Parameters.AddWithValue("@K2", pK2);
+                cmd .Parameters.AddWithValue("@Kto", pKto);
+                cmd .Parameters.AddWithValue("@Txt", (r.ResultBuchungstext ?? string.Empty));
                 var o = await cmd.ExecuteScalarAsync();
                 int ruleId = Convert.ToInt32(Convert.ToDecimal(o));
-
                 await SaveClausesAsync(ruleId, r.Clauses);
                 return ruleId;
             }
         }
 
-        public async Task SaveClausesAsync(int ruleId, IList<AbrechnungsClause> clauses)
-        {
-            await EnsureRulesTableAsync();
-            using (var tx = _connection.BeginTransaction())
-            using (var cmd = _connection.CreateCommand())
-            {
-                cmd.Transaction = tx;
-                cmd.CommandText = $@"DELETE FROM {_tblAbrechnungsClauses} WHERE RuleId=@R";
-                cmd.Parameters.AddWithValue("@R", ruleId);
-                await cmd.ExecuteNonQueryAsync();
-                cmd.Parameters.Clear();
+        public async Task<DataTable > GetLetzteLoginHistoryEventsAsync(int persId) {
+            var dt = new DataTable();
+            await EnsureOpenAsync();
 
-                if (clauses != null)
-                {
-                    foreach (var c in clauses)
-                    {
-                        cmd.CommandText = $@"INSERT INTO {_tblAbrechnungsClauses} (RuleId, GroupId, Field, Operator, Value) VALUES (@R,@G,@F,@O,@V)";
-                        cmd.Parameters.AddWithValue("@R", ruleId);
-                        cmd.Parameters.AddWithValue("@G", c.GroupId);
-                        cmd.Parameters.AddWithValue("@F", (object)(c.Field ?? (object)DBNull.Value) ?? DBNull.Value);
-                        cmd.Parameters.AddWithValue("@O", (object)(c.Operator ?? (object)DBNull.Value) ?? DBNull.Value);
-                        cmd.Parameters.AddWithValue("@V", (object)(c.Value ?? (object)DBNull.Value) ?? DBNull.Value);
+            using (var cmd = _connection.CreateCommand()) {
+                cmd .CommandText = @" SELECT EventTyp, MAX(EventZeit) AS EventZeit FROM THistoryEvents WHERE EventPersID = @PersID AND EventTyp IN (91, 92) GROUP BY EventTyp;
+                "; var p = cmd.CreateParameter();
+                p .ParameterName = "@PersID";
+                p .Value = persId;
+                cmd .Parameters.Add(p);
+
+                using (var reader = await cmd.ExecuteReaderAsync()) {
+                    dt .Load(reader);
+                }
+            }
+
+            return dt;
+        }
+
+        public async Task SaveClausesAsync(int ruleId, IList<AbrechnungsClause> clauses) {
+            await EnsureRulesTableAsync();
+
+            using (var tx = _connection.BeginTransaction())
+            using (var cmd = _connection.CreateCommand()) {
+                cmd .Transaction = tx;
+                cmd .CommandText = $@"DELETE FROM {_tblAbrechnungsClauses} WHERE RuleId=@R";
+                cmd .Parameters.AddWithValue("@R", ruleId);
+                await cmd.ExecuteNonQueryAsync();
+                cmd .Parameters.Clear();
+
+                if (clauses != null) {
+                    foreach (var c in clauses) {
+                        cmd .CommandText = $@"INSERT INTO {_tblAbrechnungsClauses} (RuleId, GroupId, Field, Operator, Value) VALUES (@R,@G,@F,@O,@V)";
+                        cmd .Parameters.AddWithValue("@R", ruleId);
+                        cmd .Parameters.AddWithValue("@G", c.GroupId);
+                        cmd .Parameters.AddWithValue("@F", (object)(c.Field ?? (object)DBNull.Value) ?? DBNull.Value);
+                        cmd .Parameters.AddWithValue("@O", (object)(c.Operator ?? (object)DBNull.Value) ?? DBNull.Value);
+                        cmd .Parameters.AddWithValue("@V", (object)(c.Value ?? (object)DBNull.Value) ?? DBNull.Value);
                         await cmd.ExecuteNonQueryAsync();
-                        cmd.Parameters.Clear();
+                        cmd .Parameters.Clear();
                     }
                 }
 
-                tx.Commit();
+                tx .Commit();
             }
         }
+// In DatabaseHelperKassen.cs innerhalb der Klasse DatabaseHelperKassen einfügen.
+// Voraussetzung: using System.Data;
 
-        private static byte MapTypStringToCode(string t)
+public async Task<DataTable > GetFuehrerscheinKontrollenAsync() {
+    var dt = new DataTable();
+    await EnsureOpenAsync();
+
+    using (var cmd = _connection.CreateCommand()) {
+        cmd .CommandText = @" SELECT LTRIM(RTRIM( COALESCE(NULLIF(p.Name, ''), '') + CASE WHEN ISNULL(p.Vorname, '') <> '' AND ISNULL(p.Name, '') <> '' THEN ', ' ELSE '' END + COALESCE(NULLIF(p.Vorname, ''), '') )) AS [Name],
+    p.PID AS Personalnummer,
+    MAX(h.EventZeit) AS LetzteKontrolle
+FROM TPersonal p
+INNER JOIN THistoryEvents h
+    ON h.EventPersID = p.PID
+   AND h.EventTyp = 92
+WHERE ISNULL(p.Gesperrt, 0) = 0
+GROUP BY
+    p.PID,
+    p.Name,
+    p.Vorname
+ORDER BY
+    MAX(h.EventZeit) ASC;";
+
+        using (var reader = await cmd.ExecuteReaderAsync())
         {
+            dt.Load(reader);
+        }
+    }
+
+    return dt;
+}
+// In DatabaseHelperKassen.cs innerhalb der Klasse DatabaseHelperKassen einfügen:
+
+public async Task<DataTable > GetPersonalLoginHistoryAsync(int persId) {
+    var dt = new DataTable();
+    if (persId <= 0) return dt;
+    await EnsureOpenAsync();
+
+    using (var cmd = _connection.CreateCommand()) {
+        cmd .CommandText = @" SELECT TOP (50) EventZeit, EventTyp, EventText FROM THistoryEvents WHERE EventPersID = @PersID AND EventTyp IN (91, 92) ORDER BY EventZeit DESC, EventID DESC;
+        "; var p = cmd.CreateParameter();
+        p .ParameterName = "@PersID";
+        p .Value = persId;
+        cmd .Parameters.Add(p);
+
+        using (var reader = await cmd.ExecuteReaderAsync()) {
+            dt .Load(reader);
+        }
+    }
+
+    return dt;
+}
+
+
+        private static byte MapTypStringToCode(string t) {
             if (string.IsNullOrWhiteSpace(t)) return 0;
             t = t.Trim();
             // Neu: numerische Codes direkt erlauben (1..6)
-            if (byte.TryParse(t, out var num) && num >= 1 && num <= 6)
-                return num;
-            switch (t.ToLowerInvariant())
-            {
+            if (byte.TryParse(t, out var num) && num >= 1 && num <= 6) return num;
+
+            switch (t.ToLowerInvariant()) {
                 case "anfangsbestand": return 1;
                 case "einzahlung": return 2;
                 case "auszahlung": return 3;
@@ -1417,19 +1395,35 @@ WHERE Id=@Id; SELECT @Id;";
             }
         }
 
-        public void Dispose()
-        {
-            _connection?.Dispose();
+        public void Dispose() {
+            _connection ?.Dispose();
         }
     }
-
     // DTO für dieses Projekt
-    public class PersonalInfo
-    {
-        public int PID { get; set; }
-        public string Name { get; set; }
-        public string Vorname { get; set; }
-        public string NFCTagUID { get; set; }
-        public string Fahrercode { get; set; }
+    public class PersonalInfo {
+        public int PID {
+            get;
+            set;
+        }
+
+        public string Name {
+            get;
+            set;
+        }
+
+        public string Vorname {
+            get;
+            set;
+        }
+
+        public string NFCTagUID {
+            get;
+            set;
+        }
+
+        public string Fahrercode {
+            get;
+            set;
+        }
     }
 }

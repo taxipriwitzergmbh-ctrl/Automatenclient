@@ -16,6 +16,7 @@ namespace TaMi_Automatenclient
         private DataGridView gvSchichten;
         private DataGridView gvZahlungen;
         private DataGridView gvGuthaben;
+        private DataGridView gvFuehrerschein;
         private readonly string _gridCfgPath = Path.Combine(Environment.GetFolderPath(Environment.SpecialFolder.CommonApplicationData), "SuE-Software", "SuE-TaMi Client SQL", "Automaten-Client.GridLayout.xml");
         private const string _gridCfgApp = "TaMi Automaten-Client";
 
@@ -40,20 +41,25 @@ namespace TaMi_Automatenclient
             var t1 = new TabPage("Offene Schichten");
             var t2 = new TabPage("Offene Zahlungen");
             var t3 = new TabPage("Personalguthaben");
+            var t4 = new TabPage("Führerschein");
 
             gvSchichten = MakeGrid();
             gvZahlungen = MakeGrid();
             gvZahlungen.CellFormatting += GvZahlungen_CellFormatting;
             gvGuthaben = MakeGrid();
             gvGuthaben.CellFormatting += GvGuthaben_CellFormatting;
+            gvFuehrerschein = MakeGrid();
+            gvFuehrerschein.CellFormatting += GvFuehrerschein_CellFormatting;
 
             t1.Controls.Add(gvSchichten);
             t2.Controls.Add(gvZahlungen);
             t3.Controls.Add(gvGuthaben);
+            t4.Controls.Add(gvFuehrerschein);
 
             tabs.TabPages.Add(t1);
             tabs.TabPages.Add(t2);
             tabs.TabPages.Add(t3);
+            tabs.TabPages.Add(t4);
 
             this.Controls.Add(tabs);
 
@@ -103,6 +109,7 @@ namespace TaMi_Automatenclient
             await LoadOpenShiftsAsync();
             await LoadOpenPaymentsAsync();
             await LoadGuthabenAsync();
+            await LoadFuehrerscheinAsync();
         }
 
         private async Task LoadCurrentAsync()
@@ -112,6 +119,7 @@ namespace TaMi_Automatenclient
                 case 0: await LoadOpenShiftsAsync(); break;
                 case 1: await LoadOpenPaymentsAsync(); break;
                 case 2: await LoadGuthabenAsync(); break;
+                case 3: await LoadFuehrerscheinAsync(); break;
             }
         }
 
@@ -177,6 +185,28 @@ namespace TaMi_Automatenclient
             }
             catch { gvGuthaben.DataSource = null; }
         }
+        private async Task LoadFuehrerscheinAsync()
+        {
+            try
+            {
+                using (var db = new DatabaseHelperKassen())
+                {
+                    var dt = await db.GetFuehrerscheinKontrollenAsync();
+                    ConfigureFuehrerscheinGrid();
+                    gvFuehrerschein.DataSource = dt;
+                    LoadGridLayout("Fuehrerschein", gvFuehrerschein);
+
+                    try
+                    {
+                        if (gvFuehrerschein.Columns.Contains("LetzteKontrolle"))
+                            gvFuehrerschein.Columns["LetzteKontrolle"].DefaultCellStyle.Format = "dd.MM.yyyy HH:mm";
+                    }
+                    catch { }
+                }
+            }
+            catch { gvFuehrerschein.DataSource = null; }
+        }
+
 
         // --- Offene Zahlungen: Mapping & Grid ---
         private static string MapTypCodeToText(string code)
@@ -313,6 +343,87 @@ namespace TaMi_Automatenclient
             catch { }
         }
 
+        private void ConfigureFuehrerscheinGrid()
+        {
+            if (gvFuehrerschein == null) return;
+
+            gvFuehrerschein.AutoGenerateColumns = false;
+            gvFuehrerschein.Columns.Clear();
+
+            DataGridViewTextBoxColumn Add(string name, string header, int width = 100, string format = null, bool fill = false)
+            {
+                var col = new DataGridViewTextBoxColumn
+                {
+                    DataPropertyName = name,
+                    HeaderText = header,
+                    Name = name,
+                    AutoSizeMode = fill ? DataGridViewAutoSizeColumnMode.Fill : DataGridViewAutoSizeColumnMode.None,
+                    Width = fill ? 200 : width
+                };
+                if (format != null) col.DefaultCellStyle.Format = format;
+                gvFuehrerschein.Columns.Add(col);
+                return col;
+            }
+
+            Add("Name", "Name", 0, null, true);
+            Add("Personalnummer", "Personalnummer", 120);
+            Add("LetzteKontrolle", "Letzte Kontrolle", 150, "dd.MM.yyyy HH:mm");
+        }
+
+        private void GvFuehrerschein_CellFormatting(object sender, DataGridViewCellFormattingEventArgs e)
+        {
+            try
+            {
+                var gv = sender as DataGridView;
+                if (gv == null || e.RowIndex < 0 || e.ColumnIndex < 0) return;
+
+                var row = gv.Rows[e.RowIndex];
+                DateTime letzteKontrolle;
+                bool hatDatum = false;
+
+                if (row.DataBoundItem is DataRowView drv && drv.Row.Table.Columns.Contains("LetzteKontrolle") && drv.Row["LetzteKontrolle"] != DBNull.Value)
+                {
+                    hatDatum = DateTime.TryParse(Convert.ToString(drv.Row["LetzteKontrolle"]), out letzteKontrolle);
+                }
+                else
+                {
+                    letzteKontrolle = DateTime.MinValue;
+                }
+
+                if (hatDatum)
+                {
+                    var tageAlt = (DateTime.Now.Date - letzteKontrolle.Date).TotalDays;
+
+                    if (tageAlt > 30)
+                        e.CellStyle.ForeColor = Color.Red;
+                    else if (tageAlt > 14)
+                        e.CellStyle.ForeColor = Color.DarkOrange;
+                    else
+                        e.CellStyle.ForeColor = Color.Black;
+                }
+
+                var name = gv.Columns[e.ColumnIndex].DataPropertyName ?? gv.Columns[e.ColumnIndex].Name;
+                if (string.Equals(name, "LetzteKontrolle", StringComparison.OrdinalIgnoreCase))
+                {
+                    if (e.Value == null || e.Value == DBNull.Value)
+                    {
+                        e.Value = "-";
+                        e.FormattingApplied = true;
+                        return;
+                    }
+
+                    DateTime dt;
+                    if (DateTime.TryParse(Convert.ToString(e.Value), out dt))
+                    {
+                        e.Value = dt.ToString("dd.MM.yyyy HH:mm");
+                        e.FormattingApplied = true;
+                        return;
+                    }
+                }
+            }
+            catch { }
+        }
+
         // Formatierung: Beträge mit 2 Nachkommastellen, 0,00 als "-" anzeigen
         private void ApplySchichtenFormatting()
         {
@@ -385,6 +496,7 @@ namespace TaMi_Automatenclient
                 SaveGridLayout("Schichten", gvSchichten);
                 SaveGridLayout("Zahlungen", gvZahlungen);
                 SaveGridLayout("Guthaben", gvGuthaben);
+                SaveGridLayout("Fuehrerschein", gvFuehrerschein);
             }
             catch { }
             base.OnFormClosed(e);

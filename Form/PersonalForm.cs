@@ -52,6 +52,8 @@ namespace TaMi_Automatenclient
 
         // Neue Zahlung UI (links, schmal)
         private GroupBox grpNewPayment;
+        private GroupBox grpLoginHistory;
+        private DataGridView gvLoginHistory;
         private ComboBox cboPreset;      // Vorlagen-Auswahl
         private ComboBox cboNewType;     // Typ: Einzahlung/Auszahlung
         private ComboBox cboNewMwst;
@@ -475,6 +477,60 @@ namespace TaMi_Automatenclient
                 nudNew0 = new NumericUpDown { Visible = false };
                 grpNewPayment.ResumeLayout(false);
                 grpNewPayment.PerformLayout();
+
+                // Login History unter "Neue Zahlung"
+                grpLoginHistory = new GroupBox
+                {
+                    Text = "Login History",
+                    Location = new Point(16, grpNewPayment.Bottom + 12),
+                    Size = new Size(500, 210)
+                };
+                Controls.Add(grpLoginHistory);
+                grpLoginHistory.SuspendLayout();
+
+                gvLoginHistory = new DataGridView
+                {
+                    Location = new Point(10, 24),
+                    Size = new Size(grpLoginHistory.Width - 20, grpLoginHistory.Height - 34),
+                    ReadOnly = true,
+                    AllowUserToAddRows = false,
+                    AllowUserToDeleteRows = false,
+                    AutoGenerateColumns = false,
+                    AutoSizeColumnsMode = DataGridViewAutoSizeColumnsMode.None,
+                    Anchor = AnchorStyles.Top | AnchorStyles.Left | AnchorStyles.Right | AnchorStyles.Bottom,
+                    SelectionMode = DataGridViewSelectionMode.FullRowSelect,
+                    MultiSelect = false,
+                    BackgroundColor = Color.White,
+                    BorderStyle = BorderStyle.FixedSingle
+                };
+                StyleGrid(gvLoginHistory);
+                EnableDgvDoubleBuffer(gvLoginHistory);
+
+                gvLoginHistory.Columns.Add(new DataGridViewTextBoxColumn
+                {
+                    Name = "Automat",
+                    DataPropertyName = "Automat",
+                    HeaderText = "Automat",
+                    Width = 190
+                });
+                gvLoginHistory.Columns.Add(new DataGridViewTextBoxColumn
+                {
+                    Name = "Login",
+                    DataPropertyName = "Login",
+                    HeaderText = "Login",
+                    Width = 145,
+                    DefaultCellStyle = { Format = "dd.MM.yyyy HH:mm" }
+                });
+                gvLoginHistory.Columns.Add(new DataGridViewTextBoxColumn
+                {
+                    Name = "Art",
+                    DataPropertyName = "Art",
+                    HeaderText = "Art",
+                    AutoSizeMode = DataGridViewAutoSizeColumnMode.Fill
+                });
+
+                grpLoginHistory.Controls.Add(gvLoginHistory);
+                grpLoginHistory.ResumeLayout(false);
             }
             catch (Exception)
             {
@@ -804,8 +860,82 @@ namespace TaMi_Automatenclient
                 gvOpenShifts.DataSource = await db.GetOpenShiftsListAsync(_currentPid); ApplyOpenShiftsGridFormatting();
                 
                 await BindOpenPaymentsAsync(db); // neue Ansicht
-                await LoadGuthabenHistoryAsync(); await UpdateSaldoLabelAsync(db); GvOpenPayments_SelectionChanged(null, EventArgs.Empty);
+                await LoadGuthabenHistoryAsync();
+                await LoadLoginHistoryAsync(db);
+                await UpdateSaldoLabelAsync(db);
+                GvOpenPayments_SelectionChanged(null, EventArgs.Empty);
             }
+        }
+
+
+        private async System.Threading.Tasks.Task LoadLoginHistoryAsync(DatabaseHelperKassen db)
+        {
+            try
+            {
+                if (gvLoginHistory == null)
+                    return;
+
+                if (_currentPid <= 0 || db == null)
+                {
+                    gvLoginHistory.DataSource = null;
+                    return;
+                }
+
+                var raw = await db.GetPersonalLoginHistoryAsync(_currentPid);
+                gvLoginHistory.DataSource = BuildLoginHistoryView(raw);
+            }
+            catch
+            {
+                try { if (gvLoginHistory != null) gvLoginHistory.DataSource = null; } catch { }
+            }
+        }
+
+        private DataTable BuildLoginHistoryView(DataTable raw)
+        {
+            var view = new DataTable();
+            view.Columns.Add("Automat", typeof(string));
+            view.Columns.Add("Login", typeof(DateTime));
+            view.Columns.Add("Art", typeof(string));
+
+            if (raw == null)
+                return view;
+
+            foreach (DataRow r in raw.Rows)
+            {
+                DateTime loginZeit;
+                if (!DateTime.TryParse(Convert.ToString(r["EventZeit"]), out loginZeit))
+                    continue;
+
+                int typ = SafeInt(r.Table.Columns.Contains("EventTyp") ? r["EventTyp"] : null);
+                string art = typ == 91 ? "PIN" : (typ == 92 ? "NFC" : Convert.ToString(typ));
+                string eventText = r.Table.Columns.Contains("EventText") ? Convert.ToString(r["EventText"]) : string.Empty;
+                string automat = ExtractAutomatNameFromEventText(eventText);
+
+                view.Rows.Add(automat, loginZeit, art);
+            }
+
+            return view;
+        }
+
+        private static string ExtractAutomatNameFromEventText(string eventText)
+        {
+            if (string.IsNullOrWhiteSpace(eventText))
+                return string.Empty;
+
+            const string markerStart = "Einzahlautomat";
+            const string markerEnd = " mit";
+
+            int start = eventText.IndexOf(markerStart, StringComparison.OrdinalIgnoreCase);
+            if (start < 0)
+                return eventText.Trim();
+
+            start += markerStart.Length;
+
+            int end = eventText.IndexOf(markerEnd, start, StringComparison.OrdinalIgnoreCase);
+            if (end < 0)
+                end = eventText.Length;
+
+            return eventText.Substring(start, end - start).Trim();
         }
 
         private async System.Threading.Tasks.Task UpdateSaldoLabelAsync(DatabaseHelperKassen db)
