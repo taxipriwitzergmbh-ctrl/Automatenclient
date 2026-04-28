@@ -24,6 +24,8 @@ namespace TaMi_Automatenclient
         private ComboBox cboPerson; // Dropdown mit aktiven Mitarbeitern
         private Label lblName;      // Wertanzeige
         private Label lblVorname;   // Wertanzeige
+        private Label lblLastPinLogin; // Wertanzeige
+        private Label lblLastNfcLogin; // Wertanzeige
         private TextBox txtNfc;
         private TextBox txtFahrercode;
         private ModernGradientButton btnSave;
@@ -337,7 +339,7 @@ namespace TaMi_Automatenclient
                 if (grpStammdaten == null)
                     grpStammdaten = new GroupBox { Text = "Stammdaten" };
                 grpStammdaten.Location = new Point(16, grpMitarbeiter.Bottom + 10);
-                grpStammdaten.Size = new Size(500, 250);
+                grpStammdaten.Size = new Size(500, 330);
                 if (!Controls.Contains(grpStammdaten)) Controls.Add(grpStammdaten);
                 grpStammdaten.SuspendLayout();
 
@@ -352,6 +354,18 @@ namespace TaMi_Automatenclient
                 grpStammdaten.Controls.Add(lblVornameCaption);
                 lblVorname = new Label { Text = string.Empty, Location = new Point(fieldX, startY + 6), AutoSize = true };
                 grpStammdaten.Controls.Add(lblVorname);
+
+                startY += rowH;
+                var lblLastPinCaption = new Label { Text = "Letzte PIN:", Location = new Point(12, startY + 6), AutoSize = true, Width = labelW };
+                grpStammdaten.Controls.Add(lblLastPinCaption);
+                lblLastPinLogin = new Label { Text = "-", Location = new Point(fieldX, startY + 6), AutoSize = true };
+                grpStammdaten.Controls.Add(lblLastPinLogin);
+
+                startY += rowH;
+                var lblLastNfcCaption = new Label { Text = "Letzte NFC:", Location = new Point(12, startY + 6), AutoSize = true, Width = labelW };
+                grpStammdaten.Controls.Add(lblLastNfcCaption);
+                lblLastNfcLogin = new Label { Text = "-", Location = new Point(fieldX, startY + 6), AutoSize = true };
+                grpStammdaten.Controls.Add(lblLastNfcLogin);
 
                 startY += rowH;
                 var lblNfc = new Label { Text = "NFC:", Location = new Point(12, startY + 6), AutoSize = true, Width = labelW };
@@ -856,6 +870,7 @@ namespace TaMi_Automatenclient
                 lblVorname.Text = p.Vorname; 
                 txtNfc.Text = p.NFCTagUID ?? string.Empty; 
                 txtFahrercode.Text = p.Fahrercode ?? string.Empty;
+                await LoadLastLoginInfoAsync(db);
                 
                 gvOpenShifts.DataSource = await db.GetOpenShiftsListAsync(_currentPid); ApplyOpenShiftsGridFormatting();
                 
@@ -864,6 +879,66 @@ namespace TaMi_Automatenclient
                 await LoadLoginHistoryAsync(db);
                 await UpdateSaldoLabelAsync(db);
                 GvOpenPayments_SelectionChanged(null, EventArgs.Empty);
+            }
+        }
+
+        private async System.Threading.Tasks.Task LoadLastLoginInfoAsync(DatabaseHelperKassen db)
+        {
+            try
+            {
+                if (lblLastPinLogin == null || lblLastNfcLogin == null)
+                    return;
+
+                lblLastPinLogin.Text = "-";
+                lblLastNfcLogin.Text = "-";
+
+                if (_currentPid <= 0 || db == null)
+                    return;
+
+                var dt = await db.GetLetzteLoginHistoryEventsAsync(_currentPid);
+                if (dt == null)
+                    return;
+
+                foreach (DataRow row in dt.Rows)
+                {
+                    int eventTyp = SafeInt(row.Table.Columns.Contains("EventTyp") ? row["EventTyp"] : null);
+                    string formatted = FormatLoginDateTime(row.Table.Columns.Contains("EventZeit") ? row["EventZeit"] : null);
+
+                    if (eventTyp == 91)
+                        lblLastPinLogin.Text = formatted;
+                    else if (eventTyp == 92)
+                        lblLastNfcLogin.Text = formatted;
+                }
+            }
+            catch
+            {
+                try
+                {
+                    if (lblLastPinLogin != null) lblLastPinLogin.Text = "-";
+                    if (lblLastNfcLogin != null) lblLastNfcLogin.Text = "-";
+                }
+                catch { }
+            }
+        }
+
+        private static string FormatLoginDateTime(object value)
+        {
+            try
+            {
+                if (value == null || value == DBNull.Value)
+                    return "-";
+
+                DateTime dt;
+                if (value is DateTime)
+                    dt = (DateTime)value;
+                else if (!DateTime.TryParse(Convert.ToString(value), out dt))
+                    return "-";
+
+                return dt.ToString("dd.MM.yyyy HH:mm");
+            }
+            catch
+            {
+                return "-";
             }
         }
 
