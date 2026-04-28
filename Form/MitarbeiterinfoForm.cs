@@ -21,6 +21,9 @@ namespace TaMi_Automatenclient
         private ModernGradientButton btnAdd;
         private ModernGradientButton btnArchive;
         private DataGridView gv;
+        private ContextMenuStrip mnuEntry;
+        private ToolStripMenuItem miEditGueltigBis;
+        private ToolStripMenuItem miSetDeleted;
         private CheckBox chkShowArchived;
         private readonly HashSet<string> _expandedGroups = new HashSet<string>(StringComparer.Ordinal);
 
@@ -163,11 +166,29 @@ namespace TaMi_Automatenclient
 
             gv.CellFormatting += Gv_CellFormatting;
             gv.CellClick += Gv_CellClick;
+            gv.CellDoubleClick += Gv_CellDoubleClick;
+            gv.CellMouseDown += Gv_CellMouseDown;
             gv.SelectionChanged += (s, e) => UpdateArchiveButtonState();
+
+            BuildEntryContextMenu();
 
             Controls.Add(gv);
 
             BuildFooter();
+        }
+
+
+        private void BuildEntryContextMenu()
+        {
+            mnuEntry = new ContextMenuStrip();
+
+            miEditGueltigBis = new ToolStripMenuItem("Gültig bis bearbeiten");
+            miEditGueltigBis.Click += async (s, e) => await EditGueltigBisSelectedAsync();
+            mnuEntry.Items.Add(miEditGueltigBis);
+
+            miSetDeleted = new ToolStripMenuItem("Als gelöscht markieren");
+            miSetDeleted.Click += async (s, e) => await SetDeletedSelectedAsync();
+            mnuEntry.Items.Add(miSetDeleted);
         }
 
         private void BuildFooter()
@@ -269,6 +290,7 @@ namespace TaMi_Automatenclient
             view.Columns.Add("GueltigBis", typeof(DateTime));
             view.Columns.Add("IsArchived", typeof(bool));
             view.Columns.Add("IsRead", typeof(bool));
+            view.Columns.Add("Flags", typeof(short));
             view.Columns.Add("IsGroup", typeof(bool));
             view.Columns.Add("GroupKey", typeof(string));
             view.Columns.Add("Text", typeof(string));
@@ -316,6 +338,7 @@ namespace TaMi_Automatenclient
                     var ids = new List<string>();
                     bool groupArchived = true;
                     bool groupRead = true;
+                    short groupFlags = 0;
 
                     foreach (var r in rows)
                     {
@@ -328,6 +351,7 @@ namespace TaMi_Automatenclient
                             if (raw.Columns.Contains("Flags") && r["Flags"] != DBNull.Value)
                             {
                                 short flags = Convert.ToInt16(r["Flags"]);
+                                groupFlags = (short)(groupFlags | flags);
                                 var ff = (NotizFlags)flags;
                                 isArchived = ((ff & NotizFlags.ARCHIVED) == NotizFlags.ARCHIVED);
                                 isRead = ((ff & NotizFlags.READ) == NotizFlags.READ);
@@ -340,7 +364,7 @@ namespace TaMi_Automatenclient
                     }
 
                     bool expanded = _expandedGroups.Contains(g.Key);
-                    view.Rows.Add(expanded ? "▼" : "▶", firstId, string.Join(",", ids), datum, "Alle (" + rows.Count + ")", DBNull.Value, groupArchived, groupRead, true, g.Key, text);
+                    view.Rows.Add(expanded ? "▼" : "▶", firstId, string.Join(",", ids), datum, "Alle (" + rows.Count + ")", DBNull.Value, groupArchived, groupRead, groupFlags, true, g.Key, text);
 
                     if (!expanded) continue;
                 }
@@ -370,12 +394,14 @@ namespace TaMi_Automatenclient
 
                     bool isArchived = false;
                     bool isRead = false;
+                    short rowFlags = 0;
                     try
                     {
                         if (raw.Columns.Contains("Flags") && r["Flags"] != DBNull.Value)
                         {
                             short flags = 0;
                             try { flags = Convert.ToInt16(r["Flags"]); } catch { flags = 0; }
+                            rowFlags = flags;
                             var ff = (NotizFlags)flags;
                             isArchived = ((ff & NotizFlags.ARCHIVED) == NotizFlags.ARCHIVED);
                             isRead = ((ff & NotizFlags.READ) == NotizFlags.READ);
@@ -390,7 +416,7 @@ namespace TaMi_Automatenclient
                         else if (string.IsNullOrEmpty(mitarbeiter)) mitarbeiter = "✓";
                     }
 
-                    view.Rows.Add("", id, id.ToString(), datum, mitarbeiter, (object)gb ?? DBNull.Value, isArchived, isRead, false, g.Key, text);
+                    view.Rows.Add("", id, id.ToString(), datum, mitarbeiter, (object)gb ?? DBNull.Value, isArchived, isRead, rowFlags, false, g.Key, text);
                 }
             }
 
@@ -417,6 +443,238 @@ namespace TaMi_Automatenclient
                 await LoadAsync();
             }
             catch { }
+        }
+
+
+        private async void Gv_CellDoubleClick(object sender, DataGridViewCellEventArgs e)
+        {
+            try
+            {
+                if (e.RowIndex < 0 || e.ColumnIndex < 0) return;
+                if (gv == null) return;
+                if (string.Equals(gv.Columns[e.ColumnIndex].Name, "Expand", StringComparison.OrdinalIgnoreCase)) return;
+                gv.CurrentCell = gv.Rows[e.RowIndex].Cells[e.ColumnIndex];
+                await EditGueltigBisSelectedAsync();
+            }
+            catch { }
+        }
+
+        private void Gv_CellMouseDown(object sender, DataGridViewCellMouseEventArgs e)
+        {
+            try
+            {
+                if (e.Button != MouseButtons.Right || e.RowIndex < 0 || e.ColumnIndex < 0 || gv == null) return;
+                gv.ClearSelection();
+                gv.Rows[e.RowIndex].Selected = true;
+                gv.CurrentCell = gv.Rows[e.RowIndex].Cells[e.ColumnIndex];
+
+                var hasSelection = TryGetSelectedNotizIds().Count > 0;
+                if (miEditGueltigBis != null) miEditGueltigBis.Enabled = hasSelection;
+                if (miSetDeleted != null) miSetDeleted.Enabled = hasSelection;
+                if (mnuEntry != null) mnuEntry.Show(gv, gv.PointToClient(Cursor.Position));
+            }
+            catch { }
+        }
+
+        private List<int> TryGetSelectedNotizIds()
+        {
+            var ids = new List<int>();
+            try
+            {
+                if (gv == null || gv.CurrentRow == null) return ids;
+                var drv = gv.CurrentRow.DataBoundItem as DataRowView;
+                if (drv == null) return ids;
+                var row = drv.Row;
+
+                bool isGroup = false;
+                try { isGroup = row.Table.Columns.Contains("IsGroup") && row["IsGroup"] != DBNull.Value && Convert.ToBoolean(row["IsGroup"]); } catch { isGroup = false; }
+
+                if (isGroup && row.Table.Columns.Contains("NotizIDs"))
+                {
+                    var rawIds = Convert.ToString(row["NotizIDs"]) ?? string.Empty;
+                    foreach (var part in rawIds.Split(new[] { ',' }, StringSplitOptions.RemoveEmptyEntries))
+                    {
+                        int parsed;
+                        if (int.TryParse(part.Trim(), out parsed) && parsed > 0) ids.Add(parsed);
+                    }
+                }
+                else if (row.Table.Columns.Contains("NotizID"))
+                {
+                    int id = 0;
+                    try { if (row["NotizID"] != DBNull.Value) id = Convert.ToInt32(row["NotizID"]); } catch { id = 0; }
+                    if (id > 0) ids.Add(id);
+                }
+            }
+            catch { }
+            return ids;
+        }
+
+        private async Task EditGueltigBisSelectedAsync()
+        {
+            var ids = TryGetSelectedNotizIds();
+            if (ids.Count == 0) return;
+
+            DateTime? current = null;
+            try
+            {
+                var drv = gv.CurrentRow.DataBoundItem as DataRowView;
+                if (drv != null && drv.Row.Table.Columns.Contains("GueltigBis") && drv.Row["GueltigBis"] != DBNull.Value)
+                    current = Convert.ToDateTime(drv.Row["GueltigBis"]).Date;
+            }
+            catch { current = null; }
+
+            DateTime? newDate;
+            if (!ShowGueltigBisDialog(current, ids.Count, out newDate)) return;
+
+            try
+            {
+                using (var db = new DatabaseHelperKassen())
+                {
+                    foreach (var id in ids)
+                        await UpdateNotizGueltigBisAsync(db, id, newDate);
+                }
+                await LoadAsync();
+            }
+            catch (Exception ex)
+            {
+                MessageBox.Show(this, "Fehler beim Bearbeiten von 'Gültig bis':\r\n" + ex.Message, "Fehler", MessageBoxButtons.OK, MessageBoxIcon.Error);
+            }
+        }
+
+        private bool ShowGueltigBisDialog(DateTime? current, int count, out DateTime? value)
+        {
+            value = current;
+            using (var frm = new Form())
+            using (var chkNoDate = new CheckBox())
+            using (var picker = new DateTimePicker())
+            using (var btnOk = new Button())
+            using (var btnCancel = new Button())
+            using (var lbl = new Label())
+            {
+                frm.Text = "Gültig bis bearbeiten";
+                frm.FormBorderStyle = FormBorderStyle.FixedDialog;
+                frm.StartPosition = FormStartPosition.CenterParent;
+                frm.MinimizeBox = false;
+                frm.MaximizeBox = false;
+                frm.ClientSize = new Size(360, 135);
+
+                lbl.Text = count == 1 ? "Neues Gültig-bis-Datum:" : "Neues Gültig-bis-Datum für " + count + " Einträge:";
+                lbl.Left = 12;
+                lbl.Top = 12;
+                lbl.Width = 330;
+                lbl.Height = 22;
+
+                picker.Left = 12;
+                picker.Top = 40;
+                picker.Width = 140;
+                picker.Format = DateTimePickerFormat.Custom;
+                picker.CustomFormat = "dd.MM.yyyy";
+                picker.Value = current.HasValue && current.Value > new DateTime(1900, 1, 1) ? current.Value : DateTime.Today;
+
+                chkNoDate.Text = "Kein Ablaufdatum";
+                chkNoDate.Left = 170;
+                chkNoDate.Top = 42;
+                chkNoDate.AutoSize = true;
+                chkNoDate.Checked = !current.HasValue || current.Value <= new DateTime(1900, 1, 1);
+                chkNoDate.CheckedChanged += (s, e) => { try { picker.Enabled = !chkNoDate.Checked; } catch { } };
+                picker.Enabled = !chkNoDate.Checked;
+
+                btnOk.Text = "OK";
+                btnOk.DialogResult = DialogResult.OK;
+                btnOk.Left = 184;
+                btnOk.Top = 90;
+                btnOk.Width = 75;
+
+                btnCancel.Text = "Abbrechen";
+                btnCancel.DialogResult = DialogResult.Cancel;
+                btnCancel.Left = 270;
+                btnCancel.Top = 90;
+                btnCancel.Width = 75;
+
+                frm.Controls.Add(lbl);
+                frm.Controls.Add(picker);
+                frm.Controls.Add(chkNoDate);
+                frm.Controls.Add(btnOk);
+                frm.Controls.Add(btnCancel);
+                frm.AcceptButton = btnOk;
+                frm.CancelButton = btnCancel;
+
+                if (frm.ShowDialog(this) != DialogResult.OK) return false;
+                value = chkNoDate.Checked ? (DateTime?)null : picker.Value.Date;
+                return true;
+            }
+        }
+
+        private async Task SetDeletedSelectedAsync()
+        {
+            var ids = TryGetSelectedNotizIds();
+            if (ids.Count == 0) return;
+
+            string msg = ids.Count == 1 ? "Eintrag wirklich als gelöscht markieren?" : ids.Count + " Einträge wirklich als gelöscht markieren?";
+            if (MessageBox.Show(this, msg, "Bestätigung", MessageBoxButtons.YesNo, MessageBoxIcon.Warning) != DialogResult.Yes)
+                return;
+
+            try
+            {
+                using (var db = new DatabaseHelperKassen())
+                {
+                    foreach (var id in ids)
+                        await SetNotizDeletedAsync(db, id);
+                }
+                await LoadAsync();
+            }
+            catch (Exception ex)
+            {
+                MessageBox.Show(this, "Fehler beim Löschen-Markieren:\r\n" + ex.Message, "Fehler", MessageBoxButtons.OK, MessageBoxIcon.Error);
+            }
+        }
+
+        private static async Task InvokeDbAsync(object db, string methodName, params object[] args)
+        {
+            var method = db.GetType().GetMethod(methodName, Array.ConvertAll(args, a => a == null ? typeof(DateTime?) : a.GetType()));
+            if (method == null)
+            {
+                foreach (var m in db.GetType().GetMethods())
+                {
+                    if (!string.Equals(m.Name, methodName, StringComparison.Ordinal)) continue;
+                    if (m.GetParameters().Length == args.Length) { method = m; break; }
+                }
+            }
+            if (method == null) throw new MissingMethodException(db.GetType().Name, methodName);
+            var result = method.Invoke(db, args);
+            var task = result as Task;
+            if (task != null) await task;
+        }
+
+        private static async Task UpdateNotizGueltigBisAsync(DatabaseHelperKassen db, int notizId, DateTime? gueltigBis)
+        {
+            string[] methodNames = { "UpdateNotizGueltigBisAsync", "SetNotizGueltigBisAsync", "UpdateNotizGueltigBis", "SetNotizGueltigBis" };
+            foreach (var name in methodNames)
+            {
+                try { await InvokeDbAsync(db, name, notizId, gueltigBis); return; }
+                catch (MissingMethodException) { }
+            }
+            throw new MissingMethodException("DatabaseHelperKassen", "UpdateNotizGueltigBisAsync / SetNotizGueltigBisAsync");
+        }
+
+        private static async Task SetNotizDeletedAsync(DatabaseHelperKassen db, int notizId)
+        {
+            string[] methodNames = { "SetNotizDeletedAsync", "MarkNotizDeletedAsync", "DeleteNotizAsync", "SetNotizDeleted", "MarkNotizDeleted", "DeleteNotiz" };
+            foreach (var name in methodNames)
+            {
+                try { await InvokeDbAsync(db, name, notizId); return; }
+                catch (MissingMethodException) { }
+            }
+
+            short deletedFlag = (short)NotizFlags.DELETED;
+            string[] flagMethodNames = { "SetNotizFlagsAsync", "UpdateNotizFlagsAsync", "SetNotizFlags", "UpdateNotizFlags" };
+            foreach (var name in flagMethodNames)
+            {
+                try { await InvokeDbAsync(db, name, notizId, deletedFlag); return; }
+                catch (MissingMethodException) { }
+            }
+
+            throw new MissingMethodException("DatabaseHelperKassen", "SetNotizDeletedAsync / UpdateNotizFlagsAsync");
         }
 
         private void UpdateArchiveButtonState()
@@ -749,7 +1007,7 @@ namespace TaMi_Automatenclient
             {
                 if (gv == null || gv.Columns == null || gv.Columns.Count == 0) return;
 
-                foreach (var name in new[] { "NotizID", "NotizIDs", "IsArchived", "IsRead", "IsGroup", "GroupKey" })
+                foreach (var name in new[] { "NotizID", "NotizIDs", "IsArchived", "IsRead", "Flags", "IsGroup", "GroupKey" })
                 {
                     if (gv.Columns.Contains(name)) gv.Columns[name].Visible = false;
                 }

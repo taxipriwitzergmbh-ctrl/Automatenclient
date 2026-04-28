@@ -112,234 +112,380 @@ namespace TaMi_Automatenclient {
             await EnsureOpenAsync();
 
             using (var cmd = _connection.CreateCommand()) {
-                cmd .CommandText = $@" SELECT NotizID, Flags, RelTyp, RelID, Datum, Text, ZeitAnlage, UserAnlage, ZeitBearbeitet, UserBearbeitet, GueltigBis FROM { _tblNotizen
-            }
+                cmd .CommandText = $@" SELECT NotizID, Flags, RelTyp, RelID, Datum, Text, ZeitAnlage, UserAnlage, ZeitBearbeitet, UserBearbeitet, GueltigBis FROM {
+                    _tblNotizen
+                }
 
-            WITH (NOLOCK) WHERE RelTyp = @RelTyp AND (@IncludeArchived = 1 OR (ISNULL(Flags,0) & 1) = 0) AND (ISNULL(Flags,0) & 2) = 0 ORDER BY Datum DESC"; cmd.Parameters.AddWithValue("@RelTyp", relTyp); cmd .Parameters.AddWithValue("@IncludeArchived", includeArchived ? 1 : 0);
+                WITH (NOLOCK) WHERE RelTyp = @RelTyp AND (@IncludeArchived = 1 OR (ISNULL(Flags,0) & 1) = 0) AND (ISNULL(Flags,0) & 2) = 0 ORDER BY Datum DESC"; cmd.Parameters.AddWithValue("@RelTyp", relTyp);
+                cmd .Parameters.AddWithValue("@IncludeArchived", includeArchived ? 1 : 0);
 
-            using (var rdr = await cmd.ExecuteReaderAsync()) {
-                var dt = new DataTable();
-                dt .Load(rdr);
-                return dt;
+                using (var rdr = await cmd.ExecuteReaderAsync()) {
+                    var dt = new DataTable();
+                    dt .Load(rdr);
+                    return dt;
+                }
             }
         }
-    }
 
-    public async Task<int > InsertNotizAsync(byte relTyp, string relId, DateTime datum, string text, short flags = 0, DateTime? gueltigBis = null) {
-        await EnsureOpenAsync();
+        public async Task<int > InsertNotizAsync(byte relTyp, string relId, DateTime datum, string text, short flags = 0, DateTime? gueltigBis = null) {
+            await EnsureOpenAsync();
 
-        using (var cmd = _connection.CreateCommand()) {
-            int newId = 1;
+            using (var cmd = _connection.CreateCommand()) {
+                int newId = 1;
 
-            using (var cmdId = _connection.CreateCommand()) {
-                cmdId .CommandText = $@"SELECT ISNULL(MAX(NotizID),0)+1 FROM {_tblNotizen} WITH (UPDLOCK, HOLDLOCK)";
-                var oId = await cmdId.ExecuteScalarAsync();
+                using (var cmdId = _connection.CreateCommand()) {
+                    cmdId .CommandText = $@"SELECT ISNULL(MAX(NotizID),0)+1 FROM {_tblNotizen} WITH (UPDLOCK, HOLDLOCK)";
+                    var oId = await cmdId.ExecuteScalarAsync();
+
+                    try {
+                        newId = (oId == null || oId == DBNull.Value) ? 1 : Convert.ToInt32(oId);
+                    }
+
+                    catch {
+                        newId = 1;
+                    }
+                }
+
+                int userId = -1;
 
                 try {
-                    newId = (oId == null || oId == DBNull.Value) ? 1 : Convert.ToInt32(oId);
+                    if (Program.MainTaMiClient != null) userId = Program.MainTaMiClient.UserId;
                 }
 
                 catch {
-                    newId = 1;
-                }
-            }
-
-            int userId = -1;
-
-            try {
-                if (Program.MainTaMiClient != null) userId = Program.MainTaMiClient.UserId;
-            }
-
-            catch {
-                userId = -1;
-            }
-
-            if (gueltigBis.HasValue) {
-                cmd .CommandText = $@" INSERT INTO {
-                    _tblNotizen
+                    userId = -1;
                 }
 
-                (NotizID, Flags, RelTyp, RelID, Datum, Text, ZeitAnlage, UserAnlage, GueltigBis) VALUES (@NotizID, @Flags, @RelTyp, @RelID, @Datum, @Text, GETDATE(), @UserAnlage, @GueltigBis);
-                SELECT @NotizID;
-                "; cmd.Parameters.AddWithValue("@GueltigBis", gueltigBis.Value.Date);
-            }
+                if (gueltigBis.HasValue) {
+                    cmd .CommandText = $@" INSERT INTO {
+                        _tblNotizen
+                    }
 
-            else {
-                // GueltigBis wird bewusst NICHT gesetzt,
-                // damit bei NOT NULL der Default-Wert der Datenbank greift.
-                cmd .CommandText = $@" INSERT INTO {
-                    _tblNotizen
+                    (NotizID, Flags, RelTyp, RelID, Datum, Text, ZeitAnlage, UserAnlage, GueltigBis) VALUES (@NotizID, @Flags, @RelTyp, @RelID, @Datum, @Text, GETDATE(), @UserAnlage, @GueltigBis);
+                    SELECT @NotizID;
+                    "; cmd.Parameters.AddWithValue("@GueltigBis", gueltigBis.Value.Date);
                 }
 
-                (NotizID, Flags, RelTyp, RelID, Datum, Text, ZeitAnlage, UserAnlage) VALUES (@NotizID, @Flags, @RelTyp, @RelID, @Datum, @Text, GETDATE(), @UserAnlage);
-                SELECT @NotizID;
-                ";
-            }
+                else {
+                    // GueltigBis wird bewusst NICHT gesetzt,
+                    // damit bei NOT NULL der Default-Wert der Datenbank greift.
+                    cmd .CommandText = $@" INSERT INTO {
+                        _tblNotizen
+                    }
 
-            cmd .Parameters.AddWithValue("@NotizID", newId);
-            cmd .Parameters.AddWithValue("@Flags", flags);
-            cmd .Parameters.AddWithValue("@RelTyp", relTyp);
-            cmd .Parameters.AddWithValue("@RelID", (object)relId ?? string.Empty);
-            cmd .Parameters.AddWithValue("@Datum", datum);
-            cmd .Parameters.AddWithValue("@Text", (object)text ?? string.Empty);
-            cmd .Parameters.AddWithValue("@UserAnlage", userId);
-            var o = await cmd.ExecuteScalarAsync();
-            if (o == null || o == DBNull.Value) return 0;
-            return Convert.ToInt32(o);
+                    (NotizID, Flags, RelTyp, RelID, Datum, Text, ZeitAnlage, UserAnlage) VALUES (@NotizID, @Flags, @RelTyp, @RelID, @Datum, @Text, GETDATE(), @UserAnlage);
+                    SELECT @NotizID;
+                    ";
+                }
+
+                cmd .Parameters.AddWithValue("@NotizID", newId);
+                cmd .Parameters.AddWithValue("@Flags", flags);
+                cmd .Parameters.AddWithValue("@RelTyp", relTyp);
+                cmd .Parameters.AddWithValue("@RelID", (object)relId ?? string.Empty);
+                cmd .Parameters.AddWithValue("@Datum", datum);
+                cmd .Parameters.AddWithValue("@Text", (object)text ?? string.Empty);
+                cmd .Parameters.AddWithValue("@UserAnlage", userId);
+                var o = await cmd.ExecuteScalarAsync();
+                if (o == null || o == DBNull.Value) return 0;
+                return Convert.ToInt32(o);
+            }
         }
-    }
 
-public async Task<int > InsertNotizFuerAlleAktiveMitarbeiterAsync(byte relTyp, DateTime datum, string text, short flags = 0) {
-    await EnsureOpenAsync();
+        public async Task<int > InsertNotizFuerAlleAktiveMitarbeiterAsync(byte relTyp, DateTime datum, string text, short flags = 0) {
+            await EnsureOpenAsync();
 
-    using (var tx = _connection.BeginTransaction()) {
-        try {
-            var pids = new List<int>();
+            using (var tx = _connection.BeginTransaction()) {
+                try {
+                    var pids = new List<int>();
 
-            using (var cmdPers = _connection.CreateCommand()) {
-                cmdPers .Transaction = tx;
+                    using (var cmdPers = _connection.CreateCommand()) {
+                        cmdPers .Transaction = tx;
 
-                cmdPers .CommandText = $@" SELECT PID FROM {
-                    _tblPersonal
-                }
+                        cmdPers .CommandText = $@" SELECT PID FROM {
+                            _tblPersonal
+                        }
 
-                WITH (UPDLOCK, HOLDLOCK) WHERE ISNULL(Gesperrt,0) = 0 AND (
+                        WITH (UPDLOCK, HOLDLOCK) WHERE ISNULL(Gesperrt,0) = 0 AND (
         AustrittAm IS NULL
         OR CAST(AustrittAm AS date) = '1899-12-30'
         OR CAST(AustrittAm AS date) >= CAST(GETDATE() AS date)
-)"; using (var rdr = await cmdPers.ExecuteReaderAsync()) { while (await rdr.ReadAsync()) {
-                    if (!rdr.IsDBNull(0)) pids.Add(rdr.GetInt32(0));
+      )"; using (var rdr = await cmdPers.ExecuteReaderAsync()) {
+                            while (await rdr.ReadAsync()) {
+                                if (!rdr.IsDBNull(0)) pids.Add(rdr.GetInt32(0));
+                            }
+                        }
+                    }
+
+                    int nextId = 1;
+
+                    using (var cmdId = _connection.CreateCommand()) {
+                        cmdId .Transaction = tx;
+                        cmdId .CommandText = $@"SELECT ISNULL(MAX(NotizID),0)+1 FROM {_tblNotizen} WITH (UPDLOCK, HOLDLOCK)";
+                        var oId = await cmdId.ExecuteScalarAsync();
+                        nextId = (oId == null || oId == DBNull.Value) ? 1 : Convert.ToInt32(oId);
+                    }
+
+                    int userId = -1;
+
+                    try {
+                        if (Program.MainTaMiClient != null) userId = Program.MainTaMiClient.UserId;
+                    }
+
+                    catch {
+                        userId = -1;
+                    }
+
+                    foreach (var pid in pids) {
+                        using (var cmd = _connection.CreateCommand()) {
+                            cmd .Transaction = tx;
+                            // GueltigBis wird bewusst NICHT gesetzt,
+                            // damit bei NOT NULL der Default-Wert der Datenbank greift.
+                            cmd .CommandText = $@" INSERT INTO {
+                                _tblNotizen
+                            }
+
+                            (NotizID, Flags, RelTyp, RelID, Datum, Text, ZeitAnlage, UserAnlage) VALUES (@NotizID, @Flags, @RelTyp, @RelID, @Datum, @Text, GETDATE(), @UserAnlage);
+                            "; cmd.Parameters.AddWithValue("@NotizID", nextId++);
+                            cmd .Parameters.AddWithValue("@Flags", flags);
+                            cmd .Parameters.AddWithValue("@RelTyp", relTyp);
+                            cmd .Parameters.AddWithValue("@RelID", pid.ToString());
+                            cmd .Parameters.AddWithValue("@Datum", datum);
+                            cmd .Parameters.AddWithValue("@Text", (object)text ?? string.Empty);
+                            cmd .Parameters.AddWithValue("@UserAnlage", userId);
+                            await cmd.ExecuteNonQueryAsync();
+                        }
+                    }
+
+                    tx .Commit();
+                    return pids.Count;
+                }
+
+                catch {
+                    tx .Rollback();
+                    throw;
                 }
             }
         }
 
-        int nextId = 1;
+        public async Task<int > UpdateNotizAsync(int notizId, string text, DateTime? gueltigBis = null) {
+            await EnsureOpenAsync();
 
-        using (var cmdId = _connection.CreateCommand()) {
-            cmdId .Transaction = tx;
-            cmdId .CommandText = $@"SELECT ISNULL(MAX(NotizID),0)+1 FROM {_tblNotizen} WITH (UPDLOCK, HOLDLOCK)";
-            var oId = await cmdId.ExecuteScalarAsync();
-            nextId = (oId == null || oId == DBNull.Value) ? 1 : Convert.ToInt32(oId);
+            using (var cmd = _connection.CreateCommand()) {
+                int userId = -1;
+
+                try {
+                    if (Program.MainTaMiClient != null) userId = Program.MainTaMiClient.UserId;
+                }
+
+                catch {
+                    userId = -1;
+                }
+
+                if (gueltigBis.HasValue) {
+                    cmd .CommandText = $@" UPDATE {
+                        _tblNotizen
+                    }
+
+                    SET Text = @Text, GueltigBis = @GueltigBis, ZeitBearbeitet = GETDATE(), UserBearbeitet = @User WHERE NotizID = @Id"; cmd.Parameters.AddWithValue("@GueltigBis", gueltigBis.Value.Date);
+                }
+
+                else {
+                    // GueltigBis ist NOT NULL. Deshalb wird beim Bearbeiten ohne Datum
+                    // der bekannte Leer-/Standardwert gesetzt.
+                    cmd .CommandText = $@" UPDATE {
+                        _tblNotizen
+                    }
+
+                    SET Text = @Text, GueltigBis = @GueltigBis, ZeitBearbeitet = GETDATE(), UserBearbeitet = @User WHERE NotizID = @Id"; cmd.Parameters.AddWithValue("@GueltigBis", new DateTime(1899, 12, 30));
+                }
+
+                cmd .Parameters.AddWithValue("@Id", notizId);
+                cmd .Parameters.AddWithValue("@Text", (object)text ?? string.Empty);
+                cmd .Parameters.AddWithValue("@User", userId);
+                return await cmd.ExecuteNonQueryAsync();
+            }
         }
 
-        int userId = -1;
+        public async Task<int > UpdateNotizGueltigBisAsync(int notizId, DateTime? gueltigBis) {
+            await EnsureOpenAsync();
 
-        try {
-            if (Program.MainTaMiClient != null) userId = Program.MainTaMiClient.UserId;
+            using (var cmd = _connection.CreateCommand()) {
+                int userId = -1;
+
+                try {
+                    if (Program.MainTaMiClient != null) userId = Program.MainTaMiClient.UserId;
+                }
+
+                catch {
+                    userId = -1;
+                }
+
+                cmd .CommandText = $@" UPDATE {
+                    _tblNotizen
+                }
+
+                SET GueltigBis = @GueltigBis, ZeitBearbeitet = GETDATE(), UserBearbeitet = @User WHERE NotizID = @Id";
+                cmd .Parameters.AddWithValue("@Id", notizId);
+                cmd .Parameters.AddWithValue("@GueltigBis", gueltigBis.HasValue ? (object)gueltigBis.Value.Date : new DateTime(1899, 12, 30));
+                cmd .Parameters.AddWithValue("@User", userId);
+                return await cmd.ExecuteNonQueryAsync();
+            }
         }
 
-        catch {
-            userId = -1;
+        public async Task<int > SetNotizFlagsAsync(int notizId, short flags) {
+            await EnsureOpenAsync();
+
+            using (var cmd = _connection.CreateCommand()) {
+                int userId = -1;
+
+                try {
+                    if (Program.MainTaMiClient != null) userId = Program.MainTaMiClient.UserId;
+                }
+
+                catch {
+                    userId = -1;
+                }
+
+                cmd .CommandText = $@" UPDATE {
+                    _tblNotizen
+                }
+
+                SET Flags = @Flags, ZeitBearbeitet = GETDATE(), UserBearbeitet = @User WHERE NotizID = @Id";
+                cmd .Parameters.AddWithValue("@Id", notizId);
+                cmd .Parameters.AddWithValue("@Flags", flags);
+                cmd .Parameters.AddWithValue("@User", userId);
+                return await cmd.ExecuteNonQueryAsync();
+            }
         }
 
-        foreach (var pid in pids) {
+        public async Task<int > SetNotizDeletedAsync(int notizId) {
+            await EnsureOpenAsync();
+
+            using (var cmd = _connection.CreateCommand()) {
+                int userId = -1;
+
+                try {
+                    if (Program.MainTaMiClient != null) userId = Program.MainTaMiClient.UserId;
+                }
+
+                catch {
+                    userId = -1;
+                }
+
+                cmd .CommandText = $@" UPDATE {
+                    _tblNotizen
+                }
+
+                SET Flags = ISNULL(Flags,0) | 2, ZeitBearbeitet = GETDATE(), UserBearbeitet = @User WHERE NotizID = @Id";
+                cmd .Parameters.AddWithValue("@Id", notizId);
+                cmd .Parameters.AddWithValue("@User", userId);
+                return await cmd.ExecuteNonQueryAsync();
+            }
+        }
+
+        public async Task<int > UpdateNotizenAsync(IEnumerable<int> notizIds, string text, DateTime? gueltigBis = null) {
+            if (notizIds == null) return 0;
+            await EnsureOpenAsync();
+            int count = 0;
+
+            foreach (var id in notizIds) {
+                count += await UpdateNotizAsync(id, text, gueltigBis);
+            }
+
+            return count;
+        }
+
+        public async Task<int > ArchiveNotizAsync(int notizId) {
+            await EnsureOpenAsync();
+
+            using (var cmd = _connection.CreateCommand()) {
+                cmd .CommandText = $@" UPDATE {
+                    _tblNotizen
+                }
+
+                SET Flags = ISNULL(Flags,0) | 1, ZeitBearbeitet = GETDATE(), UserBearbeitet = @User WHERE NotizID = @Id"; cmd.Parameters.AddWithValue("@Id", notizId);
+                int userId = -1;
+
+                try {
+                    if (Program.MainTaMiClient != null) userId = Program.MainTaMiClient.UserId;
+                }
+
+                catch {
+                    userId = -1;
+                }
+
+                cmd .Parameters.AddWithValue("@User", userId);
+                return await cmd.ExecuteNonQueryAsync();
+            }
+        }
+
+        public async Task<int > ArchiveNotizenAsync(IEnumerable<int> notizIds) {
+            if (notizIds == null) return 0;
+            await EnsureOpenAsync();
+            int count = 0;
+
+            foreach (var id in notizIds) {
+                count += await ArchiveNotizAsync(id);
+            }
+
+            return count;
+        }
+
+        private async Task<string > ResolveQualifiedTableAsync(string tableName) {
+            using (var cmd = _connection.CreateCommand()) {
+                cmd .CommandText = @" SELECT QUOTENAME(s.name) + '.' + QUOTENAME(t.name) FROM sys.tables t JOIN sys.schemas s ON s.schema_id = t.schema_id WHERE t.name = @name";
+                cmd .Parameters.AddWithValue("@name", tableName);
+                var o = await cmd.ExecuteScalarAsync();
+                return (o == null || o == DBNull.Value) ? null : Convert.ToString(o);
+            }
+        }
+
+        private static string ExtractTableName(string qualified) {
+            if (string.IsNullOrEmpty(qualified)) return null;
+            // Expect format [schema].[name]
+            int lastOpen = qualified.LastIndexOf('[');
+            int lastClose = qualified.LastIndexOf(']');
+            if (lastOpen >= 0 && lastClose > lastOpen) return qualified.Substring(lastOpen + 1, lastClose - lastOpen - 1);
+            var parts = qualified.Split('.');
+            return parts.Length > 0 ? parts[parts.Length - 1].Trim('[', ']') : qualified;
+        }
+
+        private async Task<HashSet<string > > GetWritableColumnsAsync(SqlTransaction tx) {
             using (var cmd = _connection.CreateCommand()) {
                 cmd .Transaction = tx;
-                // GueltigBis wird bewusst NICHT gesetzt,
-                // damit bei NOT NULL der Default-Wert der Datenbank greift.
-                cmd .CommandText = $@" INSERT INTO { _tblNotizen
-            }
+                cmd .CommandText = $"SELECT TOP 0 * FROM {_tblKassenbuch}";
 
-            (NotizID, Flags, RelTyp, RelID, Datum, Text, ZeitAnlage, UserAnlage) VALUES (@NotizID, @Flags, @RelTyp, @RelID, @Datum, @Text, GETDATE(), @UserAnlage);
-            "; cmd.Parameters.AddWithValue("@NotizID", nextId++); cmd .Parameters.AddWithValue("@Flags", flags);
-            cmd .Parameters.AddWithValue("@RelTyp", relTyp);
-            cmd .Parameters.AddWithValue("@RelID", pid.ToString());
-            cmd .Parameters.AddWithValue("@Datum", datum);
-            cmd .Parameters.AddWithValue("@Text", (object)text ?? string.Empty);
-            cmd .Parameters.AddWithValue("@UserAnlage", userId);
-            await cmd.ExecuteNonQueryAsync();
-        }
-    }
+                using (var rdr = await cmd.ExecuteReaderAsync()) {
+                    var schema = rdr.GetSchemaTable();
+                    var set = new HashSet<string>(StringComparer.OrdinalIgnoreCase);
 
-    tx .Commit();
-    return pids.Count;
-}
-
-        catch {
-            tx .Rollback();
-            throw;
-        }
-    }
-}
-
-    public async Task<int > ArchiveNotizAsync(int notizId) {
-        await EnsureOpenAsync();
-
-        using (var cmd = _connection.CreateCommand()) {
-            cmd .CommandText = $@"UPDATE {_tblNotizen} SET Flags = ISNULL(Flags,0) | 1, ZeitBearbeitet = GETDATE(), UserBearbeitet = @User WHERE NotizID = @Id";
-            cmd .Parameters.AddWithValue("@Id", notizId);
-            int userId = -1;
-
-            try {
-                if (Program.MainTaMiClient != null) userId = Program.MainTaMiClient.UserId;
-            }
-
-            catch {
-                userId = -1;
-            }
-
-            cmd .Parameters.AddWithValue("@User", userId);
-            return await cmd.ExecuteNonQueryAsync();
-        }
-    }
-
-    private async Task<string > ResolveQualifiedTableAsync(string tableName) {
-        using (var cmd = _connection.CreateCommand()) {
-            cmd .CommandText = @" SELECT QUOTENAME(s.name) + '.' + QUOTENAME(t.name) FROM sys.tables t JOIN sys.schemas s ON s.schema_id = t.schema_id WHERE t.name = @name";
-            cmd .Parameters.AddWithValue("@name", tableName);
-            var o = await cmd.ExecuteScalarAsync();
-            return (o == null || o == DBNull.Value) ? null : Convert.ToString(o);
-        }
-    }
-
-    private static string ExtractTableName(string qualified) {
-        if (string.IsNullOrEmpty(qualified)) return null;
-        // Expect format [schema].[name]
-        int lastOpen = qualified.LastIndexOf('[');
-        int lastClose = qualified.LastIndexOf(']');
-        if (lastOpen >= 0 && lastClose > lastOpen) return qualified.Substring(lastOpen + 1, lastClose - lastOpen - 1);
-        var parts = qualified.Split('.');
-        return parts.Length > 0 ? parts[parts.Length - 1].Trim('[', ']') : qualified;
-    }
-
-    private async Task<HashSet<string > > GetWritableColumnsAsync(SqlTransaction tx) {
-        using (var cmd = _connection.CreateCommand()) {
-            cmd .Transaction = tx;
-            cmd .CommandText = $"SELECT TOP 0 * FROM {_tblKassenbuch}";
-
-            using (var rdr = await cmd.ExecuteReaderAsync()) {
-                var schema = rdr.GetSchemaTable();
-                var set = new HashSet<string>(StringComparer.OrdinalIgnoreCase);
-
-                foreach (DataRow r in schema.Rows) {
-                    string name = Convert.ToString(r["ColumnName"]);
-                    bool isReadOnly = r.Table.Columns.Contains("IsReadOnly") && r["IsReadOnly"] is bool bro && bro;
+                    foreach (DataRow r in schema.Rows) {
+                        string name = Convert.ToString(r["ColumnName"]);
+                        bool isReadOnly = r.Table.Columns.Contains("IsReadOnly") && r["IsReadOnly"] is bool bro && bro;
                         bool isHidden = r.Table.Columns.Contains("IsHidden") && r["IsHidden"] is bool bh && bh;
                         bool isRowVersion = r.Table.Columns.Contains("IsRowVersion") && r["IsRowVersion"] is bool brv && brv;
                         if (!isReadOnly && !isHidden && !isRowVersion) set.Add(name);
-                }
+                    }
 
-                set .Remove("BetragGesamt");
-                set .Remove("Betrag");
-                return set;
+                    set .Remove("BetragGesamt");
+                    set .Remove("Betrag");
+                    return set;
+                }
             }
         }
-    }
-    // --- Personal-/Zahlungs-Hilfen ---
-public async Task<DataTable > GetActivePersonalAsync() {
-    await EnsureOpenAsync();
+        // --- Personal-/Zahlungs-Hilfen ---
+        public async Task<DataTable > GetActivePersonalAsync() {
+            await EnsureOpenAsync();
 
-    using (var cmd = _connection.CreateCommand()) {
-        cmd .CommandText = $@" SELECT PID, (Name + ' ' + Vorname) AS Name, Vorname FROM {
-            _tblPersonal
-        }
+            using (var cmd = _connection.CreateCommand()) {
+                cmd .CommandText = $@" SELECT PID, (Name + ' ' + Vorname) AS Name, Vorname FROM { _tblPersonal
+            }
 
-        WITH (NOLOCK) WHERE ISNULL(Gesperrt,0) = 0 AND (
+            WITH (NOLOCK) WHERE ISNULL(Gesperrt,0) = 0 AND (
         AustrittAm IS NULL
         OR CAST(AustrittAm AS date) = '1899-12-30'
         OR CAST(AustrittAm AS date) >= CAST(GETDATE() AS date)
-    ) ORDER BY Name ASC, Vorname ASC"; using (var rdr = await cmd.ExecuteReaderAsync()) {
-            var dt = new DataTable();
+    ) ORDER BY Name ASC, Vorname ASC"; using (var rdr = await cmd.ExecuteReaderAsync()) { var dt = new DataTable();
             dt .Load(rdr);
             return dt;
         }
