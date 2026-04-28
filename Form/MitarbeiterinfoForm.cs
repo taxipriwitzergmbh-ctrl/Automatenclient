@@ -22,6 +22,7 @@ namespace TaMi_Automatenclient
         private ModernGradientButton btnArchive;
         private DataGridView gv;
         private CheckBox chkShowArchived;
+        private readonly HashSet<string> _expandedGroups = new HashSet<string>(StringComparer.Ordinal);
 
         private Panel footerPanel;
 
@@ -74,9 +75,10 @@ namespace TaMi_Automatenclient
             rbEmployee = new RadioButton { Text = "Für Mitarbeiter:", Left = 90, Top = 30, AutoSize = true };
             cboEmployee = new ComboBox { Left = 210, Top = 28, Width = 320, DropDownStyle = ComboBoxStyle.DropDownList, Enabled = false };
 
-            chkGueltigBis = new CheckBox { Text = "Gültig bis:", Left = 550, Top = 30, AutoSize = true };
-            dtpGueltigBis = new DateTimePicker { Left = 635, Top = 27, Width = 180, Format = DateTimePickerFormat.Custom, CustomFormat = "dd.MM.yyyy", Enabled = false };
-            chkGueltigBis.CheckedChanged += (s, e) => { try { dtpGueltigBis.Enabled = chkGueltigBis.Checked; } catch { } };
+            chkGueltigBis = new CheckBox { Text = "Bestätigung erforderlich", Left = 550, Top = 30, AutoSize = true };
+            var lblGueltigBis = new Label { Text = "Gültig bis:", Left = 735, Top = 31, Width = 65, Height = 22 };
+            dtpGueltigBis = new DateTimePicker { Left = 800, Top = 27, Width = 115, Format = DateTimePickerFormat.Custom, CustomFormat = "dd.MM.yyyy", Enabled = true };
+            chkGueltigBis.CheckedChanged += (s, e) => { try { dtpGueltigBis.Enabled = !chkGueltigBis.Checked; } catch { } };
 
             rbAll.CheckedChanged += (s, e) => { try { cboEmployee.Enabled = rbEmployee.Checked; } catch { } };
             rbEmployee.CheckedChanged += (s, e) => { try { cboEmployee.Enabled = rbEmployee.Checked; } catch { } };
@@ -111,6 +113,7 @@ namespace TaMi_Automatenclient
             pnlNew.Controls.Add(rbEmployee);
             pnlNew.Controls.Add(cboEmployee);
             pnlNew.Controls.Add(chkGueltigBis);
+            pnlNew.Controls.Add(lblGueltigBis);
             pnlNew.Controls.Add(dtpGueltigBis);
             pnlNew.Controls.Add(txtInfo);
             pnlNew.Controls.Add(btnAdd);
@@ -152,12 +155,14 @@ namespace TaMi_Automatenclient
             gv.AlternatingRowsDefaultCellStyle.SelectionForeColor = Color.White;
             gv.GridColor = Color.FromArgb(220, 225, 230);
 
+            AddCol("Expand", "", 32);
             AddCol("Datum", "Datum", 130);
             AddCol("Mitarbeiter", "Mitarbeiter", 200);
             AddCol("GueltigBis", "Gültig bis", 110);
             AddCol("Text", "Text", 0, true);
 
             gv.CellFormatting += Gv_CellFormatting;
+            gv.CellClick += Gv_CellClick;
             gv.SelectionChanged += (s, e) => UpdateArchiveButtonState();
 
             Controls.Add(gv);
@@ -256,64 +261,162 @@ namespace TaMi_Automatenclient
         private DataTable BuildView(DataTable raw)
         {
             var view = new DataTable();
+            view.Columns.Add("Expand", typeof(string));
             view.Columns.Add("NotizID", typeof(int));
+            view.Columns.Add("NotizIDs", typeof(string));
             view.Columns.Add("Datum", typeof(DateTime));
             view.Columns.Add("Mitarbeiter", typeof(string));
             view.Columns.Add("GueltigBis", typeof(DateTime));
             view.Columns.Add("IsArchived", typeof(bool));
             view.Columns.Add("IsRead", typeof(bool));
+            view.Columns.Add("IsGroup", typeof(bool));
+            view.Columns.Add("GroupKey", typeof(string));
             view.Columns.Add("Text", typeof(string));
 
             if (raw == null) return view;
 
+            var groups = new Dictionary<string, List<DataRow>>(StringComparer.Ordinal);
+
             foreach (DataRow r in raw.Rows)
             {
-                int id = 0;
-                try { if (raw.Columns.Contains("NotizID") && r["NotizID"] != DBNull.Value) id = Convert.ToInt32(r["NotizID"]); } catch { id = 0; }
-                DateTime datum = DateTime.MinValue;
-                try { if (raw.Columns.Contains("Datum") && r["Datum"] != DBNull.Value) datum = Convert.ToDateTime(r["Datum"]); } catch { datum = DateTime.MinValue; }
-                string relId = string.Empty;
-                try { if (raw.Columns.Contains("RelID") && r["RelID"] != DBNull.Value) relId = Convert.ToString(r["RelID"]) ?? string.Empty; } catch { relId = string.Empty; }
                 string text = string.Empty;
                 try { if (raw.Columns.Contains("Text") && r["Text"] != DBNull.Value) text = Convert.ToString(r["Text"]) ?? string.Empty; } catch { text = string.Empty; }
 
-                DateTime? gb = null;
-                try
-                {
-                    if (raw.Columns.Contains("GueltigBis") && r["GueltigBis"] != DBNull.Value)
-                    {
-                        var d = Convert.ToDateTime(r["GueltigBis"]);
-                        if (d.Date > new DateTime(1900, 1, 1)) gb = d;
-                    }
-                }
-                catch { gb = null; }
+                string key = text.Trim();
+                if (string.IsNullOrEmpty(key)) key = "__EMPTY__";
 
-                bool isArchived = false;
-                bool isRead = false;
-                try
-                {
-                    if (raw.Columns.Contains("Flags") && r["Flags"] != DBNull.Value)
-                    {
-                        short flags = 0;
-                        try { flags = Convert.ToInt16(r["Flags"]); } catch { flags = 0; }
-                        var ff = (NotizFlags)flags;
-                        isArchived = ((ff & NotizFlags.ARCHIVED) == NotizFlags.ARCHIVED);
-                        isRead = ((ff & NotizFlags.READ) == NotizFlags.READ);
-                    }
-                }
-                catch { isArchived = false; isRead = false; }
-
-                string mitarbeiter = ResolveRelIdToName(relId);
-                if (isRead)
-                {
-                    if (!string.IsNullOrEmpty(mitarbeiter) && !mitarbeiter.StartsWith("✓ ", StringComparison.Ordinal))
-                        mitarbeiter = "✓ " + mitarbeiter;
-                    else if (string.IsNullOrEmpty(mitarbeiter))
-                        mitarbeiter = "✓";
-                }
-                view.Rows.Add(id, datum, mitarbeiter, (object)gb ?? DBNull.Value, isArchived, isRead, text);
+                if (!groups.ContainsKey(key)) groups[key] = new List<DataRow>();
+                groups[key].Add(r);
             }
+
+            foreach (var g in groups)
+            {
+                var rows = g.Value;
+                rows.Sort((a, b) =>
+                {
+                    DateTime da = DateTime.MinValue;
+                    DateTime db = DateTime.MinValue;
+                    try { if (raw.Columns.Contains("Datum") && a["Datum"] != DBNull.Value) da = Convert.ToDateTime(a["Datum"]); } catch { }
+                    try { if (raw.Columns.Contains("Datum") && b["Datum"] != DBNull.Value) db = Convert.ToDateTime(b["Datum"]); } catch { }
+                    return db.CompareTo(da);
+                });
+
+                bool makeGroup = rows.Count > 1;
+                if (makeGroup)
+                {
+                    var first = rows[0];
+                    int firstId = 0;
+                    DateTime datum = DateTime.MinValue;
+                    string text = string.Empty;
+
+                    try { if (raw.Columns.Contains("NotizID") && first["NotizID"] != DBNull.Value) firstId = Convert.ToInt32(first["NotizID"]); } catch { }
+                    try { if (raw.Columns.Contains("Datum") && first["Datum"] != DBNull.Value) datum = Convert.ToDateTime(first["Datum"]); } catch { }
+                    try { if (raw.Columns.Contains("Text") && first["Text"] != DBNull.Value) text = Convert.ToString(first["Text"]) ?? string.Empty; } catch { }
+
+                    var ids = new List<string>();
+                    bool groupArchived = true;
+                    bool groupRead = true;
+
+                    foreach (var r in rows)
+                    {
+                        try { if (raw.Columns.Contains("NotizID") && r["NotizID"] != DBNull.Value) ids.Add(Convert.ToString(r["NotizID"])); } catch { }
+
+                        bool isArchived = false;
+                        bool isRead = false;
+                        try
+                        {
+                            if (raw.Columns.Contains("Flags") && r["Flags"] != DBNull.Value)
+                            {
+                                short flags = Convert.ToInt16(r["Flags"]);
+                                var ff = (NotizFlags)flags;
+                                isArchived = ((ff & NotizFlags.ARCHIVED) == NotizFlags.ARCHIVED);
+                                isRead = ((ff & NotizFlags.READ) == NotizFlags.READ);
+                            }
+                        }
+                        catch { }
+
+                        groupArchived = groupArchived && isArchived;
+                        groupRead = groupRead && isRead;
+                    }
+
+                    bool expanded = _expandedGroups.Contains(g.Key);
+                    view.Rows.Add(expanded ? "▼" : "▶", firstId, string.Join(",", ids), datum, "Alle (" + rows.Count + ")", DBNull.Value, groupArchived, groupRead, true, g.Key, text);
+
+                    if (!expanded) continue;
+                }
+
+                foreach (var r in rows)
+                {
+                    int id = 0;
+                    DateTime datum = DateTime.MinValue;
+                    string relId = string.Empty;
+                    string text = string.Empty;
+
+                    try { if (raw.Columns.Contains("NotizID") && r["NotizID"] != DBNull.Value) id = Convert.ToInt32(r["NotizID"]); } catch { id = 0; }
+                    try { if (raw.Columns.Contains("Datum") && r["Datum"] != DBNull.Value) datum = Convert.ToDateTime(r["Datum"]); } catch { datum = DateTime.MinValue; }
+                    try { if (raw.Columns.Contains("RelID") && r["RelID"] != DBNull.Value) relId = Convert.ToString(r["RelID"]) ?? string.Empty; } catch { relId = string.Empty; }
+                    try { if (raw.Columns.Contains("Text") && r["Text"] != DBNull.Value) text = Convert.ToString(r["Text"]) ?? string.Empty; } catch { text = string.Empty; }
+
+                    DateTime? gb = null;
+                    try
+                    {
+                        if (raw.Columns.Contains("GueltigBis") && r["GueltigBis"] != DBNull.Value)
+                        {
+                            var d = Convert.ToDateTime(r["GueltigBis"]);
+                            if (d.Date > new DateTime(1900, 1, 1)) gb = d;
+                        }
+                    }
+                    catch { gb = null; }
+
+                    bool isArchived = false;
+                    bool isRead = false;
+                    try
+                    {
+                        if (raw.Columns.Contains("Flags") && r["Flags"] != DBNull.Value)
+                        {
+                            short flags = 0;
+                            try { flags = Convert.ToInt16(r["Flags"]); } catch { flags = 0; }
+                            var ff = (NotizFlags)flags;
+                            isArchived = ((ff & NotizFlags.ARCHIVED) == NotizFlags.ARCHIVED);
+                            isRead = ((ff & NotizFlags.READ) == NotizFlags.READ);
+                        }
+                    }
+                    catch { isArchived = false; isRead = false; }
+
+                    string mitarbeiter = ResolveRelIdToName(relId);
+                    if (isRead)
+                    {
+                        if (!string.IsNullOrEmpty(mitarbeiter) && !mitarbeiter.StartsWith("✓ ", StringComparison.Ordinal)) mitarbeiter = "✓ " + mitarbeiter;
+                        else if (string.IsNullOrEmpty(mitarbeiter)) mitarbeiter = "✓";
+                    }
+
+                    view.Rows.Add("", id, id.ToString(), datum, mitarbeiter, (object)gb ?? DBNull.Value, isArchived, isRead, false, g.Key, text);
+                }
+            }
+
             return view;
+        }
+
+        private async void Gv_CellClick(object sender, DataGridViewCellEventArgs e)
+        {
+            try
+            {
+                if (e.RowIndex < 0 || e.ColumnIndex < 0) return;
+                if (gv == null || !string.Equals(gv.Columns[e.ColumnIndex].Name, "Expand", StringComparison.OrdinalIgnoreCase)) return;
+
+                var drv = gv.Rows[e.RowIndex].DataBoundItem as DataRowView;
+                if (drv == null) return;
+
+                bool isGroup = drv.Row.Table.Columns.Contains("IsGroup") && drv.Row["IsGroup"] != DBNull.Value && Convert.ToBoolean(drv.Row["IsGroup"]);
+                if (!isGroup) return;
+
+                string key = Convert.ToString(drv.Row["GroupKey"]) ?? string.Empty;
+                if (_expandedGroups.Contains(key)) _expandedGroups.Remove(key);
+                else _expandedGroups.Add(key);
+
+                await LoadAsync();
+            }
+            catch { }
         }
 
         private void UpdateArchiveButtonState()
@@ -384,28 +487,58 @@ namespace TaMi_Automatenclient
                     return;
                 }
 
-                string relId;
-                if (rbEmployee != null && rbEmployee.Checked)
-                {
-                    int pid = 0;
-                    try { if (cboEmployee != null && cboEmployee.SelectedValue != null) pid = Convert.ToInt32(cboEmployee.SelectedValue); } catch { pid = 0; }
-                    if (pid <= 0)
-                    {
-                        MessageBox.Show(this, "Bitte Mitarbeiter auswählen.", "Hinweis", MessageBoxButtons.OK, MessageBoxIcon.Information);
-                        return;
-                    }
-                    relId = pid.ToString();
-                }
-                else
-                {
-                    relId = "-1";
-                }
+                bool bestaetigungErforderlich = chkGueltigBis != null && chkGueltigBis.Checked;
 
                 using (var db = new DatabaseHelperKassen())
                 {
                     DateTime? gb = null;
-                    try { if (chkGueltigBis != null && chkGueltigBis.Checked) gb = dtpGueltigBis.Value.Date; } catch { gb = null; }
-                    await db.InsertNotizAsync(RelTypMitarbeiterinfo, relId, DateTime.Now, text, 0, gb);
+                    if (!bestaetigungErforderlich)
+                    {
+                        try { gb = dtpGueltigBis.Value.Date; } catch { gb = null; }
+                    }
+
+                    if (rbAll != null && rbAll.Checked && bestaetigungErforderlich)
+                    {
+                        int anzahl = 0;
+                        try
+                        {
+                            var personal = await db.GetActivePersonalAsync();
+                            anzahl = personal == null ? 0 : personal.Rows.Count;
+                        }
+                        catch { anzahl = 0; }
+
+                        var confirm = MessageBox.Show(
+                            this,
+                            "Wollen Sie wirklich für alle Mitarbeiter (" + anzahl + " Mitarbeiter) einen Eintrag erstellen?\r\n\r\nAchtung: Dies erzeugt große Datenmengen in der Datenbank.",
+                            "Bestätigung",
+                            MessageBoxButtons.YesNo,
+                            MessageBoxIcon.Warning);
+
+                        if (confirm != DialogResult.Yes) return;
+
+                        await db.InsertNotizFuerAlleAktiveMitarbeiterAsync(RelTypMitarbeiterinfo, DateTime.Now, text, 0);
+                    }
+                    else
+                    {
+                        string relId;
+                        if (rbEmployee != null && rbEmployee.Checked)
+                        {
+                            int pid = 0;
+                            try { if (cboEmployee != null && cboEmployee.SelectedValue != null) pid = Convert.ToInt32(cboEmployee.SelectedValue); } catch { pid = 0; }
+                            if (pid <= 0)
+                            {
+                                MessageBox.Show(this, "Bitte Mitarbeiter auswählen.", "Hinweis", MessageBoxButtons.OK, MessageBoxIcon.Information);
+                                return;
+                            }
+                            relId = pid.ToString();
+                        }
+                        else
+                        {
+                            relId = "-1";
+                        }
+
+                        await db.InsertNotizAsync(RelTypMitarbeiterinfo, relId, DateTime.Now, text, 0, gb);
+                    }
                 }
 
                 try { txtInfo.Clear(); } catch { }
@@ -487,6 +620,13 @@ namespace TaMi_Automatenclient
                 var col = grid.Columns[e.ColumnIndex];
                 var name = col.DataPropertyName ?? col.Name;
 
+                try
+                {
+                    if (grid.Rows[e.RowIndex].DataBoundItem is DataRowView drvStyle && drvStyle.Row.Table.Columns.Contains("IsGroup") && drvStyle.Row["IsGroup"] != DBNull.Value && Convert.ToBoolean(drvStyle.Row["IsGroup"]))
+                        grid.Rows[e.RowIndex].DefaultCellStyle.Font = new Font(grid.DefaultCellStyle.Font, FontStyle.Bold);
+                }
+                catch { }
+
                 if (string.Equals(name, "Datum", StringComparison.OrdinalIgnoreCase))
                 {
                     if (e.Value == null || e.Value == DBNull.Value) { e.Value = string.Empty; e.FormattingApplied = true; return; }
@@ -539,17 +679,38 @@ namespace TaMi_Automatenclient
                 var drv = gv.CurrentRow.DataBoundItem as DataRowView;
                 if (drv == null) return;
                 var row = drv.Row;
-                if (!row.Table.Columns.Contains("NotizID")) return;
-                int id = 0;
-                try { if (row["NotizID"] != DBNull.Value) id = Convert.ToInt32(row["NotizID"]); } catch { id = 0; }
-                if (id <= 0) return;
 
-                if (MessageBox.Show(this, "Nachricht wirklich archivieren?", "Bestätigung", MessageBoxButtons.YesNo, MessageBoxIcon.Question) != DialogResult.Yes)
+                var ids = new List<int>();
+                bool isGroup = false;
+                try { isGroup = row.Table.Columns.Contains("IsGroup") && row["IsGroup"] != DBNull.Value && Convert.ToBoolean(row["IsGroup"]); } catch { isGroup = false; }
+
+                if (isGroup && row.Table.Columns.Contains("NotizIDs"))
+                {
+                    var rawIds = Convert.ToString(row["NotizIDs"]) ?? string.Empty;
+                    foreach (var part in rawIds.Split(new[] { ',' }, StringSplitOptions.RemoveEmptyEntries))
+                    {
+                        int parsed;
+                        if (int.TryParse(part.Trim(), out parsed) && parsed > 0) ids.Add(parsed);
+                    }
+                }
+                else
+                {
+                    if (!row.Table.Columns.Contains("NotizID")) return;
+                    int id = 0;
+                    try { if (row["NotizID"] != DBNull.Value) id = Convert.ToInt32(row["NotizID"]); } catch { id = 0; }
+                    if (id > 0) ids.Add(id);
+                }
+
+                if (ids.Count == 0) return;
+
+                string msg = ids.Count == 1 ? "Nachricht wirklich archivieren?" : "Gruppe mit " + ids.Count + " Nachrichten wirklich archivieren?";
+                if (MessageBox.Show(this, msg, "Bestätigung", MessageBoxButtons.YesNo, MessageBoxIcon.Question) != DialogResult.Yes)
                     return;
 
                 using (var db = new DatabaseHelperKassen())
                 {
-                    await db.ArchiveNotizAsync(id);
+                    foreach (var id in ids)
+                        await db.ArchiveNotizAsync(id);
                 }
                 await LoadAsync();
             }
@@ -587,6 +748,19 @@ namespace TaMi_Automatenclient
             try
             {
                 if (gv == null || gv.Columns == null || gv.Columns.Count == 0) return;
+
+                foreach (var name in new[] { "NotizID", "NotizIDs", "IsArchived", "IsRead", "IsGroup", "GroupKey" })
+                {
+                    if (gv.Columns.Contains(name)) gv.Columns[name].Visible = false;
+                }
+
+                if (gv.Columns.Contains("Expand"))
+                {
+                    gv.Columns["Expand"].Width = 32;
+                    gv.Columns["Expand"].DefaultCellStyle.Alignment = DataGridViewContentAlignment.MiddleCenter;
+                    gv.Columns["Expand"].Resizable = DataGridViewTriState.False;
+                }
+
                 var ini = GetIniPath();
                 if (!File.Exists(ini)) return;
                 var key = GetIniKey();
